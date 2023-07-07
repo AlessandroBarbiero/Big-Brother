@@ -4,6 +4,7 @@ from launch.actions import ExecuteProcess
 from launch.actions import DeclareLaunchArgument
 
 import sys
+
 # set launch arguments
 bag_name = 'static_sensors_only'
 for arg in sys.argv:
