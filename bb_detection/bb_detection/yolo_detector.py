@@ -12,34 +12,50 @@ import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
 
+from rcl_interfaces.msg import SetParametersResult
+
 class YoloDetector(Node):
 
     def __init__(self):
         super().__init__('yolo_detector')
-        self._pub = self.create_publisher(Detection2DArray, 'topic', 10)
 
-        # Create the subscriber. This subscriber will receive an Image
-        # from the to_detect topic. The queue size is 10 messages.
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('show_debug', True),
+                ('confidence_threshold', 0.5)
+            ]
+        )
+        self.add_on_set_parameters_callback(self.parameter_callback)
+
+        self._pub = self.create_publisher(Detection2DArray, 'topic', 10)
         self._sub = self.create_subscription(Image, 'to_detect', self.listener_callback, 10)
         self._sub # prevent unused variable warning
 
         # Load a pretrained YOLO model
         self.yolo = YOLO('yolov8m.pt')
-        # self.yolo.fuse()
         self.yolo.to("cuda:0")
         self._class_to_color = {}
 
         self.br = CvBridge()
-        self.threshold = 0.5
 
+    def parameter_callback(self, params):
+        for param in params:
+            if param.name == 'show_debug' and param.value == False:
+                cv2.destroyAllWindows()
+        return SetParametersResult(successful=True)
+    
     def listener_callback(self, data: Image):
         """
-        Callback function, it is called everytime an image is published on the given topic.
+        Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes,
+        It can also show the debug image if the parameter is set
         """
+
+        # Display the message on the console
+        self.get_logger().info("Received image")
     
         # Convert ROS Image message to OpenCV image
         cv_image = self.br.imgmsg_to_cv2(data)
-
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
 
         # Perform object detection on an image using the model
@@ -47,7 +63,7 @@ class YoloDetector(Node):
                 source=cv_image,
                 verbose=False,
                 stream=False,
-                conf=self.threshold,
+                conf=float(self.get_parameter('confidence_threshold').value),
             )
         results: Results = results[0].cpu()
 
@@ -82,41 +98,41 @@ class YoloDetector(Node):
             hypothesis.score = score
             detection.results.append(hypothesis)
 
-            # draw boxes for debug
-            if label not in self._class_to_color:
-                r = random.randint(0, 255)
-                g = random.randint(0, 255)
-                box_data = random.randint(0, 255)
-                self._class_to_color[label] = (r, g, box_data)
-            color = self._class_to_color[label]
+            if(self.get_parameter('show_debug').value):
+                # draw boxes for debug
+                if label not in self._class_to_color:
+                    r = random.randint(0, 255)
+                    g = random.randint(0, 255)
+                    box_data = random.randint(0, 255)
+                    self._class_to_color[label] = (r, g, box_data)
+                color = self._class_to_color[label]
 
-            min_pt = (round(detection.bbox.center.x - detection.bbox.size_x / 2.0),
-                        round(detection.bbox.center.y - detection.bbox.size_y / 2.0))
-            max_pt = (round(detection.bbox.center.x + detection.bbox.size_x / 2.0),
-                        round(detection.bbox.center.y + detection.bbox.size_y / 2.0))
-            cv2.rectangle(cv_image, min_pt, max_pt, color, 2)
+                min_pt = (round(detection.bbox.center.x - detection.bbox.size_x / 2.0),
+                            round(detection.bbox.center.y - detection.bbox.size_y / 2.0))
+                max_pt = (round(detection.bbox.center.x + detection.bbox.size_x / 2.0),
+                            round(detection.bbox.center.y + detection.bbox.size_y / 2.0))
+                cv2.rectangle(cv_image, min_pt, max_pt, color, 2)
 
-            label = "{} ({}) ({:.3f})".format(label, str(track_id), score)
-            pos = (min_pt[0] + 5, min_pt[1] + 25)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(cv_image, label, pos, font,
-                        1, color, 1, cv2.LINE_AA)
+            
+                label = "{} ({}) ({:.3f})".format(label, str(track_id), score)
+                pos = (min_pt[0] + 5, min_pt[1] + 25)
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(cv_image, label, pos, font,
+                            1, color, 1, cv2.LINE_AA)
 
             # append msg
             detections_msg.detections.append(detection)
 
-        # publish detections and dbg image
+        # publish detections
         self._pub.publish(detections_msg)
+
+        if(self.get_parameter('show_debug').value):
+            # Display image
+            cv2.imshow("Detection", cv_image)
+            cv2.waitKey(1)
+        # Publish debug image to a topic
         # self._dbg_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv_image, encoding=data.encoding))
-
-        # Display the message on the console
-        self.get_logger().info("Received image")
-
-        # Display image
-        cv2.imshow("Detection", cv_image)
         
-        cv2.waitKey(1)
-
 
 def main(args=None):
     rclpy.init(args=args)
