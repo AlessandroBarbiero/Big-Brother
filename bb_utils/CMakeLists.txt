@@ -17,6 +17,7 @@ find_package(std_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(bb_interfaces REQUIRED) 
 find_package(message_filters REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
 
 # Add to run launch files
 install(DIRECTORY
@@ -100,6 +101,14 @@ ament_target_dependencies(bb_listener
   )
 # ---------------
 
+#--------------- BAG CONVERTER
+add_executable(rewrite_bag_timestamps src/rewrite_bag_timestamps.cpp)
+ament_target_dependencies(rewrite_bag_timestamps 
+  rosbag2_cpp 
+  rclcpp
+  )
+# ------------------
+
 # target_include_directories(bb_node PUBLIC
 #   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 #   $<INSTALL_INTERFACE:include>)
@@ -109,6 +118,7 @@ install(TARGETS
   bb_visualizer
   bb_talker
   bb_listener
+  rewrite_bag_timestamps
   DESTINATION lib/${PROJECT_NAME})
 
 
