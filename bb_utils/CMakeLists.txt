@@ -18,6 +18,11 @@ find_package(vision_msgs REQUIRED)
 find_package(bb_interfaces REQUIRED) 
 find_package(message_filters REQUIRED)
 
+# Add to run launch files
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # %%%%%%%%%%%%%%%%%%%%%%% TO USE IMGUI
 
