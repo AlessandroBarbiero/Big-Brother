@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
 from launch.actions import DeclareLaunchArgument
 
-import sys
+import sys, os
 
 # set launch arguments
 bag_name = 'static_sensors_only'
@@ -12,7 +12,7 @@ for arg in sys.argv:
         bag_name = str(arg.split(":=")[1])
 
 def generate_launch_description():
-    bag_folder_path = '/home/airlab/bag_files/'
+    bag_folder = os.getenv('BAG_DIR') # set environmental variable BAG_DIR to the current directory where you save the bag files
 
     yolo_node = Node(
     package="bb_detection",
@@ -33,7 +33,7 @@ def generate_launch_description():
     )
 
     bag_process = ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', bag_folder_path + bag_name],
+            cmd=['ros2', 'bag', 'play', bag_folder + bag_name],
             # output='screen'
         )
 
