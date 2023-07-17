@@ -15,6 +15,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(bb_interfaces REQUIRED) 
 find_package(message_filters REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
@@ -106,6 +107,7 @@ add_executable(rewrite_bag_timestamps src/rewrite_bag_timestamps.cpp)
 ament_target_dependencies(rewrite_bag_timestamps 
   rosbag2_cpp 
   rclcpp
+  sensor_msgs
   )
 # ------------------
 
