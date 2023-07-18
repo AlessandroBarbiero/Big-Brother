@@ -28,7 +28,7 @@ class YoloDetector(Node):
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
 
-        self._pub = self.create_publisher(Detection2DArray, 'topic', 10)
+        self._pub = self.create_publisher(Detection2DArray, 'detected', 10)
         self._sub = self.create_subscription(Image, 'to_detect', self.listener_callback, 10)
         self._sub # prevent unused variable warning
 
@@ -38,6 +38,7 @@ class YoloDetector(Node):
         self._class_to_color = {}
 
         self.br = CvBridge()
+        self.no_image_detected_yet = True
 
     def parameter_callback(self, params):
         for param in params:
@@ -51,8 +52,10 @@ class YoloDetector(Node):
         It can also show the debug image if the parameter is set
         """
 
-        # Display the message on the console
-        self.get_logger().info("Received image")
+        # Display the message on the console if it is the first time
+        if self.no_image_detected_yet:
+            self.get_logger().info("Started detecting images")
+            self.no_image_detected_yet = False
     
         # Convert ROS Image message to OpenCV image
         cv_image = self.br.imgmsg_to_cv2(data)
