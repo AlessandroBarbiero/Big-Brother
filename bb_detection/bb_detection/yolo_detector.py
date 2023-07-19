@@ -1,13 +1,20 @@
 # ROS
+import math
 import rclpy
 from rclpy.node import Node
 from message_filters import TimeSynchronizer, Subscriber
 from rcl_interfaces.msg import SetParametersResult
+from image_geometry import PinholeCameraModel
+from tf2_ros import TransformException
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros.buffer import Buffer
 # ROS messages
 from sensor_msgs.msg import Image
-from vision_msgs.msg import Detection2D
+from sensor_msgs.msg import CameraInfo
+from vision_msgs.msg import Detection3D
 from vision_msgs.msg import ObjectHypothesisWithPose
-from vision_msgs.msg import Detection2DArray
+from vision_msgs.msg import Detection3DArray
+from geometry_msgs.msg import TransformStamped
 # Other
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
@@ -15,6 +22,26 @@ import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
 
+DEFAULT_FRAME = 'sensors_home'
+
+def find_3d_point_on_line(line_vector, z_value):
+    '''
+    Compute the position in the 3D world of a point along a line described by the line_vector 3d (x,y,z) passed
+    '''
+    # Normalize the line vector
+    magnitude = math.sqrt(line_vector[0] ** 2 + line_vector[1] ** 2 + line_vector[2] ** 2)
+    x_unit = line_vector[0] / magnitude
+    y_unit = line_vector[1] / magnitude
+    z_unit = line_vector[2] / magnitude
+
+    # Calculate proportions
+    a = z_value / z_unit
+
+    # Calculate the final coordinates (x, y, z)
+    x = a * x_unit
+    y = a * y_unit
+
+    return float(x), float(y), float(z_value)
 
 class YoloDetector(Node):
 
@@ -36,15 +63,23 @@ class YoloDetector(Node):
                              'motorcycle',
                              'truck']
         
+        self.class_to_z_val = {'person': 1.0,
+                        'bicycle': 1.5,
+                        'car': 2.5,
+                        'motorcycle': 2.0,
+                        'truck': 3.0}
+        
 
         sub1 = Subscriber(self, Image, "to_detect")
-        sub2 = Subscriber(self, Image, "depth")
-        self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
+        sub2 = Subscriber(self, CameraInfo, "camera_info")
+        sub3 = Subscriber(self, Image, "depth")
+        self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
         self._tss.registerCallback(self.detect_3d)
 
-        self._pub = self.create_publisher(Detection2DArray, 'detected', 10)
-        # self._sub = self.create_subscription(Image, 'to_detect', self.detect_3d, 10)
-        # self._sub # prevent unused variable warning
+        self._pub = self.create_publisher(Detection3DArray, 'detected', 10)
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Load a pretrained YOLO model
         self.yolo = YOLO('yolov8m.pt')
@@ -64,11 +99,29 @@ class YoloDetector(Node):
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
     
-    def detect_3d(self, data: Image, depth: Image):
+    
+    def detect_3d(self, data: Image, camera_info: CameraInfo, depth: Image):
         """
         Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes,
         It can also show the debug image if the parameter is set
         """
+        
+        # Compute the transformation from the Default frame to remove tilted orientation from bboxes
+        from_frame_rel = camera_info.header.frame_id
+        to_frame_rel = DEFAULT_FRAME
+
+        try:
+            tf : TransformStamped = self.tf_buffer.lookup_transform(
+                to_frame_rel,
+                from_frame_rel,
+                rclpy.time.Time())
+        except TransformException as ex:
+            self.get_logger().info(
+                f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+            return
+        
+        inverse_tf_rotation = tf.transform.rotation
+        inverse_tf_rotation.w = -inverse_tf_rotation.w
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
@@ -78,6 +131,7 @@ class YoloDetector(Node):
         # Convert ROS Image message to OpenCV image
         cv_image = self.br.imgmsg_to_cv2(data)
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
+        cv_dep = self.br.imgmsg_to_cv2(depth, "32FC1")
 
         # Perform object detection on an image using the model
         results = self.yolo.predict(
@@ -90,12 +144,16 @@ class YoloDetector(Node):
         results: Results = results[0].cpu()
 
         # create detections msg
-        detections_msg = Detection2DArray()
+        detections_msg = Detection3DArray()
         detections_msg.header = data.header
+
+        camera_model = PinholeCameraModel()
+        camera_model.fromCameraInfo(camera_info)
+
 
         for box_data in results.boxes:
 
-            detection = Detection2D()
+            detection = Detection3D()
 
             # get label and score
             label = self.yolo.names[int(box_data.cls)]
@@ -103,16 +161,44 @@ class YoloDetector(Node):
 
             # get boxes values
             box = box_data.xywh[0]
-            detection.bbox.center.x = float(box[0])
-            detection.bbox.center.y = float(box[1])
-            detection.bbox.size_x = float(box[2])
-            detection.bbox.size_y = float(box[3])
+
+            uv_coordinates = (box[0], box[1])
+            bbox_image_size = (box[2], box[3])
+            # The depth data is stored inside the cv_dep numpy array -> y are the rows and x are columns
+            z_value = cv_dep[int(uv_coordinates[1])][int(uv_coordinates[0])]
+
+            # bottom-left
+            min_pt = (int(uv_coordinates[0] - bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] - bbox_image_size[1] / 2.0))
+            # top-right
+            max_pt = (int(uv_coordinates[0] + bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
+
+            # Project the 3 points
+            center_ray3d = camera_model.projectPixelTo3dRay(uv_coordinates)
+            min_ray3d = camera_model.projectPixelTo3dRay(min_pt)
+            max_ray3d = camera_model.projectPixelTo3dRay(max_pt)
+
+            # Obtain the real coordinates
+            detection.bbox.center.position.x, \
+                detection.bbox.center.position.y, \
+                    detection.bbox.center.position.z  = find_3d_point_on_line(center_ray3d, z_value)
+            
+            min_pt_3d = find_3d_point_on_line(min_ray3d, z_value)
+            max_pt_3d = find_3d_point_on_line(max_ray3d, z_value)
+            
+            # Add an orientation to remove the tilt of the camera and place the bbox orizontally
+            detection.bbox.center.orientation = inverse_tf_rotation
+
+            # Compute the size of the bounding box looking at the projections of the two vertexes
+            detection.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
+            detection.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
+            detection.bbox.size.z = self.class_to_z_val[label]
 
             # get track id
             track_id = ""
             if box_data.is_track:
                 track_id = str(int(box_data.id))
-            # detection.id = track_id
 
             # create hypothesis
             hypothesis = ObjectHypothesisWithPose()
@@ -128,14 +214,9 @@ class YoloDetector(Node):
                     box_data = random.randint(0, 255)
                     self._class_to_color[label] = (r, g, box_data)
                 color = self._class_to_color[label]
-
-                min_pt = (round(detection.bbox.center.x - detection.bbox.size_x / 2.0),
-                            round(detection.bbox.center.y - detection.bbox.size_y / 2.0))
-                max_pt = (round(detection.bbox.center.x + detection.bbox.size_x / 2.0),
-                            round(detection.bbox.center.y + detection.bbox.size_y / 2.0))
+             
                 cv2.rectangle(cv_image, min_pt, max_pt, color, 2)
 
-            
                 label = "{} ({}) ({:.3f})".format(label, str(track_id), score)
                 pos = (min_pt[0] + 5, min_pt[1] + 25)
                 font = cv2.FONT_HERSHEY_SIMPLEX
