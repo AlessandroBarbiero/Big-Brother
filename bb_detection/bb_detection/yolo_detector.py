@@ -1,18 +1,20 @@
+# ROS
 import rclpy
 from rclpy.node import Node
-
-from sensor_msgs.msg import Image # Image is the message type
+from message_filters import TimeSynchronizer, Subscriber
+from rcl_interfaces.msg import SetParametersResult
+# ROS messages
+from sensor_msgs.msg import Image
 from vision_msgs.msg import Detection2D
 from vision_msgs.msg import ObjectHypothesisWithPose
 from vision_msgs.msg import Detection2DArray
-
+# Other
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
 
-from rcl_interfaces.msg import SetParametersResult
 
 class YoloDetector(Node):
 
@@ -28,14 +30,30 @@ class YoloDetector(Node):
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
 
+        classes_to_detect = ['person',
+                             'bicycle',
+                             'car',
+                             'motorcycle',
+                             'truck']
+        
+
+        sub1 = Subscriber(self, Image, "to_detect")
+        sub2 = Subscriber(self, Image, "depth")
+        self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
+        self._tss.registerCallback(self.detect_3d)
+
         self._pub = self.create_publisher(Detection2DArray, 'detected', 10)
-        self._sub = self.create_subscription(Image, 'to_detect', self.listener_callback, 10)
-        self._sub # prevent unused variable warning
+        # self._sub = self.create_subscription(Image, 'to_detect', self.detect_3d, 10)
+        # self._sub # prevent unused variable warning
 
         # Load a pretrained YOLO model
         self.yolo = YOLO('yolov8m.pt')
         self.yolo.to("cuda:0")
+
         self._class_to_color = {}
+
+        # Obtain the enumeration equivalent to the classes i want to detect
+        self.classes_numbers = [key for key, value in self.yolo.names.items() if value in classes_to_detect]
 
         self.br = CvBridge()
         self.no_image_detected_yet = True
@@ -46,7 +64,7 @@ class YoloDetector(Node):
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
     
-    def listener_callback(self, data: Image):
+    def detect_3d(self, data: Image, depth: Image):
         """
         Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes,
         It can also show the debug image if the parameter is set
@@ -67,6 +85,7 @@ class YoloDetector(Node):
                 verbose=False,
                 stream=False,
                 conf=float(self.get_parameter('confidence_threshold').value),
+                classes=self.classes_numbers
             )
         results: Results = results[0].cpu()
 
@@ -142,7 +161,10 @@ def main(args=None):
 
     yolo_detector = YoloDetector()
 
-    rclpy.spin(yolo_detector)
+    try:
+        rclpy.spin(yolo_detector)
+    except:
+        print("Yolo Detector Terminated")
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically

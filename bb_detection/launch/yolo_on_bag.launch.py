@@ -18,7 +18,8 @@ def generate_launch_description():
     package="bb_detection",
     executable="yolo_detector",
     remappings=[
-        ("/to_detect", "/carla/sensors_home/static_rgb_camera/image")
+        ("/to_detect", "/carla/sensors_home/static_rgb_camera/image"),
+        ("/depth", "/carla/sensors_home/static_depth_camera/image")
     ],
     parameters=[
         {"confidence_threshold": 0.5},
