@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'yolo_detector = bb_detection.yolo_detector:main',
+            'thermal_detector = bb_detection.thermal_detector:main',
         ],
     },
 )

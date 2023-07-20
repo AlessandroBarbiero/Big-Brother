@@ -8,11 +8,13 @@
   <license>Apache License 2.0</license>
 
   <depend>rclpy</depend>
-  <depend>image_transport</depend>
-  <depend>cv_bridge</depend>
+  
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>vision_msgs</depend>
+
+  <depend>image_transport</depend>
+  <depend>cv_bridge</depend>
   <depend>python3-opencv</depend>
   <depend>ultralytics</depend>
 
