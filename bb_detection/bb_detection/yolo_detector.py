@@ -1,5 +1,4 @@
 # ROS
-import math
 import rclpy
 from rclpy.node import Node
 from message_filters import TimeSynchronizer, Subscriber
@@ -22,34 +21,8 @@ import cv2 # OpenCV library
 import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
-
-DEFAULT_FRAME = 'sensors_home'
-
-def quaternion_multiply(q1, q2):
-    q_result = Quaternion()
-    q_result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z
-    q_result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y
-    q_result.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x
-    q_result.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w
-    return q_result
-
-def find_3d_point_on_line(line_vector, z_value):
-    '''
-    Compute the position in the 3D world of a point along a line described by the line_vector 3d (x,y,z) passed
-    '''
-    # Normalize the line vector
-    magnitude = math.sqrt(line_vector[0] ** 2 + line_vector[1] ** 2 + line_vector[2] ** 2)
-    x_unit = line_vector[0] / magnitude
-    y_unit = line_vector[1] / magnitude
-    z_unit = line_vector[2] / magnitude
-    # Calculate proportions
-    a = z_value / z_unit
-
-    # Calculate the final coordinates (x, y, z)
-    x = a * x_unit
-    y = a * y_unit
-
-    return float(x), float(y), float(z_value)
+# My scripts
+from .utility import *
 
 class YoloDetector(Node):
 
@@ -188,17 +161,12 @@ class YoloDetector(Node):
                             int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
 
             # Project the 3 points
-            center_ray3d = camera_model.projectPixelTo3dRay(uv_coordinates)
-            min_ray3d = camera_model.projectPixelTo3dRay(min_pt)
-            max_ray3d = camera_model.projectPixelTo3dRay(max_pt)
-
-            # Obtain the real coordinates
             detection.bbox.center.position.x, \
                 detection.bbox.center.position.y, \
-                    detection.bbox.center.position.z  = find_3d_point_on_line(center_ray3d, z_value)
+                    detection.bbox.center.position.z  = project_to_3D_space(camera_model, uv_coordinates, z_value)
             
-            min_pt_3d = find_3d_point_on_line(min_ray3d, z_value)
-            max_pt_3d = find_3d_point_on_line(max_ray3d, z_value)
+            min_pt_3d = project_to_3D_space(camera_model, min_pt, z_value)
+            max_pt_3d = project_to_3D_space(camera_model, max_pt, z_value)
             
             # Add an orientation to remove the tilt of the camera and place the bbox orizontally
             detection.bbox.center.orientation = q_to_apply
