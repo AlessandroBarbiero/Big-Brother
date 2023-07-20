@@ -15,6 +15,7 @@ from vision_msgs.msg import Detection3D
 from vision_msgs.msg import ObjectHypothesisWithPose
 from vision_msgs.msg import Detection3DArray
 from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import Quaternion
 # Other
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
@@ -23,6 +24,14 @@ from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
 
 DEFAULT_FRAME = 'sensors_home'
+
+def quaternion_multiply(q1, q2):
+    q_result = Quaternion()
+    q_result.w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z
+    q_result.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y
+    q_result.y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x
+    q_result.z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.x + q1.z * q2.w
+    return q_result
 
 def find_3d_point_on_line(line_vector, z_value):
     '''
@@ -33,7 +42,6 @@ def find_3d_point_on_line(line_vector, z_value):
     x_unit = line_vector[0] / magnitude
     y_unit = line_vector[1] / magnitude
     z_unit = line_vector[2] / magnitude
-
     # Calculate proportions
     a = z_value / z_unit
 
@@ -94,6 +102,9 @@ class YoloDetector(Node):
         self.no_image_detected_yet = True
 
     def parameter_callback(self, params):
+        '''
+        Function used to close the cv2 window when the show debug parameter is set to False
+        '''
         for param in params:
             if param.name == 'show_debug' and param.value == False:
                 cv2.destroyAllWindows()
@@ -122,6 +133,8 @@ class YoloDetector(Node):
         
         inverse_tf_rotation = tf.transform.rotation
         inverse_tf_rotation.w = -inverse_tf_rotation.w
+        r90_zaxis = Quaternion(w=0.707, x=0.0, y=0.0, z=0.707)
+        q_to_apply = quaternion_multiply(inverse_tf_rotation,r90_zaxis)
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
@@ -188,7 +201,7 @@ class YoloDetector(Node):
             max_pt_3d = find_3d_point_on_line(max_ray3d, z_value)
             
             # Add an orientation to remove the tilt of the camera and place the bbox orizontally
-            detection.bbox.center.orientation = inverse_tf_rotation
+            detection.bbox.center.orientation = q_to_apply
 
             # Compute the size of the bounding box looking at the projections of the two vertexes
             detection.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
