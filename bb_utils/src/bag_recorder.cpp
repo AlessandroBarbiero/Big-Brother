@@ -6,6 +6,8 @@
 #include <rosbag2_cpp/writers/sequential_writer.hpp>
 #include <rosbag2_storage/serialized_bag_message.hpp>
 
+// %%%%%%%%%%%% This is not currently used, kept for reference %%%%%%%%%%%%
+
 using std::placeholders::_1;
 
 class BagRecorder : public rclcpp::Node
