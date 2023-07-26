@@ -60,7 +60,7 @@ file(GLOB imgui_files
     ${IMGUI_DIR}/imgui_widgets.cpp
 )
 # ImGui_f
-include_directories(/opt/ImGui-f/src)
+include_directories(/opt/ImGui-f/src)   # -------> Set this to point to an up-to-date ImGui-f repo
 
 # Libraries
 set(LIBRARIES "glfw;Vulkan::Vulkan")

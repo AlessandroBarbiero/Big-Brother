@@ -11,7 +11,7 @@
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <rosbag2_cpp/storage_options.hpp>
 #include <rosbag2_cpp/writers/sequential_writer.hpp>
-
+// ROS messages
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -71,7 +71,8 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
   const auto topics = reader->get_all_topics_and_types();
   for (const auto topic : topics){
     auto iter = std::find(topics_to_keep.begin(), topics_to_keep.end(), topic.name);
-    if(iter != topics_to_keep.end()){
+    // If the topic is in the topics to keep
+    if(iter != topics_to_keep.end()){ 
       topic_to_type.emplace(topic.name, topic.type);
       writer->create_topic(
         {topic.name,
