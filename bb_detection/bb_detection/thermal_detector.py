@@ -95,6 +95,12 @@ class ThermalDetector(Node):
         inverse_tf_rotation.w = -inverse_tf_rotation.w
         r90_zaxis = Quaternion(w=0.707, x=0.0, y=0.0, z=0.707)
         q_to_apply = quaternion_multiply(inverse_tf_rotation,r90_zaxis)
+        # TODO: Bird eye view projection
+        # compute the angle theta between the z axis and the ground
+        v = math.sqrt(tf.transform.rotation.x**2 + tf.transform.rotation.y**2 + tf.transform.rotation.z**2)
+        theta = 2 * math.atan2(v, tf.transform.rotation.w)
+        # I have to use this angle to get the real distance z of the object
+
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
