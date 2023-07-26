@@ -20,12 +20,17 @@ link_directories(${PROJECT_SOURCE_DIR}/include)
 
 # include and link dirs of cuda and tensorrt
 # cuda
-include_directories(/usr/local/cuda/include)
-link_directories(/usr/local/cuda/lib64)
+find_package(CUDA REQUIRED)
+# include_directories(/usr/local/cuda/include)
+# link_directories(/usr/local/cuda/lib64)
+include_directories(${CUDA_INCLUDE_DIRS})
+link_directories(${CUDA_LIBRARIES})
+
 # TODO add to use neural network
-# # cudnn
+# cudnn
 # include_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/include)
 # link_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/lib64)
+include_directories(/usr/lib/x86_64-linux-gnu)
 # # tensorrt
 # include_directories(/opt/tiger/demo/TensorRT-7.2.3.4/include)
 # link_directories(/opt/tiger/demo/TensorRT-7.2.3.4/lib)
@@ -39,7 +44,6 @@ find_package(vision_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(CUDA REQUIRED)
 
 # Add to run launch files
 install(DIRECTORY
