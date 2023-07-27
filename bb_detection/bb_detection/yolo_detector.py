@@ -57,7 +57,7 @@ class YoloDetector(Node):
         self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
         self._tss.registerCallback(self.detect_3d)
 
-        self._pub = self.create_publisher(Detection3DArray, 'detected', 10)
+        self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
