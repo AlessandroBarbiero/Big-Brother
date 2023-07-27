@@ -10,13 +10,11 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Add for Bytetrack
+# ------------ Add for Bytetrack
 option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
 
-include_directories(${PROJECT_SOURCE_DIR}include)
+# Eigen3
 include_directories(/usr/include/eigen3)
-link_directories(${PROJECT_SOURCE_DIR}/include)
-
 
 # include and link dirs of cuda and tensorrt
 # cuda
@@ -25,25 +23,32 @@ find_package(CUDA REQUIRED)
 # link_directories(/usr/local/cuda/lib64)
 include_directories(${CUDA_INCLUDE_DIRS})
 link_directories(${CUDA_LIBRARIES})
+# target_link_libraries(${PROJECT_NAME} ${CUDA_LIBRARIES})
 
-# TODO add to use neural network
 # cudnn
 # include_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/include)
 # link_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/lib64)
-include_directories(/usr/lib/x86_64-linux-gnu)
-# # tensorrt
+# tensorrt
 # include_directories(/opt/tiger/demo/TensorRT-7.2.3.4/include)
 # link_directories(/opt/tiger/demo/TensorRT-7.2.3.4/lib)
+# cudnn and tensorrt
+include_directories(/usr/include/x86_64-linux-gnu)
+link_directories(/usr/lib/x86_64-linux-gnu)
+
+# ----------------------------
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
+# find_package(std_msgs REQUIRED)
+# find_package(sensor_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(image_transport REQUIRED)
+# find_package(cv_bridge REQUIRED)
+# find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
+
+# Add to include header files
+include_directories(include)
 
 # Add to run launch files
 install(DIRECTORY
@@ -51,14 +56,39 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+file(GLOB BYTE_traker_files
+    src/BYTEtracker.cpp 
+    src/kalmanFilter.cpp 
+    src/lapjv.cpp 
+    src/STrack.cpp 
+    src/utils.cpp
+)
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# EXECUTABLES
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+# %%%%%%% BB_TRACKER %%%%%%%%%%%
+add_executable(bb_tracker 
+  src/bb_tracker.cpp
+  ${BYTE_traker_files}
+  )
+ament_target_dependencies(bb_tracker
+  rclcpp
+  # std_msgs
+  vision_msgs
+  OpenCV
+  # bb_interfaces
+  )
+# -----------
+
+install(TARGETS 
+  bb_tracker
+  DESTINATION lib/${PROJECT_NAME})
+
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

@@ -1,4 +1,4 @@
-#include "BYTETracker.h"
+#include <bb_tracker/BYTETracker.h>
 #include <fstream>
 
 BYTETracker::BYTETracker(int frame_rate, int track_buffer)

@@ -8,7 +8,7 @@
 #include <dirent.h>
 #include "NvInfer.h"
 #include "cuda_runtime_api.h"
-#include "logging.h"
+#include <bb_tracker/logging.h>
 #include <bb_tracker/BYTETracker.h>
 
 #define CHECK(status) \

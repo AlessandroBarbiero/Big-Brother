@@ -1,5 +1,5 @@
-#include "BYTETracker.h"
-#include "lapjv.h"
+#include <bb_tracker/BYTETracker.h>
+#include <bb_tracker/lapjv.h>
 
 vector<STrack*> BYTETracker::joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb)
 {
