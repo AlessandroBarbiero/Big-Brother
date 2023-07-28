@@ -24,7 +24,18 @@ from ultralytics.yolo.engine.results import Results
 # My scripts
 from .utility import *
 
+
 class YoloDetector(Node):
+    '''
+    ROS2 Node that performs Yolo detection and classification on the images published on the topic 'to_detect'.\n
+    Exploiting the data published on the topics 'camera_info' and 'depth' it produces a list of 3D bounding boxes
+    and publish them on the topic 'detection_3d'.\n
+    The node can detect and classify objects of the classes: 'person', 'bicycle', 'car', 'motorcycle' and 'truck'.\n
+    The depth of the bounding box is obtained heuristically based on the type of the recognized class.\n
+    ROS2 parameters:
+        'show_debug': Allow to display a debug image showing the 2D detections on the given image (Default: True),
+        'confidence_threshold': Limit threshold over which the node consider a valid detection (Default: 0.5)
+    '''
 
     def __init__(self):
         super().__init__('yolo_detector')
