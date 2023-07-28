@@ -14,15 +14,29 @@ from vision_msgs.msg import Detection3D
 from vision_msgs.msg import ObjectHypothesisWithPose
 from vision_msgs.msg import Detection3DArray
 from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import Quaternion
 # Other
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import numpy as np
 # My files
 from .utility import *
+from .bev.Bev import Bev
+from .bev.Camera import Camera
+
+SENSORS_FRAME = "sensors_home/sensors_frame"
 
 class ThermalDetector(Node):
+    '''
+    ROS2 Node that performs detection and classification on the images published on the topic 'to_detect'. 
+    The node is made to work with the images produces by the semantic segmentation camera of the Carla simulator 
+    but it can be applyed on whatever image that displays segmented objects with a mask, each class of object has its own color\n
+    Exploiting the data published on the topic 'camera_info' it produces a list of 3D bounding boxes
+    and publish them on the topic 'detection_3d'.\n
+    The node can detect and classify objects of the classes: 'person' and 'vehicle'.\n
+    The depth and height of the bounding box is obtained heuristically based on the type of the recognized class.\n
+    ROS2 parameters:
+        'show_debug': Allow to display a debug image showing the 2D detections on the given image (Default: True),
+    '''
 
     def __init__(self):
         super().__init__('thermal_detector')
@@ -35,8 +49,11 @@ class ThermalDetector(Node):
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
         
-        self.class_to_z_val = {'person': 1.0,
+        self.class_to_depth = {'person': 1.0,
                             'vehicle': 2.0
+                            }
+        self.class_to_height = {'person': 1.8,
+                            'vehicle': 1.6
                             }
         
         self.colors = {'person': (60, 20, 220),
@@ -77,8 +94,8 @@ class ThermalDetector(Node):
         It can also show the debug image if the parameter is set
         """
         
-        # Compute the transformation from the Default frame to remove tilted orientation from bboxes
-        from_frame_rel = camera_info.header.frame_id
+        # Compute the transformation from the Default frame to the sensor frame to compute the bev projection
+        from_frame_rel = SENSORS_FRAME
         to_frame_rel = DEFAULT_FRAME
 
         try:
@@ -91,16 +108,7 @@ class ThermalDetector(Node):
                 f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
             return
         
-        inverse_tf_rotation = tf.transform.rotation
-        inverse_tf_rotation.w = -inverse_tf_rotation.w
-        r90_zaxis = Quaternion(w=0.707, x=0.0, y=0.0, z=0.707)
-        q_to_apply = quaternion_multiply(inverse_tf_rotation,r90_zaxis)
-        # TODO: Bird eye view projection
-        # compute the angle theta between the z axis and the ground
-        v = math.sqrt(tf.transform.rotation.x**2 + tf.transform.rotation.y**2 + tf.transform.rotation.z**2)
-        theta = 2 * math.atan2(v, tf.transform.rotation.w)
-        # I have to use this angle to get the real distance z of the object
-
+        roll, pitch, yaw = euler_from_quaternion(tf.transform.rotation)
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
@@ -111,13 +119,37 @@ class ThermalDetector(Node):
         cv_image = self.br.imgmsg_to_cv2(data)
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
 
-        # create detections msg
-        detections_msg = Detection3DArray()
-        detections_msg.header = data.header
 
+        # Prepare Bird Eye View projection
         camera_model = PinholeCameraModel()
         camera_model.fromCameraInfo(camera_info)
+        cameraData = {
+            'intrinsic': {
+                'fx': camera_model.fx(),
+                'fy': camera_model.fy(),
+                'u0': camera_model.cx(),
+                'v0': camera_model.cy()
+            },
+            'extrinsic': {
+                'x': tf.transform.translation.x,
+                'y': tf.transform.translation.y,
+                'z': tf.transform.translation.z,
+                'yaw': yaw,
+                'pitch': pitch,
+                'roll': roll
+            }
+        }
+        camera = Camera(cameraData)
+        bev_out_view = [0, 10, -20, 20]
+        bev_out_image_width = 1000
+        bev_out_image_size = [np.nan, bev_out_image_width] 
+        bev_obj = Bev(camera, bev_out_view, bev_out_image_size)
 
+
+        # Create detections msg
+        detections_msg = Detection3DArray()
+        detections_msg.header = data.header
+        detections_msg.header.frame_id = DEFAULT_FRAME
 
         # Create the bbox starting from semseg
         for class_name, target_color in self.colors.items():
@@ -127,56 +159,53 @@ class ThermalDetector(Node):
             # Find contours of the target pixels
             contours, _ = cv2.findContours(target_pixels.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            # draw boxes for debug
+            # For debug window
             bounding_box_color = self.class_to_bbox_color[class_name]
 
             # Draw bounding boxes around the detected regions
             for contour in contours:
                 x, y, w, h = cv2.boundingRect(contour)
-                min_pt = (x, y)
-                max_pt = (x + w, y + h)
+                left_base_pt = (x, y)
+                right_base_pt = (x+w, y)
 
                 detection = Detection3D()
 
-                center_coordinates = (min_pt[0] + (max_pt[0]-min_pt[0])/2, min_pt[1] + (max_pt[1]-min_pt[1])/2)
+                # Project base points into Bird Eye View Projection
+                points = np.array([left_base_pt, right_base_pt])
+                bev_points = bev_obj.projectImagePointsToBevPoints(points)
+                real_points = bev_obj.projectBevPointsToWorldGroundPlane(bev_points)
+                real_left = (real_points[0][0], real_points[0][1])
+                real_right = (real_points[1][0], real_points[1][1])
+    
+                detection.bbox.center.position.x = real_left[0] + (real_right[0]-real_left[0])/2
+                detection.bbox.center.position.y = real_left[1] + (real_right[1]-real_left[1])/2
+                detection.bbox.center.position.z = self.class_to_height[class_name]/2
 
-                # The depth data is stored inside the cv_dep numpy array -> y are the rows and x are columns
-                # z_value = cv_dep[int(uv_coordinates[1])][int(uv_coordinates[0])]
-                z_value = 1 # TODO: find the z value using trigonometry knowing the angle that the camera has with the ground
+                # Compute the size of the bounding box based on the class
+                detection.bbox.size.x = self.class_to_depth[class_name]
+                detection.bbox.size.y = float(real_right[1]-real_left[1])
+                detection.bbox.size.z = self.class_to_height[class_name]
 
-                # Project the 3 points
-                detection.bbox.center.position.x, \
-                    detection.bbox.center.position.y, \
-                        detection.bbox.center.position.z  = project_to_3D_space(camera_model, center_coordinates, z_value)
-                
-                min_pt_3d = project_to_3D_space(camera_model, min_pt, z_value)
-                max_pt_3d = project_to_3D_space(camera_model, max_pt, z_value)
-                
-                # Add an orientation to remove the tilt of the camera and place the bbox orizontally
-                detection.bbox.center.orientation = q_to_apply
-
-                # Compute the size of the bounding box looking at the projections of the two vertexes
-                detection.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
-                detection.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
-                detection.bbox.size.z = self.class_to_z_val[class_name]
-
-                # create hypothesis
+                # Create hypothesis
                 hypothesis = ObjectHypothesisWithPose()
                 hypothesis.id = class_name
                 hypothesis.score = 1.0
                 detection.results.append(hypothesis)
 
-                # append msg
+                # Append msg
                 detections_msg.detections.append(detection)
 
+                # Draw rectangles in debug image
                 if(self.get_parameter('show_debug').value):
+                    min_pt = left_base_pt
+                    max_pt = (x+w, y+h)
                     cv2.rectangle(cv_image, min_pt, max_pt, bounding_box_color, 2)
                     pos = (min_pt[0] + 5, min_pt[1] + 25)
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     cv2.putText(cv_image, class_name, pos, font,
                                 1, bounding_box_color, 1, cv2.LINE_AA)
 
-        # publish detections
+        # Publish detections
         self._pub.publish(detections_msg)
 
         if(self.get_parameter('show_debug').value):
@@ -190,12 +219,12 @@ def main(args=None):
 
     thermal_detector = ThermalDetector()
 
-    # try:
-    #     rclpy.spin(thermal_detector)
-    # except:
-    #     print("Thermal Detector Terminated")
+    try:
+        rclpy.spin(thermal_detector)
+    except:
+        print("Thermal Detector Terminated")
 
-    rclpy.spin(thermal_detector)
+    # rclpy.spin(thermal_detector)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
