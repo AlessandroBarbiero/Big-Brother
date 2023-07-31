@@ -52,7 +52,7 @@ class BBTracker : public rclcpp::Node
 
         // Sorting
         //qsort_descent_inplace(proposals);
-}
+    }
 
     void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
     {
@@ -93,6 +93,9 @@ class BBTracker : public rclcpp::Node
       // putText(img, format("frame: %d fps: %d num_tracks: %d", _num_detections, _num_detections * 1000000 / _total_ms, output_stracks.size()), 
       //         Point(0, 30), 0, 0.6, Scalar(0, 0, 255), 2, LINE_AA);
     }
+
+
+  private:
 
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
     BYTETracker _tracker;
