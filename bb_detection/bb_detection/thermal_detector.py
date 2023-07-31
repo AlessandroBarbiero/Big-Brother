@@ -28,7 +28,7 @@ SENSORS_FRAME = "sensors_home/sensors_frame"
 class ThermalDetector(Node):
     '''
     ROS2 Node that performs detection and classification on the images published on the topic 'to_detect'. 
-    The node is made to work with the images produces by the semantic segmentation camera of the Carla simulator 
+    The node is made to work with the images produced by the semantic segmentation camera of the Carla simulator 
     but it can be applyed on whatever image that displays segmented objects with a mask, each class of object has its own color\n
     Exploiting the data published on the topic 'camera_info' it produces a list of 3D bounding boxes
     and publish them on the topic 'detection_3d'.\n
