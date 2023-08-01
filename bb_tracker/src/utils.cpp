@@ -157,33 +157,44 @@ void BYTETracker::linear_assignment(vector<vector<float> > &cost_matrix, int cos
 	}
 }
 
-vector<vector<float> > BYTETracker::ious(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs)
+vector<vector<float> > BYTETracker::ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs)
 {
 	vector<vector<float> > ious;
-	if (atlbrs.size()*btlbrs.size() == 0)
+	if (aminmaxs.size()*bminmaxs.size() == 0)
 		return ious;
 
-	ious.resize(atlbrs.size());
+	ious.resize(aminmaxs.size());
 	for (unsigned int i = 0; i < ious.size(); i++)
 	{
-		ious[i].resize(btlbrs.size());
+		ious[i].resize(bminmaxs.size());
 	}
 
 	//bbox_ious
-	for (unsigned int k = 0; k < btlbrs.size(); k++)
+	for (unsigned int k = 0; k < bminmaxs.size(); k++)
 	{
 		vector<float> ious_tmp;
-		float box_area = (btlbrs[k][2] - btlbrs[k][0] + 1)*(btlbrs[k][3] - btlbrs[k][1] + 1);
-		for (unsigned int n = 0; n < atlbrs.size(); n++)
+		float box_volume = (bminmaxs[k][3] - bminmaxs[k][0] + 1)*(bminmaxs[k][4] - bminmaxs[k][1] + 1)*(bminmaxs[k][5] - bminmaxs[k][2] + 1);
+		for (unsigned int n = 0; n < aminmaxs.size(); n++)
 		{
-			float iw = min(atlbrs[n][2], btlbrs[k][2]) - max(atlbrs[n][0], btlbrs[k][0]) + 1;
+			float iw = min(aminmaxs[n][3], bminmaxs[k][3]) - max(aminmaxs[n][0], bminmaxs[k][0]) + 1;
 			if (iw > 0)
 			{
-				float ih = min(atlbrs[n][3], btlbrs[k][3]) - max(atlbrs[n][1], btlbrs[k][1]) + 1;
-				if(ih > 0)
+				float id = min(aminmaxs[n][4], bminmaxs[k][4]) - max(aminmaxs[n][1], bminmaxs[k][1]) + 1;
+				if(id>0)
 				{
-					float ua = (atlbrs[n][2] - atlbrs[n][0] + 1)*(atlbrs[n][3] - atlbrs[n][1] + 1) + box_area - iw * ih;
-					ious[n][k] = iw * ih / ua;
+					float ih = min(aminmaxs[n][5], bminmaxs[k][5]) - max(aminmaxs[n][2], bminmaxs[k][2]) + 1;
+					if(ih > 0)
+					{
+						//Intersection
+						float inter = iw * id * ih;
+						//Union
+						float ua = (aminmaxs[n][3] - aminmaxs[n][0] + 1)*(aminmaxs[n][4] - aminmaxs[n][1] + 1)*(aminmaxs[n][5] - aminmaxs[n][2] + 1) + box_volume - inter;
+						ious[n][k] = inter / ua;
+					}
+					else
+					{
+						ious[n][k] = 0.0;
+					}
 				}
 				else
 				{
@@ -209,20 +220,20 @@ vector<vector<float> > BYTETracker::iou_distance(vector<STrack*> &atracks, vecto
 		dist_size_size = btracks.size();
 		return cost_matrix;
 	}
-	vector<vector<float> > atlbrs, btlbrs;
+	vector<vector<float> > aminmaxs, bminmaxs;
 	for (unsigned int i = 0; i < atracks.size(); i++)
 	{
-		atlbrs.push_back(atracks[i]->tlbr);
+		aminmaxs.push_back(atracks[i]->minmax);
 	}
 	for (unsigned int i = 0; i < btracks.size(); i++)
 	{
-		btlbrs.push_back(btracks[i].tlbr);
+		bminmaxs.push_back(btracks[i].minmax);
 	}
 
 	dist_size = atracks.size();
 	dist_size_size = btracks.size();
 
-	vector<vector<float> > _ious = ious(atlbrs, btlbrs);
+	vector<vector<float> > _ious = ious(aminmaxs, bminmaxs);
 	
 	for (unsigned int i = 0; i < _ious.size();i++)
 	{
@@ -239,17 +250,17 @@ vector<vector<float> > BYTETracker::iou_distance(vector<STrack*> &atracks, vecto
 
 vector<vector<float> > BYTETracker::iou_distance(vector<STrack> &atracks, vector<STrack> &btracks)
 {
-	vector<vector<float> > atlbrs, btlbrs;
+	vector<vector<float> > aminmaxs, bminmaxs;
 	for (unsigned int i = 0; i < atracks.size(); i++)
 	{
-		atlbrs.push_back(atracks[i].tlbr);
+		aminmaxs.push_back(atracks[i].minmax);
 	}
 	for (unsigned int i = 0; i < btracks.size(); i++)
 	{
-		btlbrs.push_back(btracks[i].tlbr);
+		bminmaxs.push_back(btracks[i].minmax);
 	}
 
-	vector<vector<float> > _ious = ious(atlbrs, btlbrs);
+	vector<vector<float> > _ious = ious(aminmaxs, bminmaxs);
 	vector<vector<float> > cost_matrix;
 	for (unsigned int i = 0; i < _ious.size(); i++)
 	{

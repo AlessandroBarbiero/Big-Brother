@@ -1,10 +1,22 @@
 #pragma once
 
 #include "STrack.h"
+#include <Eigen/Geometry>
+#include <vision_msgs/msg/bounding_box3_d.hpp>
+#include <map>
+
+std::unordered_map<std::string, int> class_to_int{
+	{"person", 0},
+	{"pedestrian", 0},
+	{"vehicle", 1},
+	{"car", 1},
+	{"truck", 1},
+	{"bicycle", 2},
+};
 
 struct Object
 {
-    cv::Rect_<float> rect;
+    vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size <--- ex cv::Rect_
     int label;
     float prob;
 };

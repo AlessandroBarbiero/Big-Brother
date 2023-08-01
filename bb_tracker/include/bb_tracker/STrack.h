@@ -11,15 +11,17 @@ enum TrackState { New = 0, Tracked, Lost, Removed };
 class STrack
 {
 public:
-	STrack(vector<float> tlwh_, float score);
+	STrack(vector<float> minwdh_, float score);
 	~STrack();
 
-	vector<float> static tlbr_to_tlwh(vector<float> &tlbr);
+	vector<float> static minmax_to_minwdh(vector<float> &minmax);
 	void static multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter);
-	void static_tlwh();
-	void static_tlbr();
-	vector<float> tlwh_to_xyah(vector<float> tlwh_tmp);
-	vector<float> to_xyah();
+	void static_minwdh();
+	void static_minmax();
+	// xyzaah respresents the box independently of the dimensions, only the height is kept as it is
+	// Returns a vector whose elements are {cx-cy-cz - width/height - depth/height - height}
+	vector<float> minwdh_to_xyzaah(vector<float> minwdh_tmp);
+	vector<float> to_xyzaah();
 	void mark_lost();
 	void mark_removed();
 	int next_id();
@@ -34,9 +36,9 @@ public:
 	int track_id;
 	int state;
 
-	vector<float> _tlwh;
-	vector<float> tlwh;
-	vector<float> tlbr;
+	vector<float> _minwdh; 	// <--- ex _tlwh
+	vector<float> minwdh;	// <--- ex tlwh
+	vector<float> minmax;	// <--- ex tlbr
 	int frame_id;
 	int tracklet_len;
 	int start_frame;

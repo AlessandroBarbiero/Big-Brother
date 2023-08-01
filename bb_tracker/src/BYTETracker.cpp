@@ -42,16 +42,18 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 	{
 		for (unsigned int i = 0; i < objects.size(); i++)
 		{
-			vector<float> tlbr_;
-			tlbr_.resize(4);
-			tlbr_[0] = objects[i].rect.x;
-			tlbr_[1] = objects[i].rect.y;
-			tlbr_[2] = objects[i].rect.x + objects[i].rect.width;
-			tlbr_[3] = objects[i].rect.y + objects[i].rect.height;
+			vector<float> minmax_;
+			minmax_.resize(6);
+			minmax_[0] = objects[i].box.center.position.x - objects[i].box.size.x/2;
+			minmax_[1] = objects[i].box.center.position.y - objects[i].box.size.y/2;
+			minmax_[2] = objects[i].box.center.position.z - objects[i].box.size.z/2;
+			minmax_[3] = objects[i].box.center.position.x + objects[i].box.size.x/2;
+			minmax_[4] = objects[i].box.center.position.y + objects[i].box.size.y/2;
+			minmax_[5] = objects[i].box.center.position.z + objects[i].box.size.z/2;
 
 			float score = objects[i].prob;
 
-			STrack strack(STrack::tlbr_to_tlwh(tlbr_), score);
+			STrack strack(STrack::minmax_to_minwdh(minmax_), score);
 			if (score >= track_thresh)
 			{
 				detections.push_back(strack);

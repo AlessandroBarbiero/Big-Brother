@@ -1,6 +1,6 @@
 #include <bb_tracker/kalmanFilter.h>
 #include <Eigen/Cholesky>
-
+// TODO
 namespace byte_kalman
 {
 	const double KalmanFilter::chi2inv95[10] = {
@@ -15,6 +15,7 @@ namespace byte_kalman
 	15.507,
 	16.919
 	};
+	
 	KalmanFilter::KalmanFilter()
 	{
 		int ndim = 4;
@@ -59,17 +60,22 @@ namespace byte_kalman
 
 	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance)
 	{
-		//revise the data;
+		// mean(3) in xyah representation is the only value representing the real size of the object -> big object = big height
+		// With the same meaning mean(6) in xyzwadah is the only real size
+		// A cov is given to pos that changes in real time in proportion to the object size
+		// revise the data;
+		float size_regularization = mean(6);
+		// TODO: change after DETECTBOX
 		DETECTBOX std_pos;
-		std_pos << _std_weight_position * mean(3),
-			_std_weight_position * mean(3),
+		std_pos << _std_weight_position * size_regularization,
+			_std_weight_position * size_regularization,
 			1e-2,
-			_std_weight_position * mean(3);
+			_std_weight_position * size_regularization;
 		DETECTBOX std_vel;
-		std_vel << _std_weight_velocity * mean(3),
-			_std_weight_velocity * mean(3),
+		std_vel << _std_weight_velocity * size_regularization,
+			_std_weight_velocity * size_regularization,
 			1e-5,
-			_std_weight_velocity * mean(3);
+			_std_weight_velocity * size_regularization;
 		KAL_MEAN tmp;
 		tmp.block<1, 4>(0, 0) = std_pos;
 		tmp.block<1, 4>(0, 4) = std_vel;

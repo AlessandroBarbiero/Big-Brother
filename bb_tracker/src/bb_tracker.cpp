@@ -35,23 +35,14 @@ class BBTracker : public rclcpp::Node
         objects.resize(detections.size());
         for(auto detection : detections){
           // Decode
-        // if (box_prob > prob_threshold)
-        //     {
-        //         Object obj;
-        //         obj.rect.x = x0;
-        //         obj.rect.y = y0;
-        //         obj.rect.width = w;
-        //         obj.rect.height = h;
-        //         obj.label = class_idx;
-        //         obj.prob = box_prob;
+          Object obj;
+          obj.box = detection.bbox;
+          obj.label = class_to_int[detection.results[0].id];
+          obj.prob = detection.results[0].score;
 
-        //         objects.push_back(obj);
-        //     }
+          objects.push_back(obj);
         }
-        //std::cout << "num of boxes before nms: " << proposals.size() << std::endl;
-
-        // Sorting
-        //qsort_descent_inplace(proposals);
+        std::cout << "num of boxes: " << objects.size() << std::endl;
     }
 
     void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
@@ -78,16 +69,16 @@ class BBTracker : public rclcpp::Node
 
       for (int i = 0; i < output_stracks.size(); i++)
       {
-        vector<float> tlwh = output_stracks[i].tlwh;
-        bool vertical = tlwh[2] / tlwh[3] > 1.6;
-        if (tlwh[2] * tlwh[3] > 20 && !vertical)
-        {
-          Scalar s = _tracker.get_color(output_stracks[i].track_id);
-          // TODO: Show Tracking
-          // putText(img, format("%d", output_stracks[i].track_id), Point(tlwh[0], tlwh[1] - 5), 
-          //                 0, 0.6, Scalar(0, 0, 255), 2, LINE_AA);
-          // rectangle(img, Rect(tlwh[0], tlwh[1], tlwh[2], tlwh[3]), s, 2);
-        }
+        vector<float> minwdh = output_stracks[i].minwdh;
+        // bool vertical = tlwh[2] / tlwh[3] > 1.6; <-- show only vertical and big rectangles
+        // if (tlwh[2] * tlwh[3] > 20 && !vertical)
+
+        Scalar s = _tracker.get_color(output_stracks[i].track_id);
+        // TODO: Show Tracking
+        // putText(img, format("%d", output_stracks[i].track_id), Point(tlwh[0], tlwh[1] - 5), 
+        //                 0, 0.6, Scalar(0, 0, 255), 2, LINE_AA);
+        // rectangle(img, Rect(tlwh[0], tlwh[1], tlwh[2], tlwh[3]), s, 2);
+
       }
       // TODO: Show Progress
       // putText(img, format("frame: %d fps: %d num_tracks: %d", _num_detections, _num_detections * 1000000 / _total_ms, output_stracks.size()), 
