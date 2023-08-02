@@ -1,6 +1,6 @@
 #include <bb_tracker/kalmanFilter.h>
 #include <Eigen/Cholesky>
-// TODO
+
 namespace byte_kalman
 {
 	const double KalmanFilter::chi2inv95[10] = {
@@ -18,14 +18,14 @@ namespace byte_kalman
 	
 	KalmanFilter::KalmanFilter()
 	{
-		int ndim = 4;
+		// int ndim = 6; detection dim
 		double dt = 1.;
 
-		_motion_mat = Eigen::MatrixXf::Identity(8, 8);
-		for (int i = 0; i < ndim; i++) {
-			_motion_mat(i, ndim + i) = dt;
+		_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
+		for (int i = 0; i < detection_dim; i++) {
+			_motion_mat(i, detection_dim + i) = dt;
 		}
-		_update_mat = Eigen::MatrixXf::Identity(4, 8);
+		_update_mat = Eigen::MatrixXf::Identity(detection_dim, state_dim);
 
 		this->_std_weight_position = 1. / 20;
 		this->_std_weight_velocity = 1. / 160;
@@ -35,23 +35,28 @@ namespace byte_kalman
 	{
 		DETECTBOX mean_pos = measurement;
 		DETECTBOX mean_vel;
-		for (int i = 0; i < 4; i++) mean_vel(i) = 0;
+		for (int i = 0; i < detection_dim; i++) mean_vel(i) = 0;
 
 		KAL_MEAN mean;
-		for (int i = 0; i < 8; i++) {
-			if (i < 4) mean(i) = mean_pos(i);
-			else mean(i) = mean_vel(i - 4);
+		for (int i = 0; i < state_dim; i++) {
+			if (i < detection_dim) mean(i) = mean_pos(i);
+			else mean(i) = mean_vel(i - detection_dim);
 		}
 
 		KAL_MEAN std;
-		std(0) = 2 * _std_weight_position * measurement[3];
-		std(1) = 2 * _std_weight_position * measurement[3];
-		std(2) = 1e-2;
-		std(3) = 2 * _std_weight_position * measurement[3];
-		std(4) = 10 * _std_weight_velocity * measurement[3];
-		std(5) = 10 * _std_weight_velocity * measurement[3];
-		std(6) = 1e-5;
-		std(7) = 10 * _std_weight_velocity * measurement[3];
+		float dimensional_factor = measurement[3];
+		std(0) = 2 * _std_weight_position * dimensional_factor; 	// x
+		std(1) = 2 * _std_weight_position * dimensional_factor;		// y
+		std(2) = 1e-2;												// z
+		std(3) = 1e-2;												// a_w
+		std(4) = 1e-2;												// a_d
+		std(5) = 2 * _std_weight_position *  dimensional_factor;	// h
+		std(6) = 10 * _std_weight_velocity * dimensional_factor;	// v x	
+		std(7) = 10 * _std_weight_velocity * dimensional_factor;	// v y
+		std(8) = 1e-5;												// v z
+		std(9) = 1e-5;												// v a_w
+		std(10) = 1e-5;												// v a_d
+		std(11) = 10 * _std_weight_velocity * dimensional_factor;	// v h
 
 		KAL_MEAN tmp = std.array().square();
 		KAL_COVA var = tmp.asDiagonal();
@@ -61,24 +66,27 @@ namespace byte_kalman
 	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance)
 	{
 		// mean(3) in xyah representation is the only value representing the real size of the object -> big object = big height
-		// With the same meaning mean(6) in xyzwadah is the only real size
+		// With the same meaning mean(5) in xyzwadah is the only real size
 		// A cov is given to pos that changes in real time in proportion to the object size
 		// revise the data;
-		float size_regularization = mean(6);
-		// TODO: change after DETECTBOX
+		float size_regularization = mean(5);
 		DETECTBOX std_pos;
 		std_pos << _std_weight_position * size_regularization,
 			_std_weight_position * size_regularization,
+			1e-2,
+			1e-2,
 			1e-2,
 			_std_weight_position * size_regularization;
 		DETECTBOX std_vel;
 		std_vel << _std_weight_velocity * size_regularization,
 			_std_weight_velocity * size_regularization,
 			1e-5,
+			1e-5,
+			1e-5,
 			_std_weight_velocity * size_regularization;
 		KAL_MEAN tmp;
-		tmp.block<1, 4>(0, 0) = std_pos;
-		tmp.block<1, 4>(0, 4) = std_vel;
+		tmp.block<1, 6>(0, 0) = std_pos;
+		tmp.block<1, 6>(0, 6) = std_vel;
 		tmp = tmp.array().square();
 		KAL_COVA motion_cov = tmp.asDiagonal();
 		KAL_MEAN mean1 = this->_motion_mat * mean.transpose();
@@ -92,11 +100,16 @@ namespace byte_kalman
 	KAL_HDATA KalmanFilter::project(const KAL_MEAN &mean, const KAL_COVA &covariance)
 	{
 		DETECTBOX std;
-		std << _std_weight_position * mean(3), _std_weight_position * mean(3),
-			1e-1, _std_weight_position * mean(3);
+		float size_regularization = mean(5);
+		std << _std_weight_position * size_regularization,
+			_std_weight_position * size_regularization,
+			1e-1, 
+			1e-1, 
+			1e-1, 
+			_std_weight_position * size_regularization;
 		KAL_HMEAN mean1 = _update_mat * mean.transpose();
 		KAL_HCOVA covariance1 = _update_mat * covariance * (_update_mat.transpose());
-		Eigen::Matrix<float, 4, 4> diag = std.asDiagonal();
+		Eigen::Matrix<float, 6, 6> diag = std.asDiagonal();
 		diag = diag.array().square().matrix();
 		covariance1 += diag;
 		//    covariance1.diagonal() << diag;
@@ -119,9 +132,10 @@ namespace byte_kalman
 		//scipy.linalg.cho_solve((cho_factor, lower),
 		//np.dot(covariance, self._upadte_mat.T).T,
 		//check_finite=False).T
-		Eigen::Matrix<float, 4, 8> B = (covariance * (_update_mat.transpose())).transpose();
-		Eigen::Matrix<float, 8, 4> kalman_gain = (projected_cov.llt().solve(B)).transpose(); // eg.8x4
-		Eigen::Matrix<float, 1, 4> innovation = measurement - projected_mean; //eg.1x4
+		Eigen::Matrix<float, 6, 12> B = (covariance * (_update_mat.transpose())).transpose();
+		// Computes the Cholesky decomposition and performs a triangular solve to find the Kalman gain.
+		Eigen::Matrix<float, 12, 6> kalman_gain = (projected_cov.llt().solve(B)).transpose(); // eg.12x6
+		Eigen::Matrix<float, 1, 6> innovation = measurement - projected_mean; //eg.1x6
 		auto tmp = innovation * (kalman_gain.transpose());
 		KAL_MEAN new_mean = (mean.array() + tmp.array()).matrix();
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
@@ -140,17 +154,24 @@ namespace byte_kalman
 			printf("not implement!");
 			exit(0);
 		}
+
 		KAL_HMEAN mean1 = pa.first;
 		KAL_HCOVA covariance1 = pa.second;
 
-		//    Eigen::Matrix<float, -1, 4, Eigen::RowMajor> d(size, 4);
-		DETECTBOXSS d(measurements.size(), 4);
+		//    Eigen::Matrix<float, -1, 6, Eigen::RowMajor> d(size, 6);
+		DETECTBOXSS d(measurements.size(), 6);
 		int pos = 0;
 		for (DETECTBOX box : measurements) {
 			d.row(pos++) = box - mean1;
 		}
+
+		// Calculates the Cholesky decomposition of the covariance1 matrix and extracts the lower triangular matrix factor.
+		// The Cholesky decomposition is used to decompose a positive-definite matrix into a product of
+		// a lower triangular matrix and its transpose.
 		Eigen::Matrix<float, -1, -1, Eigen::RowMajor> factor = covariance1.llt().matrixL();
+		// z is calculated by solving the linear system 'factor * z = d' for z.
 		Eigen::Matrix<float, -1, -1> z = factor.triangularView<Eigen::Lower>().solve<Eigen::OnTheRight>(d).transpose();
+		// Element-wise squaring of the z matrix
 		auto zz = ((z.array())*(z.array())).matrix();
 		auto square_maha = zz.colwise().sum();
 		return square_maha;
