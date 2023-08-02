@@ -151,6 +151,7 @@ class YoloDetector(Node):
         for box_data in results.boxes:
 
             detection = Detection3D()
+            detection.header = detections_msg.header
 
             # get label and score
             label = self.yolo.names[int(box_data.cls)]

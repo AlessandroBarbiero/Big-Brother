@@ -169,6 +169,7 @@ class ThermalDetector(Node):
                 right_base_pt = (x+w, y)
 
                 detection = Detection3D()
+                detection.header = detections_msg.header
 
                 # Project base points into Bird Eye View Projection
                 points = np.array([left_base_pt, right_base_pt])
