@@ -2,7 +2,7 @@
 #define LAPJV_H
 
 #define LARGE 1000000
-
+ 
 #if !defined TRUE
 #define TRUE 1
 #endif

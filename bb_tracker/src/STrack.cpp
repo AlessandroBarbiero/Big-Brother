@@ -1,6 +1,6 @@
 #include <bb_tracker/STrack.h>
 
-STrack::STrack(vector<float> minwdh_, float score)
+STrack::STrack(vector<float> minwdh_, float score, std::string class_name)
 {
 	_minwdh.resize(6);
 	_minwdh.assign(minwdh_.begin(), minwdh_.end());
@@ -17,6 +17,7 @@ STrack::STrack(vector<float> minwdh_, float score)
 	frame_id = 0;
 	tracklet_len = 0;
 	this->score = score;
+	this->class_name = class_name;
 	start_frame = 0;
 }
 
@@ -37,13 +38,15 @@ void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
 	_minwdh_tmp[4] = this->_minwdh[4];
 	_minwdh_tmp[5] = this->_minwdh[5];
 	vector<float> xyzaah = minwdh_to_xyzaah(_minwdh_tmp);
-	//TODO: change after DETECTBOX
-	DETECTBOX xyah_box;
-	xyah_box[0] = xyzaah[0];
-	xyah_box[1] = xyzaah[1];
-	xyah_box[2] = xyzaah[2];
-	xyah_box[3] = xyzaah[3];
-	auto mc = this->kalman_filter.initiate(xyah_box);
+
+	DETECTBOX xyzaah_box;
+	xyzaah_box[0] = xyzaah[0];
+	xyzaah_box[1] = xyzaah[1];
+	xyzaah_box[2] = xyzaah[2];
+	xyzaah_box[3] = xyzaah[3];
+	xyzaah_box[4] = xyzaah[4];
+	xyzaah_box[5] = xyzaah[5];
+	auto mc = this->kalman_filter.initiate(xyzaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -63,14 +66,16 @@ void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
 
 void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
-	vector<float> xyah = minwdh_to_xyzaah(new_track.minwdh);
-	// TODO: change after DETECTBOX
-	DETECTBOX xyah_box;
-	xyah_box[0] = xyah[0];
-	xyah_box[1] = xyah[1];
-	xyah_box[2] = xyah[2];
-	xyah_box[3] = xyah[3];
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyah_box);
+	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+
+	DETECTBOX xyzaah_box;
+	xyzaah_box[0] = xyzaah[0];
+	xyzaah_box[1] = xyzaah[1];
+	xyzaah_box[2] = xyzaah[2];
+	xyzaah_box[3] = xyzaah[3];
+	xyzaah_box[4] = xyzaah[4];
+	xyzaah_box[5] = xyzaah[5];
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyzaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -92,14 +97,16 @@ void STrack::update(STrack &new_track, int frame_id)
 	this->tracklet_len++;
 
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
-	// TODO: change after DETECTBOX
-	DETECTBOX xyah_box;
-	xyah_box[0] = xyzaah[0];
-	xyah_box[1] = xyzaah[1];
-	xyah_box[2] = xyzaah[2];
-	xyah_box[3] = xyzaah[3];
 
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyah_box);
+	DETECTBOX xyzaah_box;
+	xyzaah_box[0] = xyzaah[0];
+	xyzaah_box[1] = xyzaah[1];
+	xyzaah_box[2] = xyzaah[2];
+	xyzaah_box[3] = xyzaah[3];
+	xyzaah_box[4] = xyzaah[4];
+	xyzaah_box[5] = xyzaah[5];
+
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyzaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -206,11 +213,11 @@ int STrack::end_frame()
 
 void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter)
 {
-	for (int i = 0; i < stracks.size(); i++)
+	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
 		if (stracks[i]->state != TrackState::Tracked)
 		{
-			stracks[i]->mean[7] = 0;
+			stracks[i]->mean[11] = 0; // Set to 0 the velocity of the change in size for h
 		}
 		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance);
 		stracks[i]->static_minwdh();

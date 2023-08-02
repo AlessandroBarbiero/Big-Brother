@@ -39,7 +39,7 @@ namespace byte_kalman
 		Eigen::Matrix<float, 6, 12, Eigen::RowMajor> _update_mat;
 		float _std_weight_position;
 		float _std_weight_velocity;
-		const int detection_dim = 6;
-		const int state_dim = 12;
+		int detection_dim = 6;
+		int state_dim = 12;
 	};
 }

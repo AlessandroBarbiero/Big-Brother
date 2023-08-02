@@ -5,15 +5,6 @@
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <map>
 
-std::unordered_map<std::string, int> class_to_int{
-	{"person", 0},
-	{"pedestrian", 0},
-	{"vehicle", 1},
-	{"car", 1},
-	{"truck", 1},
-	{"bicycle", 2},
-};
-
 struct Object
 {
     vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size <--- ex cv::Rect_
@@ -29,6 +20,9 @@ public:
 
 	vector<STrack> update(const vector<Object>& objects);
 	Scalar get_color(int idx);
+
+	static std::unordered_map<std::string, int> class_to_int;
+	static std::unordered_map<int, std::string> int_to_class;
 
 private:
 	vector<STrack*> joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb);

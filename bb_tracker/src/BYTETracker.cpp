@@ -16,6 +16,22 @@ BYTETracker::~BYTETracker()
 {
 }
 
+std::unordered_map<std::string, int> BYTETracker::class_to_int{
+	{"person", 0},
+	{"pedestrian", 0},
+	{"vehicle", 1},
+	{"car", 1},
+	{"truck", 1},
+	{"motorcycle", 1},
+	{"bicycle", 2}
+};
+
+std::unordered_map<int, std::string> BYTETracker::int_to_class{
+	{0, "person"},
+	{1, "vehicle"},
+	{2, "bicycle"}
+};
+
 vector<STrack> BYTETracker::update(const vector<Object>& objects)
 {
 
@@ -42,18 +58,20 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 	{
 		for (unsigned int i = 0; i < objects.size(); i++)
 		{
+			auto object = objects[i];
 			vector<float> minmax_;
 			minmax_.resize(6);
-			minmax_[0] = objects[i].box.center.position.x - objects[i].box.size.x/2;
-			minmax_[1] = objects[i].box.center.position.y - objects[i].box.size.y/2;
-			minmax_[2] = objects[i].box.center.position.z - objects[i].box.size.z/2;
-			minmax_[3] = objects[i].box.center.position.x + objects[i].box.size.x/2;
-			minmax_[4] = objects[i].box.center.position.y + objects[i].box.size.y/2;
-			minmax_[5] = objects[i].box.center.position.z + objects[i].box.size.z/2;
+			minmax_[0] = object.box.center.position.x - object.box.size.x/2;
+			minmax_[1] = object.box.center.position.y - object.box.size.y/2;
+			minmax_[2] = object.box.center.position.z - object.box.size.z/2;
+			minmax_[3] = object.box.center.position.x + object.box.size.x/2;
+			minmax_[4] = object.box.center.position.y + object.box.size.y/2;
+			minmax_[5] = object.box.center.position.z + object.box.size.z/2;
 
-			float score = objects[i].prob;
+			float score = object.prob;
+			std::string class_name = int_to_class[object.label];
 
-			STrack strack(STrack::minmax_to_minwdh(minmax_), score);
+			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name);
 			if (score >= track_thresh)
 			{
 				detections.push_back(strack);
