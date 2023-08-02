@@ -40,11 +40,9 @@ link_directories(/usr/lib/x86_64-linux-gnu)
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-# find_package(std_msgs REQUIRED)
-# find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
-# find_package(cv_bridge REQUIRED)
-# find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 
 # Add to include header files
@@ -75,7 +73,8 @@ add_executable(bb_tracker
   )
 ament_target_dependencies(bb_tracker
   rclcpp
-  # std_msgs
+  tf2_ros
+  tf2_geometry_msgs
   vision_msgs
   OpenCV
   # bb_interfaces
