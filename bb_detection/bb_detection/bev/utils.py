@@ -24,7 +24,6 @@ def load_camera_data(data_path, intrinsic_file, extrinsic_file):
             'fy': camera_config.getfloat(config_intrinsics_section, 'fy'),
             'u0': camera_config.getfloat(config_intrinsics_section, 'cx'),
             'v0': camera_config.getfloat(config_intrinsics_section, 'cy')
-            # TODO add distorsion!!
         },
         'extrinsic': {
             'x': camera_config.getfloat(config_extrinsics_section, 'x'),
