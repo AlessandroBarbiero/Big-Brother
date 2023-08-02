@@ -23,7 +23,7 @@ def generate_launch_description():
             ("/camera_info", "/carla/sensors_home/static_termic_camera/camera_info")
         ],
         parameters=[
-            {"show_debug": True}
+            {"show_debug": False}
         ]
     )
 
