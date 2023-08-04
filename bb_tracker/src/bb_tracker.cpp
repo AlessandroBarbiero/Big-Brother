@@ -1,6 +1,7 @@
 #include <bb_tracker/bb_tracker.hpp>
 
 // #define DEBUG
+#define OBJECT_BUFFER_SIZE 500
 
 BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
@@ -38,12 +39,44 @@ BBTracker::BBTracker()
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
 
+  // ROS Timer
+  std::chrono::milliseconds ms_to_call((1000/fps));
+  _timer = this->create_wall_timer(
+      ms_to_call, std::bind(&BBTracker::periodic_update, this));
+
+  // Reserve space trying to avoid frequent dynamical reallocation
+  _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
+
   // Init BYTETracker object
   _tracker.init(fps, t_buffer, t_thresh, h_thresh, m_thresh);
   _num_detections = 0;
+  _num_updates = 0;
   _total_ms = 0;
 
   RCLCPP_INFO(this->get_logger(), "Ready to track");
+}
+
+void BBTracker::periodic_update(){
+  _num_updates++;
+
+  // Update the tracker
+  auto start = chrono::system_clock::now();
+  // Get the Tracks for the objects currently beeing tracked
+  vector<STrack> output_stracks = _tracker.update(_objects_buffer);
+  _objects_buffer.clear();
+
+  auto end = chrono::system_clock::now();
+  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+
+  #ifdef DEBUG
+    std::cout << "Tracker updated showing " << output_stracks.size() <<
+    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
+  #endif
+
+  publish_stracks(output_stracks);
+  // Show Progress
+  std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
+  std::cout.flush();
 }
 
 void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
@@ -145,13 +178,13 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
   _num_detections++;
   if (_num_detections % 50 == 0)
   {
-      RCLCPP_INFO(this->get_logger(), "Processing frame %d (%d fps)", _num_detections, _num_detections * 1000000 / _total_ms);
+      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
       //std::cout << "Processing frame " << _num_detections << " (" << _num_detections * 1000000 / _total_ms << " fps)" << std::endl;
   }
   if (detections_message->detections.empty())
     return;
 
-  // Decode detections and update the tracker
+  // Decode detections
   auto start = chrono::system_clock::now();
 
   // Move all the detections to a common fixed frame
@@ -162,20 +195,17 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
   vector<Object> objects;
   // Put detection3d array inside the object structure
   decode_detections(detections_message, objects);
-  // Get the Tracks for the object detected
-  vector<STrack> output_stracks = _tracker.update(objects);
-
-  #ifdef DEBUG
-    std::cout << "Tracker updated showing " << output_stracks.size() <<
-    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
-  #endif
+  _objects_buffer.insert(_objects_buffer.end(), objects.begin(), objects.end());
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+}
 
+void BBTracker::publish_stracks(vector<STrack> output_stracks){
   auto out_message = vision_msgs::msg::Detection3DArray();
-  out_message.header = detections_message->header;
+  out_message.header.stamp = get_clock()->now();
   out_message.header.frame_id = _fixed_frame;
+
   out_message.detections.resize(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
@@ -193,8 +223,6 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
                 << " h=" << minwdh[5]
                 << std::endl;
     #endif
-    // bool vertical = tlwh[2] / tlwh[3] > 1.6; <-- show only vertical and big rectangles
-    // if (tlwh[2] * tlwh[3] > 20 && !vertical)
 
     // Show tracking
     vision_msgs::msg::Detection3D single_det = vision_msgs::msg::Detection3D();
@@ -215,19 +243,18 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
 
     out_message.detections.push_back(single_det);
     
+    // Example way to get colors for tracks
     // Scalar s_color = _tracker.get_color(output_stracks[i].track_id);
-    // putText(img, format("%d", output_stracks[i].track_id), Point(tlwh[0], tlwh[1] - 5), 
-    //                 0, 0.6, Scalar(0, 0, 255), 2, LINE_AA);
-    // rectangle(img, Rect(tlwh[0], tlwh[1], tlwh[2], tlwh[3]), s_color, 2);
-
   }
 
   _det_publisher->publish(out_message);
-  // Show Progress
-  std::cout << format("frame: %d fps: %d num_tracks: %lu", _num_detections, _num_detections * 1000000 / _total_ms, output_stracks.size()) << "\r";
-  std::cout.flush();
 }
 
+
+
+// %%%%%%%%%%%%%%
+// %%%  MAIN  %%%
+// %%%%%%%%%%%%%%
 
 int main(int argc, char * argv[])
 {

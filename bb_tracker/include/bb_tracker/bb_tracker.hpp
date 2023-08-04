@@ -35,6 +35,8 @@ class BBTracker : public rclcpp::Node
   private:
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object>& objects);
     void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
+    void periodic_update();
+    void publish_stracks(vector<STrack> output_stracks);
 
   private:
 
@@ -42,10 +44,17 @@ class BBTracker : public rclcpp::Node
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
 
+    rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
 
+
     BYTETracker _tracker;
+    vector<Object> _objects_buffer;
+    // Total number of detections received
     int _num_detections;
-    int _total_ms;
+    // Total number of BYTETracker updates
+    int _num_updates;
+    // Microseconds passed computing the algorithm
+    long unsigned int _total_ms;
 };

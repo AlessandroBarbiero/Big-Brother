@@ -17,7 +17,14 @@ void BYTETracker::init(int frame_rate, int track_buffer, float track_thresh, flo
 	frame_id = 0;
 	float max_time_lost = track_buffer*1.0/frame_rate;
 	this->track_buffer = track_buffer;
-	cout << "Init ByteTrack! (Max time lost = " << max_time_lost << " seconds)"<< endl;
+	std::cout << "Init ByteTrack! (Max time lost = " << max_time_lost << " seconds)"<< std::endl;
+	std::cout << "Parameters: " 
+	<< "\n\tframe_rate = " << frame_rate
+	<< "\n\ttrack_buffer = " << track_buffer
+	<< "\n\ttrack_thresh = " << track_thresh
+	<< "\n\thigh_thresh = " << high_thresh
+	<< "\n\tmatch_thresh = " << match_thresh
+	<< std::endl;
 }
 
 std::unordered_map<std::string, int> BYTETracker::class_to_int{
