@@ -5,6 +5,7 @@
 BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
+  // ROS Parameters
   auto fps_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fps_desc.description = "Frequency of the Tracker, number of executions per second";
   auto t_buffer_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -31,11 +32,13 @@ BBTracker::BBTracker()
   float m_thresh =  get_parameter("match_thresh").as_double();
   _fixed_frame =    get_parameter("fixed_frame").as_string();
 
+  // ROS Subscriber and Publisher
   _detection = this->create_subscription<vision_msgs::msg::Detection3DArray>(
-          "detection_3d", 10, std::bind(&BBTracker::add_detection, this, _1));
+          "bytetrack/detections", 10, std::bind(&BBTracker::add_detection, this, _1));
 
-  _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/detections", 10);
+  _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
 
+  // Init BYTETracker object
   _tracker.init(fps, t_buffer, t_thresh, h_thresh, m_thresh);
   _num_detections = 0;
   _total_ms = 0;
