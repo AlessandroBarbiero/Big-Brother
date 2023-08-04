@@ -7,6 +7,7 @@
 #include <tf2_ros/buffer.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 // ROS msgs
+#include <geometry_msgs/msg/transform_stamped.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include <vision_msgs/msg/detection3_d.hpp>
 // extra
@@ -43,24 +44,83 @@ class BBTracker : public rclcpp::Node
         RCLCPP_INFO(this->get_logger(), "Ready to track");
     }
 
-    //FIXME: try with yolo detector
+    /**
+    * Transforms the detections in the input old_message from the old_frame to the new_frame.
+    * The function calculates the transformation and applies it to the bounding box positions, orientations, and dimensions.
+    * If any error occurs while obtaining the transform, a message is printed, and the function returns.
+    * This operation is done in place, meaning the original old_message->detections are modified with the transformed values.
+    * @param old_message The shared pointer to the input vision_msgs::msg::Detection3DArray containing the detections to transform.
+    * @param new_frame The std::string& representing the new_frame to which the detections are transformed.
+    */
     void change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
-      auto detections = old_message->detections;
-      for(auto& detect : detections){
-        // Transform
-        geometry_msgs::msg::PoseStamped old_pose;
-        old_pose.header = detect.header;
-        old_pose.pose = detect.bbox.center;
-        auto new_pose = _tf_buffer.transform(old_pose, new_frame);
-        geometry_msgs::msg::Vector3Stamped old_size;
-        old_size.header = detect.header;
-        old_size.vector = detect.bbox.size;
-        auto new_size = _tf_buffer.transform(old_size, new_frame);
-        // Assign back
-        detect.header.frame_id = new_frame;
-        detect.bbox.center = new_pose.pose;
-        detect.bbox.size = new_size.vector;
+      std::string old_frame = old_message->header.frame_id;
+      geometry_msgs::msg::TransformStamped tf_result;
+      try {
+        tf_result = _tf_buffer.lookupTransform(new_frame, old_frame, rclcpp::Time(0));
+      } catch (tf2::TransformException& ex) {
+        std::cout << "No transform exists for the given tfs" << std::endl;
+        return;
       }
+      tf2::Quaternion q(
+        tf_result.transform.rotation.x,
+        tf_result.transform.rotation.y,
+        tf_result.transform.rotation.z,
+        tf_result.transform.rotation.w
+      );
+      tf2::Vector3 p(
+        tf_result.transform.translation.x,
+        tf_result.transform.translation.y,
+        tf_result.transform.translation.z
+      );
+      tf2::Transform transform(q, p);
+
+      // for(auto& detect : old_message->detections){
+      //   auto bbox = detect.bbox;
+      //   std::cout << "bbox BEFORE transform values: " 
+      //               << " x=" << bbox.center.position.x
+      //               << " y=" << bbox.center.position.y
+      //               << " z=" << bbox.center.position.z
+      //               << " w=" << bbox.size.x
+      //               << " d=" << bbox.size.y
+      //               << " h=" << bbox.size.z
+      //               << std::endl;
+      // }
+
+      for(auto& detect : old_message->detections){
+
+        tf2::Vector3 v(detect.bbox.center.position.x, detect.bbox.center.position.y, detect.bbox.center.position.z);
+        v = transform * v;
+        detect.bbox.center.position.x = v.x();
+        detect.bbox.center.position.y = v.y();
+        detect.bbox.center.position.z = v.z();
+
+        tf2::Quaternion quat(detect.bbox.center.orientation.x, detect.bbox.center.orientation.y, detect.bbox.center.orientation.z, detect.bbox.center.orientation.w);
+        quat = transform * quat;
+        detect.bbox.center.orientation.x = quat.x();
+        detect.bbox.center.orientation.y = quat.y();
+        detect.bbox.center.orientation.z = quat.z();
+        detect.bbox.center.orientation.w = quat.w();
+
+        tf2::Vector3 s(detect.bbox.size.x, detect.bbox.size.y, detect.bbox.size.z);
+        tf2::Matrix3x3 rot_m(transform.getRotation());
+        s = rot_m * s;
+        s = s.absolute();
+        detect.bbox.size.x = s.x();
+        detect.bbox.size.y = s.y();
+        detect.bbox.size.z = s.z();
+      }
+
+      // for(auto& detect : old_message->detections){
+      //   auto bbox = detect.bbox;
+      //   std::cout << "bbox AFTER transform values: " 
+      //               << " x=" << bbox.center.position.x
+      //               << " y=" << bbox.center.position.y
+      //               << " z=" << bbox.center.position.z
+      //               << " w=" << bbox.size.x
+      //               << " d=" << bbox.size.y
+      //               << " h=" << bbox.size.z
+      //               << std::endl;
+      // }
 
       old_message->header.frame_id = new_frame;
       return;
@@ -100,10 +160,12 @@ class BBTracker : public rclcpp::Node
     
       // Decode detections and update the tracker
       auto start = chrono::system_clock::now();
+
       // Move all the detections to a common fixed frame
       if(detections_message->header.frame_id != _fixed_frame){
         change_frame(detections_message, _fixed_frame);
       }
+
       vector<Object> objects;
       // Put detection3d array inside the object structure
       decode_detections(detections_message, objects);
