@@ -5,22 +5,42 @@
 BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
-    this->declare_parameter("fps", 30);
-    this->declare_parameter("fixed_frame", "sensors_home");
+  auto fps_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  fps_desc.description = "Frequency of the Tracker, number of executions per second";
+  auto t_buffer_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  t_buffer_desc.description = "Number of frames a track is kept if it is not seen in the scene";
+  auto t_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  t_thresh_desc.description = "This threshold is used to divide initially the detections into high and low score, high score detections are considered first for matching";
+  auto h_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  h_thresh_desc.description = "This threshold is used to determine whether a high score detected object should be considered as a new object if it does not match with previously considered tracklets";
+  auto m_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
+  auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+  this->declare_parameter("fps", 30, fps_desc);
+  this->declare_parameter("track_buffer", 30, t_buffer_desc);
+  this->declare_parameter("track_thresh", 0.5, t_thresh_desc);
+  this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
+  this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
+  this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
-    _fixed_frame = get_parameter("fixed_frame").as_string();
-    int fps = get_parameter("fps").as_int();
+  int fps =         get_parameter("fps").as_int();
+  int t_buffer =    get_parameter("track_buffer").as_int();
+  float t_thresh =  get_parameter("high_thresh").as_double();
+  float h_thresh =  get_parameter("track_thresh").as_double();
+  float m_thresh =  get_parameter("match_thresh").as_double();
+  _fixed_frame =    get_parameter("fixed_frame").as_string();
 
-    _detection = this->create_subscription<vision_msgs::msg::Detection3DArray>(
-            "detection_3d", 10, std::bind(&BBTracker::add_detection, this, _1));
+  _detection = this->create_subscription<vision_msgs::msg::Detection3DArray>(
+          "detection_3d", 10, std::bind(&BBTracker::add_detection, this, _1));
 
-    _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/detections", 10);
+  _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/detections", 10);
 
-    _tracker = BYTETracker(fps, 30);
-    _num_detections = 0;
-    _total_ms = 0;
+  _tracker.init(fps, t_buffer, t_thresh, h_thresh, m_thresh);
+  _num_detections = 0;
+  _total_ms = 0;
 
-    RCLCPP_INFO(this->get_logger(), "Ready to track");
+  RCLCPP_INFO(this->get_logger(), "Ready to track");
 }
 
 void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){

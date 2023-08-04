@@ -38,11 +38,12 @@ class BBTracker : public rclcpp::Node
 
   private:
 
+    std::string _fixed_frame;
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
+
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
-    std::string _fixed_frame;
 
     BYTETracker _tracker;
     int _num_detections;

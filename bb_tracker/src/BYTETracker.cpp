@@ -1,19 +1,23 @@
 #include <bb_tracker/BYTETracker.h>
 #include <fstream>
 
-BYTETracker::BYTETracker(int frame_rate, int track_buffer)
+BYTETracker::BYTETracker()
 {
-	track_thresh = 0.5;
-	high_thresh = 0.6;
-	match_thresh = 0.8;
-
-	frame_id = 0;
-	max_time_lost = int(frame_rate / 30.0 * track_buffer);
-	cout << "Init ByteTrack!" << endl;
 }
 
 BYTETracker::~BYTETracker()
 {
+}
+
+void BYTETracker::init(int frame_rate, int track_buffer, float track_thresh, float high_thresh, float match_thresh){
+	this->track_thresh = track_thresh; //0.5;
+	this->high_thresh  = high_thresh;  //0.6;
+	this->match_thresh = match_thresh; //0.8;
+
+	frame_id = 0;
+	float max_time_lost = track_buffer*1.0/frame_rate;
+	this->track_buffer = track_buffer;
+	cout << "Init ByteTrack! (Max time lost = " << max_time_lost << " seconds)"<< endl;
 }
 
 std::unordered_map<std::string, int> BYTETracker::class_to_int{
@@ -209,7 +213,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
-		if (this->frame_id - this->lost_stracks[i].end_frame() > this->max_time_lost)
+		if (this->frame_id - this->lost_stracks[i].end_frame() > this->track_buffer)
 		{
 			this->lost_stracks[i].mark_removed();
 			removed_stracks.push_back(this->lost_stracks[i]);
