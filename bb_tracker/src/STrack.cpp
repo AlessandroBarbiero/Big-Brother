@@ -39,14 +39,13 @@ void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
 	_minwdh_tmp[5] = this->_minwdh[5];
 	vector<float> xyzaah = minwdh_to_xyzaah(_minwdh_tmp);
 
-	DETECTBOX xyzaah_box;
-	xyzaah_box[0] = xyzaah[0];
-	xyzaah_box[1] = xyzaah[1];
-	xyzaah_box[2] = xyzaah[2];
-	xyzaah_box[3] = xyzaah[3];
-	xyzaah_box[4] = xyzaah[4];
-	xyzaah_box[5] = xyzaah[5];
-	auto mc = this->kalman_filter.initiate(xyzaah_box);
+	DETECTBOX3D xyaah_box;
+	xyaah_box[0] = xyzaah[0];
+	xyaah_box[1] = xyzaah[1];
+	xyaah_box[2] = xyzaah[3];
+	xyaah_box[3] = xyzaah[4];
+	xyaah_box[4] = xyzaah[5];
+	auto mc = this->kalman_filter.initiate(xyaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -68,14 +67,15 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
-	DETECTBOX xyzaah_box;
-	xyzaah_box[0] = xyzaah[0];
-	xyzaah_box[1] = xyzaah[1];
-	xyzaah_box[2] = xyzaah[2];
-	xyzaah_box[3] = xyzaah[3];
-	xyzaah_box[4] = xyzaah[4];
-	xyzaah_box[5] = xyzaah[5];
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyzaah_box);
+	DETECTBOX3D xyaah_box;
+	xyaah_box[0] = xyzaah[0];
+	xyaah_box[1] = xyzaah[1];
+	xyaah_box[2] = xyzaah[3];
+	xyaah_box[3] = xyzaah[4];
+	xyaah_box[4] = xyzaah[5];
+
+	// TODO add dt
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -98,15 +98,15 @@ void STrack::update(STrack &new_track, int frame_id)
 
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
-	DETECTBOX xyzaah_box;
-	xyzaah_box[0] = xyzaah[0];
-	xyzaah_box[1] = xyzaah[1];
-	xyzaah_box[2] = xyzaah[2];
-	xyzaah_box[3] = xyzaah[3];
-	xyzaah_box[4] = xyzaah[4];
-	xyzaah_box[5] = xyzaah[5];
+	DETECTBOX3D xyaah_box;
+	xyaah_box[0] = xyzaah[0];
+	xyaah_box[1] = xyzaah[1];
+	xyaah_box[2] = xyzaah[3];
+	xyaah_box[3] = xyzaah[4];
+	xyaah_box[4] = xyzaah[5];
 
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyzaah_box);
+	// TODO add dt
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 
@@ -134,21 +134,16 @@ void STrack::static_minwdh()
 
 	minwdh[0] = mean[0];
 	minwdh[1] = mean[1];
-	minwdh[2] = mean[2];
+	minwdh[2] = 0.0;
 	minwdh[3] = mean[3];
 	minwdh[4] = mean[4];
 	minwdh[5] = mean[5];
 
-	// 2D
-	// tlwh[2] *= tlwh[3];
-	// tlwh[0] -= tlwh[2] / 2;
-	// tlwh[1] -= tlwh[3] / 2;
 
 	minwdh[3] *= minwdh[5];
 	minwdh[4] *= minwdh[5];
 	minwdh[0] -= minwdh[3] / 2;
 	minwdh[1] -= minwdh[4] / 2;
-	minwdh[2] -= minwdh[5] / 2;
 
 }
 
@@ -215,11 +210,13 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		if (stracks[i]->state != TrackState::Tracked)
-		{
-			stracks[i]->mean[11] = 0; // Set to 0 the velocity of the change in size for h
-		}
-		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance);
+		// if (stracks[i]->state != TrackState::Tracked)
+		// {
+		// 	stracks[i]->mean[11] = 0; // Set to 0 the velocity of the change in size for h
+		// }
+
+		// TODO add dt
+		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, 1.0);
 		stracks[i]->static_minwdh();
 		stracks[i]->static_minmax();
 	}

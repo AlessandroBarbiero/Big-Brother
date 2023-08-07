@@ -9,7 +9,8 @@ namespace byte_kalman
 	public:
 		static const double chi2inv95[10];
 		KalmanFilter();
-		KAL_DATA initiate(const DETECTBOX& measurement);
+		KAL_DATA initiate(const DETECTBOX3D& measurement);
+		KAL_DATA initiate(const DETECTBOX2D& measurement);
 
 		/**
 		 * Predicts the Kalman filter state and covariance at the next step and returns them throught the input parameters
@@ -19,38 +20,76 @@ namespace byte_kalman
 		 * P_x(t+1) = F*P_x(t)*F^T + V1
 		 * @param mean The current state x(t) of the Kalman Filter - return x~(t+1)
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state - return P_x~(t+1)
+		 * @param dt Time passed from the last measurement in seconds
 		*/
-		void predict(KAL_MEAN& mean, KAL_COVA& covariance);
+		void predict(KAL_MEAN& mean, KAL_COVA& covariance, double dt);
 
+		// %%%%%%%%%%%%%%%
+		// %%% PROJECT %%%
+		// %%%%%%%%%%%%%%%
 		/**
-		 * Project the current state of the Kalman Filter into measurement space.
+		 * Project the current state of the Kalman Filter into measurement space 3D.
 		 * Equations:
 		 * y~(t|t-1) = H*x(t|t-1)
 		 * P_y(t+1) = H*P_x(t)*H^T + V2
 		 * @param mean The current state x(t) of the Kalman Filter
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
-		 * @return The predicted output y(t|t-1) mean and covariance P_y(t)
+		 * @return The predicted output y(t|t-1) mean and covariance P_y(t) in 3 dimensions
 		*/
-		KAL_HDATA project(const KAL_MEAN& mean, const KAL_COVA& covariance);
+		KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
+		/**
+		 * Project the current state of the Kalman Filter into measurement space 2D.
+		 * Equations:
+		 * y~(t|t-1) = H*x(t|t-1)
+		 * P_y(t+1) = H*P_x(t)*H^T + V2
+		 * @param mean The current state x(t) of the Kalman Filter
+		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
+		 * @return The predicted output y(t|t-1) mean and covariance P_y(t) in 2 dimensions
+		*/
+		KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 
+		// %%%%%%%%%%%%%%
+		// %%% UPDATE %%%
+		// %%%%%%%%%%%%%%
 		/**
 		 * Update the state estimate based on the actual measurement received at time t.
-		 * This phase is responsible for fusing the predicted state with the measurement,
-		 * providing an updated and more accurate state estimate. 
+		 * 
 		 * Equations:
 		 * e(t) = y(t) - y~(t|t-1)
 		 * K(t) = (P*H^T) * (H*P*H^T + V2)^-1
 		 * x(t|t) = x(t+1|t) + K(t) * e(t)
 		 * P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
-		 * @param mean        The current state mean estimate (x(t|t-1)).
-		 * @param covariance  The current state covariance estimate (P(t|t-1)).
-		 * @param measurement The measurement obtained at time t.
+		 * @param mean        The current state mean estimate (x(t|t-1))
+		 * @param covariance  The current state covariance estimate (P(t|t-1))
+		 * @param measurement The measurement 3D obtained at time t
+		 * @param dt Time passed from the last measurement in seconds
 		 * 
-		 * @return A pair containing the updated state mean estimate (x(t|t)) and covariance (P(t|t)).
+		 * @return A pair containing the updated state mean estimate (x(t|t)) and covariance (P(t|t))
 		*/
 		KAL_DATA update(const KAL_MEAN& mean,
 			const KAL_COVA& covariance,
-			const DETECTBOX& measurement);
+			const DETECTBOX3D& measurement,
+			double dt);
+		/**
+		 * Update the state estimate based on the actual measurement received at time t.
+		 * 
+		 * Equations:
+		 * e(t) = y(t) - y~(t|t-1)
+		 * K(t) = (P*H^T) * (H*P*H^T + V2)^-1
+		 * x(t|t) = x(t+1|t) + K(t) * e(t)
+		 * P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
+		 * @param mean        The current state mean estimate (x(t|t-1))
+		 * @param covariance  The current state covariance estimate (P(t|t-1))
+		 * @param measurement The measurement 2D obtained at time t
+		 * @param dt Time passed from the last measurement in seconds
+		 * 
+		 * @return A pair containing the updated state mean estimate (x(t|t)) and covariance (P(t|t))
+		*/
+		KAL_DATA update(const KAL_MEAN& mean,
+			const KAL_COVA& covariance,
+			const DETECTBOX2D& measurement,
+			double dt);
+
 
 		/**
 		 * Gating distance sets a threshold that defines a region around the predicted state within 
@@ -61,26 +100,33 @@ namespace byte_kalman
 		 * should be given to the measurement during the state update.
 		 * This allows the Kalman filter to effectively incorporate noisy measurements while maintaining a balance between
 		 * the prediction and measurement information.
-		 * @param mean: The predicted state mean (a vector).
-		 * @param covariance: The predicted state covariance matrix.
-		 * @param measurements: A vector of measurements (each represented as a DETECTBOX vector).
+		 * @param mean: The predicted state mean (a vector)
+		 * @param covariance: The predicted state covariance matrix
+		 * @param measurements: A vector of measurements (each represented as a DETECTBOX vector)
 		 * @param only_position: A boolean flag that determines whether only the position (coordinates)
 		 * should be considered for the Mahalanobis distance calculation. (Not implemented yet)
-		 * @return The squared Mahalanobis distance for each measurement with respect to the predicted state. 
+		 * @return The squared Mahalanobis distance for each measurement with respect to the predicted state.
 		 * The result is represented as a row vector of floating-point values (Eigen::Matrix<float, 1, -1>)
 		*/
-		Eigen::Matrix<float, 1, -1> gating_distance(
+		Eigen::Matrix<float, 1, Eigen::Dynamic> gating_distance(
 			const KAL_MEAN& mean,
 			const KAL_COVA& covariance,
-			const std::vector<DETECTBOX>& measurements,
+			const std::vector<DETECTBOX3D>& measurements,
 			bool only_position = false);
 
+	private: 
+		KAL_MEAN predictState(KAL_MEAN &mean, double dt);
+		KAL_HMEAN3D projectState3D(const KAL_MEAN &mean);
+		KAL_HMEAN2D projectState2D(const KAL_MEAN &mean);
+
 	private:
-		Eigen::Matrix<float, 12, 12, Eigen::RowMajor> _motion_mat;		// F
-		Eigen::Matrix<float, 6, 12, Eigen::RowMajor> _observation_mat; 	// H
+		Eigen::Matrix<float, 8, 8, Eigen::RowMajor> _motion_mat;			// F
+		Eigen::Matrix<float, 5, 8, Eigen::RowMajor> _observation_mat3D; 	// H_3D
+		Eigen::Matrix<float, 4, 8, Eigen::RowMajor> _observation_mat2D; 	// H_2D
 		float _std_weight_position;
 		float _std_weight_velocity;
-		int detection_dim = 6;
-		int state_dim = 12;
+		int detection3D_dim = 5;
+		int detection2D_dim = 4;
+		int state_dim = 8;
 	};
 }
