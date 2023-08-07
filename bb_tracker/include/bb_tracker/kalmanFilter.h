@@ -10,8 +10,44 @@ namespace byte_kalman
 		static const double chi2inv95[10];
 		KalmanFilter();
 		KAL_DATA initiate(const DETECTBOX& measurement);
+
+		/**
+		 * Predicts the Kalman filter state and covariance at the next step and returns them throught the input parameters
+		 * The prediction is made using the relative motion model and std_weights.
+		 * Equations:
+		 * x(t+1|t) = F*x(t|t-1)
+		 * P_x(t+1) = F*P_x(t)*F^T + V1
+		 * @param mean The current state x(t) of the Kalman Filter - return x~(t+1)
+		 * @param covariance The current covariance P_x(t) of the Kalman Filter state - return P_x~(t+1)
+		*/
 		void predict(KAL_MEAN& mean, KAL_COVA& covariance);
+
+		/**
+		 * Project the current state of the Kalman Filter into measurement space.
+		 * Equations:
+		 * y~(t|t-1) = H*x(t|t-1)
+		 * P_y(t+1) = H*P_x(t)*H^T + V2
+		 * @param mean The current state x(t) of the Kalman Filter
+		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
+		 * @return The predicted output y(t|t-1) mean and covariance P_y(t)
+		*/
 		KAL_HDATA project(const KAL_MEAN& mean, const KAL_COVA& covariance);
+
+		/**
+		 * Update the state estimate based on the actual measurement received at time t.
+		 * This phase is responsible for fusing the predicted state with the measurement,
+		 * providing an updated and more accurate state estimate. 
+		 * Equations:
+		 * e(t) = y(t) - y~(t|t-1)
+		 * K(t) = (P*H^T) * (H*P*H^T + V2)^-1
+		 * x(t|t) = x(t+1|t) + K(t) * e(t)
+		 * P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
+		 * @param mean        The current state mean estimate (x(t|t-1)).
+		 * @param covariance  The current state covariance estimate (P(t|t-1)).
+		 * @param measurement The measurement obtained at time t.
+		 * 
+		 * @return A pair containing the updated state mean estimate (x(t|t)) and covariance (P(t|t)).
+		*/
 		KAL_DATA update(const KAL_MEAN& mean,
 			const KAL_COVA& covariance,
 			const DETECTBOX& measurement);
@@ -25,8 +61,13 @@ namespace byte_kalman
 		 * should be given to the measurement during the state update.
 		 * This allows the Kalman filter to effectively incorporate noisy measurements while maintaining a balance between
 		 * the prediction and measurement information.
+		 * @param mean: The predicted state mean (a vector).
+		 * @param covariance: The predicted state covariance matrix.
+		 * @param measurements: A vector of measurements (each represented as a DETECTBOX vector).
 		 * @param only_position: A boolean flag that determines whether only the position (coordinates)
 		 * should be considered for the Mahalanobis distance calculation. (Not implemented yet)
+		 * @return The squared Mahalanobis distance for each measurement with respect to the predicted state. 
+		 * The result is represented as a row vector of floating-point values (Eigen::Matrix<float, 1, -1>)
 		*/
 		Eigen::Matrix<float, 1, -1> gating_distance(
 			const KAL_MEAN& mean,
@@ -35,8 +76,8 @@ namespace byte_kalman
 			bool only_position = false);
 
 	private:
-		Eigen::Matrix<float, 12, 12, Eigen::RowMajor> _motion_mat;
-		Eigen::Matrix<float, 6, 12, Eigen::RowMajor> _update_mat;
+		Eigen::Matrix<float, 12, 12, Eigen::RowMajor> _motion_mat;		// F
+		Eigen::Matrix<float, 6, 12, Eigen::RowMajor> _observation_mat; 	// H
 		float _std_weight_position;
 		float _std_weight_velocity;
 		int detection_dim = 6;
