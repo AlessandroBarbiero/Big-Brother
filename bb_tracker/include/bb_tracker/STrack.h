@@ -1,7 +1,7 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
-#include "kalmanFilter.h"
+#include "EKF.hpp"
 
 using namespace cv;
 using namespace std;
@@ -15,7 +15,7 @@ public:
 	~STrack();
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
-	void static multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter);
+	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter);
 	void static_minwdh();
 	void static_minmax();
 	// xyzaah respresents the box independently of the dimensions, only the height is kept as it is
@@ -27,7 +27,7 @@ public:
 	int next_id();
 	int end_frame();
 	
-	void activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id);
+	void activate(byte_kalman::EKF &kalman_filter, int frame_id);
 	void re_activate(STrack &new_track, int frame_id, bool new_id = false);
 	void update(STrack &new_track, int frame_id);
 
@@ -39,6 +39,8 @@ public:
 	vector<float> _minwdh; 	// <--- ex _tlwh
 	vector<float> minwdh;	// <--- ex tlwh
 	vector<float> minmax;	// <--- ex tlbr
+	float theta;
+	
 	int frame_id;
 	int tracklet_len;
 	int start_frame;
@@ -49,5 +51,5 @@ public:
 	std::string class_name;
 
 private:
-	byte_kalman::KalmanFilter kalman_filter;
+	byte_kalman::EKF kalman_filter;
 };

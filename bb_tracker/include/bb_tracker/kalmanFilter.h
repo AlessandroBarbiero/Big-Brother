@@ -1,6 +1,8 @@
 #pragma once
 
 #include "dataType.h"
+//TODO: add when finished to speed up
+// #define DEIGEN_NO_DEBUG
 
 namespace byte_kalman
 {
@@ -114,12 +116,12 @@ namespace byte_kalman
 			const std::vector<DETECTBOX3D>& measurements,
 			bool only_position = false);
 
-	private: 
-		KAL_MEAN predictState(KAL_MEAN &mean, double dt);
-		KAL_HMEAN3D projectState3D(const KAL_MEAN &mean);
-		KAL_HMEAN2D projectState2D(const KAL_MEAN &mean);
+	protected: 
+		virtual KAL_MEAN predictState(KAL_MEAN &mean, double dt);
+		virtual KAL_HMEAN3D projectState3D(const KAL_MEAN &mean);
+		virtual KAL_HMEAN2D projectState2D(const KAL_MEAN &mean);
 
-	private:
+	protected:
 		Eigen::Matrix<float, 8, 8, Eigen::RowMajor> _motion_mat;			// F
 		Eigen::Matrix<float, 5, 8, Eigen::RowMajor> _observation_mat3D; 	// H_3D
 		Eigen::Matrix<float, 4, 8, Eigen::RowMajor> _observation_mat2D; 	// H_2D

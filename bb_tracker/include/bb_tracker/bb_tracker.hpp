@@ -10,6 +10,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include <vision_msgs/msg/detection3_d.hpp>
+#include <nav_msgs/msg/path.hpp>
 // extra
 #include <opencv2/opencv.hpp>
 #include <bb_tracker/BYTETracker.h>
@@ -46,6 +47,8 @@ class BBTracker : public rclcpp::Node
 
     rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
+    // TODO: implement path publisher to publish the various paths of the objects, possible alternative: markers
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
 
 

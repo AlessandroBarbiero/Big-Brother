@@ -231,7 +231,11 @@ void BBTracker::publish_stracks(vector<STrack> output_stracks){
     single_det.bbox.center.position.x = minwdh[0] + minwdh[3]/2;
     single_det.bbox.center.position.y = minwdh[1] + minwdh[4]/2;
     single_det.bbox.center.position.z = minwdh[2] + minwdh[5]/2;
-    single_det.bbox.center.orientation.w = 1.0;
+    tf2::Quaternion quat_tf;
+    quat_tf.setRPY(0.0, 0.0, current_track.theta);
+    geometry_msgs::msg::Quaternion quat_msg;
+    quat_msg = tf2::toMsg(quat_tf);
+    single_det.bbox.center.orientation = quat_msg;
     single_det.bbox.size.x =            minwdh[3];
     single_det.bbox.size.y =            minwdh[4];
     single_det.bbox.size.z =            minwdh[5];

@@ -61,6 +61,7 @@ file(GLOB BYTE_traker_files
     src/lapjv.cpp 
     src/STrack.cpp 
     src/utils.cpp
+    src/EKF.cpp
 )
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

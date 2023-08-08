@@ -4,6 +4,7 @@
 #include <Eigen/Geometry>
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <map>
+#include "EKF.hpp"
 
 struct Object
 {
@@ -81,5 +82,5 @@ private:
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;
 	vector<STrack> removed_stracks;
-	byte_kalman::KalmanFilter kalman_filter;
+	byte_kalman::EKF kalman_filter;
 };

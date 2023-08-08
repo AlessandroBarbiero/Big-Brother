@@ -19,8 +19,6 @@ namespace byte_kalman
 	
 	KalmanFilter::KalmanFilter()
 	{
-		double dt = 1.;
-
 		_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
 
 		_observation_mat3D = Eigen::MatrixXf::Identity(detection3D_dim, state_dim);
@@ -32,10 +30,10 @@ namespace byte_kalman
 		_observation_mat3D(4,5)=1;
 
 		_observation_mat2D = Eigen::MatrixXf::Identity(detection2D_dim, state_dim);
-		_observation_mat3D(2,2)=0;
-		_observation_mat3D(2,3)=1;
-		_observation_mat3D(3,3)=0;
-		_observation_mat3D(3,5)=1;
+		_observation_mat2D(2,2)=0;
+		_observation_mat2D(2,3)=1;
+		_observation_mat2D(3,3)=0;
+		_observation_mat2D(3,5)=1;
 
 		this->_std_weight_position = 1. / 20;
 		this->_std_weight_velocity = 1. / 160;
@@ -236,6 +234,12 @@ namespace byte_kalman
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
+		// Keep theta within [-PI , PI]
+		if(new_mean(2) > M_PI)
+			new_mean(2) -= 2*M_PI;
+		else if (new_mean(2) < M_PI)
+			new_mean(2) += 2*M_PI;
+
 		return std::make_pair(new_mean, new_covariance);
 	}
 
@@ -268,6 +272,12 @@ namespace byte_kalman
 		// if we consider the old covariance as state covariance (F*P*F^T + V1) we obtain 
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
+
+		// Keep theta within [-PI , PI]
+		if(new_mean(2) > M_PI)
+			new_mean(2) -= 2*M_PI;
+		else if (new_mean(2) < M_PI)
+			new_mean(2) += 2*M_PI;
 
 		return std::make_pair(new_mean, new_covariance);
 	}

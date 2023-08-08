@@ -25,7 +25,7 @@ STrack::~STrack()
 {
 }
 
-void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
+void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 {
 	this->kalman_filter = kalman_filter;
 	this->track_id = this->next_id();
@@ -48,6 +48,7 @@ void STrack::activate(byte_kalman::KalmanFilter &kalman_filter, int frame_id)
 	auto mc = this->kalman_filter.initiate(xyaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	theta = mean[2];
 
 	static_minwdh();
 	static_minmax();
@@ -78,6 +79,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	theta = mean[2];
 
 	static_minwdh();
 	static_minmax();
@@ -109,6 +111,7 @@ void STrack::update(STrack &new_track, int frame_id)
 	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	theta = mean[2];
 
 	static_minwdh();
 	static_minmax();
@@ -206,7 +209,7 @@ int STrack::end_frame()
 	return this->frame_id;
 }
 
-void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::KalmanFilter &kalman_filter)
+void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter)
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
