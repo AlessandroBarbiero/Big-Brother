@@ -95,6 +95,7 @@ void BYTETracker::remove_duplicate_stracks(vector<STrack> &resa, vector<STrack> 
 			dupa.push_back(pairs[i].first);
 	}
 
+	// If index not present in dupa add relative element in resa
 	for (unsigned int i = 0; i < stracksa.size(); i++)
 	{
 		vector<int>::iterator iter = find(dupa.begin(), dupa.end(), i);
@@ -104,6 +105,7 @@ void BYTETracker::remove_duplicate_stracks(vector<STrack> &resa, vector<STrack> 
 		}
 	}
 
+	// If index not present in dupb add relative element in resb
 	for (unsigned int i = 0; i < stracksb.size(); i++)
 	{
 		vector<int>::iterator iter = find(dupb.begin(), dupb.end(), i);

@@ -43,6 +43,7 @@ find_package(rclcpp REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 
 # Add to include header files
@@ -78,6 +79,7 @@ ament_target_dependencies(bb_tracker
   tf2_ros
   tf2_geometry_msgs
   vision_msgs
+  visualization_msgs
   OpenCV
   # bb_interfaces
   )

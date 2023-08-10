@@ -43,9 +43,9 @@ std::unordered_map<int, std::string> BYTETracker::int_to_class{
 	{2, "bicycle"}
 };
 
-vector<STrack> BYTETracker::update(const vector<Object>& objects)
+vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 {
-
+	//std::cout << "Step 1" << std::endl;
 	////////////////// Step 1: Get detections //////////////////
 	this->frame_id++;
 	vector<STrack> activated_stracks;
@@ -58,7 +58,8 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 	vector<STrack> detections_cp;
 	vector<STrack> tracked_stracks_swap;
 	vector<STrack> resa, resb;
-	vector<STrack> output_stracks;
+	
+	vector<STrack*> output_stracks;
 
 	vector<STrack*> unconfirmed;
 	vector<STrack*> tracked_stracks;
@@ -104,6 +105,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 			tracked_stracks.push_back(&this->tracked_stracks[i]);
 	}
 
+	//std::cout << "Step 2" << std::endl;
 	////////////////// Step 2: First association, with IoU //////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	STrack::multi_predict(strack_pool, this->kalman_filter);
@@ -132,6 +134,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 		}
 	}
 
+	//std::cout << "Step 3" << std::endl;
 	////////////////// Step 3: Second association, using low score dets //////////////////
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
@@ -207,6 +210,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 		removed_stracks.push_back(*track);
 	}
 
+	//std::cout << "Step 4" << std::endl;
 	////////////////// Step 4: Init new stracks //////////////////
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
@@ -217,6 +221,7 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 		activated_stracks.push_back(*track);
 	}
 
+	//std::cout << "Step 5" << std::endl;
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
@@ -265,8 +270,9 @@ vector<STrack> BYTETracker::update(const vector<Object>& objects)
 	{
 		if (this->tracked_stracks[i].is_activated)
 		{
-			output_stracks.push_back(this->tracked_stracks[i]);
+			output_stracks.push_back(&this->tracked_stracks[i]);
 		}
 	}
+	//std::cout << "End step 5" << std::endl;
 	return output_stracks;
 }

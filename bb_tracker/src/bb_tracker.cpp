@@ -38,6 +38,7 @@ BBTracker::BBTracker()
           "bytetrack/detections", 10, std::bind(&BBTracker::add_detection, this, _1));
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
+  _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
 
   // ROS Timer
   std::chrono::milliseconds ms_to_call((1000/fps));
@@ -62,7 +63,7 @@ void BBTracker::periodic_update(){
   // Update the tracker
   auto start = chrono::system_clock::now();
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack> output_stracks = _tracker.update(_objects_buffer);
+  vector<STrack*> output_stracks = _tracker.update(_objects_buffer);
   _objects_buffer.clear();
 
   auto end = chrono::system_clock::now();
@@ -75,8 +76,14 @@ void BBTracker::periodic_update(){
 
   publish_stracks(output_stracks);
   // Show Progress
+  #ifndef DEBUG
   std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
   std::cout.flush();
+  #endif
+
+  #ifdef DEBUG
+  std::cout<< "Tracks published" << std::endl;
+  #endif
 }
 
 void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
@@ -179,7 +186,6 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
   if (_num_detections % 50 == 0)
   {
       RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
-      //std::cout << "Processing frame " << _num_detections << " (" << _num_detections * 1000000 / _total_ms << " fps)" << std::endl;
   }
   if (detections_message->detections.empty())
     return;
@@ -201,16 +207,20 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 }
 
-void BBTracker::publish_stracks(vector<STrack> output_stracks){
+void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   auto out_message = vision_msgs::msg::Detection3DArray();
+  visualization_msgs::msg::MarkerArray path_markers;
+
   out_message.header.stamp = get_clock()->now();
   out_message.header.frame_id = _fixed_frame;
 
+  path_markers.markers.clear();
+  path_markers.markers.resize(output_stracks.size());
   out_message.detections.resize(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
     auto current_track = output_stracks[i];
-    vector<float> minwdh = current_track.minwdh;
+    vector<float> minwdh = current_track->minwdh;
 
     #ifdef DEBUG
       std::cout << "Seeing " << current_track.class_name << " number " << current_track.track_id << " -- Score: " << current_track.score << std::endl;
@@ -227,12 +237,12 @@ void BBTracker::publish_stracks(vector<STrack> output_stracks){
     // Show tracking
     vision_msgs::msg::Detection3D single_det = vision_msgs::msg::Detection3D();
     single_det.header = out_message.header;
-    single_det.is_tracking = current_track.is_activated;
+    single_det.is_tracking = current_track->is_activated;
     single_det.bbox.center.position.x = minwdh[0] + minwdh[3]/2;
     single_det.bbox.center.position.y = minwdh[1] + minwdh[4]/2;
     single_det.bbox.center.position.z = minwdh[2] + minwdh[5]/2;
     tf2::Quaternion quat_tf;
-    quat_tf.setRPY(0.0, 0.0, current_track.theta);
+    quat_tf.setRPY(0.0, 0.0, current_track->theta);
     geometry_msgs::msg::Quaternion quat_msg;
     quat_msg = tf2::toMsg(quat_tf);
     single_det.bbox.center.orientation = quat_msg;
@@ -241,17 +251,54 @@ void BBTracker::publish_stracks(vector<STrack> output_stracks){
     single_det.bbox.size.z =            minwdh[5];
 
     auto hypothesis = vision_msgs::msg::ObjectHypothesisWithPose();
-    hypothesis.id = current_track.class_name; //.append(to_string(current_track.track_id));
-    hypothesis.score = current_track.score;
+    hypothesis.id = current_track->class_name; //.append(to_string(current_track.track_id));
+    hypothesis.score = current_track->score;
     single_det.results.push_back(hypothesis);
 
     out_message.detections.push_back(single_det);
-    
-    // Example way to get colors for tracks
-    // Scalar s_color = _tracker.get_color(output_stracks[i].track_id);
+    // Publish a path for each track
+    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position);
+    path_markers.markers.push_back(path_marker);
   }
 
   _det_publisher->publish(out_message);
+  _path_publisher->publish(path_markers);
+
+}
+
+void initMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
+  path_marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+  path_marker.action = visualization_msgs::msg::Marker::ADD;
+  path_marker.ns = "TrackPath";
+  path_marker.color.r = color[2];
+  path_marker.color.g = color[1];
+  path_marker.color.b = color[0];
+  path_marker.color.a = 1.0;
+  path_marker.pose.position.x = 0;
+  path_marker.pose.position.y = 0;
+  path_marker.pose.position.z = 0;
+  path_marker.pose.orientation.x = 0;
+  path_marker.pose.orientation.y = 0;
+  path_marker.pose.orientation.z = 0;
+  path_marker.pose.orientation.w = 1;
+  path_marker.scale.x = 0.1;
+  path_marker.scale.y = 0.0;
+  path_marker.scale.z = 0.0;
+  path_marker.lifetime = rclcpp::Duration(1,0);
+}
+
+visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point){
+  track->path_marker.header = header;
+  
+  // Init marker if first visualization
+  if(track->path_marker.points.size() == 0){
+    track->path_marker.id = track->track_id;
+    Scalar s_color = _tracker.get_color(track->track_id);
+    initMarker(track->path_marker, s_color);
+  }
+  track->path_marker.points.push_back(last_point);
+  // path_marker.colors.push_back(s_color);
+  return track->path_marker;
 }
 
 
@@ -265,5 +312,8 @@ int main(int argc, char * argv[])
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<BBTracker>());
   rclcpp::shutdown();
+  #ifdef DEBUG
+  getchar();
+  #endif
   return 0;
 }

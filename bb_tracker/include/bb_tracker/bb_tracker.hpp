@@ -10,7 +10,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include <vision_msgs/msg/detection3_d.hpp>
-#include <nav_msgs/msg/path.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 // extra
 #include <opencv2/opencv.hpp>
 #include <bb_tracker/BYTETracker.h>
@@ -37,7 +37,8 @@ class BBTracker : public rclcpp::Node
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object>& objects);
     void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void periodic_update();
-    void publish_stracks(vector<STrack> output_stracks);
+    void publish_stracks(vector<STrack*>& output_stracks);
+    visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point);
 
   private:
 
@@ -48,7 +49,7 @@ class BBTracker : public rclcpp::Node
     rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
     // TODO: implement path publisher to publish the various paths of the objects, possible alternative: markers
-    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr _path_publisher;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
 
 

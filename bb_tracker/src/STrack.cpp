@@ -23,6 +23,7 @@ STrack::STrack(vector<float> minwdh_, float score, std::string class_name)
 
 STrack::~STrack()
 {
+	// std::cout<<"track deleted, id: "<< track_id << " size: " << path_marker.points.size() << std::endl;
 }
 
 void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)

@@ -35,7 +35,7 @@ public:
 	 */
 	void init(int frame_rate = 30, int track_buffer = 30, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
 
-	vector<STrack> update(const vector<Object>& objects);
+	vector<STrack*> update(const vector<Object>& objects);
 	Scalar get_color(int idx);
 
 	static std::unordered_map<std::string, int> class_to_int;

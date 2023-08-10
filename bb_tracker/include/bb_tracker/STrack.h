@@ -2,6 +2,7 @@
 
 #include <opencv2/opencv.hpp>
 #include "EKF.hpp"
+#include <visualization_msgs/msg/marker.hpp>
 
 using namespace cv;
 using namespace std;
@@ -44,6 +45,7 @@ public:
 	int frame_id;
 	int tracklet_len;
 	int start_frame;
+	visualization_msgs::msg::Marker path_marker;
 
 	KAL_MEAN mean;
 	KAL_COVA covariance;
