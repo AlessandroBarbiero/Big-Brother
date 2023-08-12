@@ -39,6 +39,7 @@ BBTracker::BBTracker()
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
+  _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
 
   // ROS Timer
   std::chrono::milliseconds ms_to_call((1000/fps));
@@ -210,12 +211,15 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   auto out_message = vision_msgs::msg::Detection3DArray();
   visualization_msgs::msg::MarkerArray path_markers;
+  visualization_msgs::msg::MarkerArray text_markers;
 
   out_message.header.stamp = get_clock()->now();
   out_message.header.frame_id = _fixed_frame;
 
   path_markers.markers.clear();
+  text_markers.markers.clear();
   path_markers.markers.resize(output_stracks.size());
+  text_markers.markers.resize(output_stracks.size());
   out_message.detections.resize(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
@@ -256,17 +260,21 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     single_det.results.push_back(hypothesis);
 
     out_message.detections.push_back(single_det);
-    // Publish a path for each track
-    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position);
+    // Publish a path for each track, with relative text
+    visualization_msgs::msg::Marker text;
+    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
+    text.pose.position.z += single_det.bbox.size.z/2;
     path_markers.markers.push_back(path_marker);
+    text_markers.markers.push_back(text);
   }
 
   _det_publisher->publish(out_message);
   _path_publisher->publish(path_markers);
+  _text_publisher->publish(text_markers);
 
 }
 
-void initMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
+void initPathMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
   path_marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
   path_marker.action = visualization_msgs::msg::Marker::ADD;
   path_marker.ns = "TrackPath";
@@ -287,17 +295,37 @@ void initMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
   path_marker.lifetime = rclcpp::Duration(1,0);
 }
 
-visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point){
+void initTextMarker(visualization_msgs::msg::Marker& text_marker, Scalar& color){
+  text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+  text_marker.action = visualization_msgs::msg::Marker::ADD;
+  text_marker.ns = "TrackID";
+  text_marker.color.r = color[2];
+  text_marker.color.g = color[1];
+  text_marker.color.b = color[0];
+  text_marker.color.a = 1.0;
+  text_marker.scale.x = 0.0;
+  text_marker.scale.y = 0.0;
+  text_marker.scale.z = 1;
+  text_marker.lifetime = rclcpp::Duration(1,0);
+}
+
+visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text){
   track->path_marker.header = header;
+  track->text_marker.header = header;
   
   // Init marker if first visualization
   if(track->path_marker.points.size() == 0){
     track->path_marker.id = track->track_id;
+    track->text_marker.id = track->track_id;
     Scalar s_color = _tracker.get_color(track->track_id);
-    initMarker(track->path_marker, s_color);
+    initPathMarker(track->path_marker, s_color);
+    initTextMarker(track->text_marker, s_color);
+    track->text_marker.text = std::to_string(track->track_id);
   }
   track->path_marker.points.push_back(last_point);
   // path_marker.colors.push_back(s_color);
+  track->text_marker.pose.position = last_point;
+  text = track->text_marker;
   return track->path_marker;
 }
 

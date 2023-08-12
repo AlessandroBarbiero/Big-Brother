@@ -46,6 +46,7 @@ public:
 	int tracklet_len;
 	int start_frame;
 	visualization_msgs::msg::Marker path_marker;
+	visualization_msgs::msg::Marker text_marker;
 
 	KAL_MEAN mean;
 	KAL_COVA covariance;
