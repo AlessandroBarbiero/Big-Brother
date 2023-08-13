@@ -57,9 +57,9 @@ class YoloDetector(Node):
         
         self.class_to_z_val = {'person': 1.0,
                         'bicycle': 1.5,
-                        'car': 2.5,
+                        'car': 2.0,
                         'motorcycle': 2.0,
-                        'truck': 3.0}
+                        'truck': 2.0}
         
 
         sub1 = Subscriber(self, Image, "to_detect")
