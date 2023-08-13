@@ -8,6 +8,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 // ROS msgs
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include <vision_msgs/msg/detection3_d.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
@@ -48,8 +49,10 @@ class BBTracker : public rclcpp::Node
 
     rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
+    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr _det_poses_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _text_publisher;
+
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
 
 

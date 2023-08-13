@@ -1,6 +1,6 @@
 #include <bb_tracker/STrack.h>
 
-STrack::STrack(vector<float> minwdh_, float score, std::string class_name)
+STrack::STrack(vector<float> minwdh_, float score, std::string class_name, long unsigned int time_ms)
 {
 	_minwdh.resize(6);
 	_minwdh.assign(minwdh_.begin(), minwdh_.end());
@@ -19,6 +19,7 @@ STrack::STrack(vector<float> minwdh_, float score, std::string class_name)
 	this->score = score;
 	this->class_name = class_name;
 	start_frame = 0;
+	last_filter_update_ms = time_ms;
 }
 
 STrack::~STrack()
@@ -68,6 +69,7 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+	auto current_time_ms = new_track.last_filter_update_ms;
 
 	DETECTBOX3D xyaah_box;
 	xyaah_box[0] = xyzaah[0];
@@ -77,7 +79,9 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	xyaah_box[4] = xyzaah[5];
 
 	// TODO add dt
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
+	double dt = (current_time_ms - last_filter_update_ms)/1000;
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
+	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
 	theta = mean[2];
@@ -98,6 +102,7 @@ void STrack::update(STrack &new_track, int frame_id)
 {
 	this->frame_id = frame_id;
 	this->tracklet_len++;
+	auto current_time_ms = new_track.last_filter_update_ms;
 
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
@@ -109,7 +114,9 @@ void STrack::update(STrack &new_track, int frame_id)
 	xyaah_box[4] = xyzaah[5];
 
 	// TODO add dt
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, 1.0);
+	double dt = (current_time_ms - last_filter_update_ms)/1000;
+	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
+	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
 	theta = mean[2];
@@ -210,17 +217,14 @@ int STrack::end_frame()
 	return this->frame_id;
 }
 
-void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter)
+void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms)
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		// if (stracks[i]->state != TrackState::Tracked)
-		// {
-		// 	stracks[i]->mean[11] = 0; // Set to 0 the velocity of the change in size for h
-		// }
-
 		// TODO add dt
-		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, 1.0);
+		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/1000;
+		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, dt);
+		// stracks[i]->last_filter_update_ms = current_time_ms;
 		stracks[i]->static_minwdh();
 		stracks[i]->static_minmax();
 	}

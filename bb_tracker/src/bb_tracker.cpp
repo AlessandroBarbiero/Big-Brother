@@ -38,6 +38,7 @@ BBTracker::BBTracker()
           "bytetrack/detections", 10, std::bind(&BBTracker::add_detection, this, _1));
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
+  _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
   _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
 
@@ -63,6 +64,12 @@ void BBTracker::periodic_update(){
 
   // Update the tracker
   auto start = chrono::system_clock::now();
+  // Order buffer in ascending order for time of detection
+  std::sort(_objects_buffer.begin(), _objects_buffer.end(), [](const Object &a, const Object &b)
+    { 
+        return a.time_ms < b.time_ms; 
+    }
+  );
   // Get the Tracks for the objects currently beeing tracked
   vector<STrack*> output_stracks = _tracker.update(_objects_buffer);
   _objects_buffer.clear();
@@ -170,6 +177,7 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
       obj.box = detection.bbox;
       obj.label = BYTETracker::class_to_int[detection.results[0].id];
       obj.prob = detection.results[0].score;
+      obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
       objects.push_back(obj);
     }
@@ -209,18 +217,22 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
 }
 
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
-  auto out_message = vision_msgs::msg::Detection3DArray();
+  vision_msgs::msg::Detection3DArray out_message;
+  geometry_msgs::msg::PoseArray poses_message;
   visualization_msgs::msg::MarkerArray path_markers;
   visualization_msgs::msg::MarkerArray text_markers;
 
+
   out_message.header.stamp = get_clock()->now();
   out_message.header.frame_id = _fixed_frame;
+  poses_message.header = out_message.header;
 
   path_markers.markers.clear();
   text_markers.markers.clear();
   path_markers.markers.resize(output_stracks.size());
   text_markers.markers.resize(output_stracks.size());
   out_message.detections.resize(output_stracks.size());
+  poses_message.poses.resize(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
     auto current_track = output_stracks[i];
@@ -266,9 +278,11 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     text.pose.position.z += single_det.bbox.size.z/2;
     path_markers.markers.push_back(path_marker);
     text_markers.markers.push_back(text);
+    poses_message.poses.push_back(single_det.bbox.center);
   }
 
   _det_publisher->publish(out_message);
+  _det_poses_publisher->publish(poses_message);
   _path_publisher->publish(path_markers);
   _text_publisher->publish(text_markers);
 

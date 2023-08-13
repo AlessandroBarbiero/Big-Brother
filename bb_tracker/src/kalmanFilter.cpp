@@ -234,10 +234,10 @@ namespace byte_kalman
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
-		// Keep theta within [-PI , PI]
-		if(new_mean(2) > M_PI)
+		// Keep theta within [0 , 2*PI]
+		if(new_mean(2) > 2*M_PI)
 			new_mean(2) -= 2*M_PI;
-		else if (new_mean(2) < M_PI)
+		else if (new_mean(2) < 0)
 			new_mean(2) += 2*M_PI;
 
 		return std::make_pair(new_mean, new_covariance);
@@ -273,10 +273,10 @@ namespace byte_kalman
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
-		// Keep theta within [-PI , PI]
-		if(new_mean(2) > M_PI)
+		// Keep theta within [0 , 2*PI]
+		if(new_mean(2) > 2*M_PI)
 			new_mean(2) -= 2*M_PI;
-		else if (new_mean(2) < M_PI)
+		else if (new_mean(2) < 0)
 			new_mean(2) += 2*M_PI;
 
 		return std::make_pair(new_mean, new_covariance);

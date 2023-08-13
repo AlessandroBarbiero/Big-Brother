@@ -66,6 +66,9 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	vector<STrack*> strack_pool;
 	vector<STrack*> r_tracked_stracks;
 
+	// TODO: fix, now I'm just projecting everything with the last time of detection and then do association
+	int last_det_time_ms = objects.back().time_ms;
+
 	if (objects.size() > 0)
 	{
 		for (unsigned int i = 0; i < objects.size(); i++)
@@ -82,8 +85,9 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 
 			float score = object.prob;
 			std::string class_name = int_to_class[object.label];
+			int time_ms = object.time_ms;
 
-			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name);
+			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name, time_ms);
 			if (score >= track_thresh)
 			{
 				detections.push_back(strack);
@@ -108,7 +112,7 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	//std::cout << "Step 2" << std::endl;
 	////////////////// Step 2: First association, with IoU //////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
-	STrack::multi_predict(strack_pool, this->kalman_filter);
+	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	vector<vector<float> > dists;
 	int dist_size = 0, dist_size_size = 0;

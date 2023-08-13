@@ -12,11 +12,11 @@ enum TrackState { New = 0, Tracked, Lost, Removed };
 class STrack
 {
 public:
-	STrack(vector<float> minwdh_, float score, std::string class_name);
+	STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms);
 	~STrack();
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
-	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter);
+	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms);
 	void static_minwdh();
 	void static_minmax();
 	// xyzaah respresents the box independently of the dimensions, only the height is kept as it is
@@ -43,6 +43,8 @@ public:
 	float theta;
 	
 	int frame_id;
+	// milliseconds
+	unsigned long int last_filter_update_ms;
 	int tracklet_len;
 	int start_frame;
 	visualization_msgs::msg::Marker path_marker;

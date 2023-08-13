@@ -11,6 +11,7 @@ struct Object
     vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size <--- ex cv::Rect_
     int label;
     float prob;
+	int time_ms;
 };
 
 class BYTETracker
