@@ -55,7 +55,7 @@ namespace byte_kalman
 		mean(6) = 0;				// v
 		mean(7) = 0;				// w
 
-		// TODO: implement gaussian noise
+		// TODO: Refine P0, starting variance -> accuracy of the estimate
 		KAL_MEAN std;
 		std(0) = 2 * _std_weight_position; 	// x
 		std(1) = 2 * _std_weight_position;	// y
@@ -67,8 +67,8 @@ namespace byte_kalman
 		std(7) = 10 * _std_weight_velocity;	// w
 
 		KAL_MEAN tmp = std.array().square();
-		KAL_COVA var = tmp.asDiagonal();
-		return std::make_pair(mean, var);
+		KAL_COVA var_P0 = tmp.asDiagonal();
+		return std::make_pair(mean, var_P0);
 	}
 
 	
@@ -84,25 +84,25 @@ namespace byte_kalman
 		mean(6) = 0;				// v
 		mean(7) = 0;				// w
 
-		// TODO: implement gaussian noise
+		// TODO: Refine P0, starting variance -> accuracy of the estimate
 		KAL_MEAN std;
 		std(0) = 2 * _std_weight_position; 	// x
 		std(1) = 2 * _std_weight_position;	// y
 		std(2) = 10 * _std_weight_position; // theta
 		std(3) = _std_weight_position;		// l_ratio
-		std(4) = 10 * _std_weight_position;		// d_ratio
+		std(4) = 10 * _std_weight_position;	// d_ratio
 		std(5) = 2 * _std_weight_position;	// h
 		std(6) = 10 * _std_weight_velocity;	// v
 		std(7) = 10 * _std_weight_velocity;	// w
 
 		KAL_MEAN tmp = std.array().square();
-		KAL_COVA var = tmp.asDiagonal();
-		return std::make_pair(mean, var);
+		KAL_COVA var_P0 = tmp.asDiagonal();
+		return std::make_pair(mean, var_P0);
 	}
 
 	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance, double dt)
 	{
-		// TODO: implement gaussian noise
+		// TODO: Refine process noise
 		KAL_MEAN std;
 		std(0) = _std_weight_position; 	// x
 		std(1) = _std_weight_position;	// y
@@ -115,7 +115,7 @@ namespace byte_kalman
 
 		KAL_MEAN tmp = std.array().square();
 		// This is V1
-		KAL_COVA motion_cov = tmp.asDiagonal();
+		KAL_COVA process_noise_cov = tmp.asDiagonal();
 
 		// State Prediction
 		// x(t+1|t) = F*x(t|t-1)
@@ -123,7 +123,7 @@ namespace byte_kalman
 		// Error Covariance Prediction
 		// P(t+1) = F*P(t)*F^T + V1
 		KAL_COVA covariance1 = this->_motion_mat * covariance *(_motion_mat.transpose());
-		covariance1 += motion_cov;
+		covariance1 += process_noise_cov;
 
 		mean = mean1;
 		covariance = covariance1;
@@ -139,7 +139,7 @@ namespace byte_kalman
 
 	KAL_HDATA3D KalmanFilter::project3D(const KAL_MEAN &mean, const KAL_COVA &covariance)
 	{
-		// TODO: gaussian noise
+		// TODO: Refine measurement noise
 		// Compute V2
 		DETECTBOX3D std;
 		std << _std_weight_position,
@@ -148,7 +148,7 @@ namespace byte_kalman
 			_std_weight_position, 
 			_std_weight_position;
 		DETECTBOX3D tmp = std.array().square();
-		KAL_HCOVA3D measure_var = tmp.asDiagonal();
+		KAL_HCOVA3D measure_noise_var = tmp.asDiagonal();
 
 		// Perform state projection in the measurement space
 		// y~(t|t-1) = H * x(t|t-1)
@@ -157,7 +157,7 @@ namespace byte_kalman
 		// P_y(t+1) = H*P_x(t)*H^T + V2
 		KAL_HCOVA3D covariance1 = _observation_mat3D * covariance * (_observation_mat3D.transpose());
 		
-		covariance1 += measure_var;
+		covariance1 += measure_noise_var;
 
 		return std::make_pair(mean1, covariance1);
 	}
@@ -168,7 +168,7 @@ namespace byte_kalman
 
 	KAL_HDATA2D KalmanFilter::project2D(const KAL_MEAN &mean, const KAL_COVA &covariance)
 	{
-		// TODO: gaussian noise
+		// TODO: Refine measurement noise
 		// Compute V2
 		DETECTBOX2D std;
 		std << _std_weight_position,
@@ -176,7 +176,7 @@ namespace byte_kalman
 			_std_weight_position, 
 			_std_weight_position;
 		DETECTBOX2D tmp = std.array().square();
-		KAL_HCOVA2D measure_var = tmp.asDiagonal();
+		KAL_HCOVA2D measure_noise_var = tmp.asDiagonal();
 
 		// Perform state projection in the measurement space
 		// y~(t|t-1) = H * x(t|t-1)
@@ -185,7 +185,7 @@ namespace byte_kalman
 		// P_y(t+1) = H*P_x(t)*H^T + V2
 		KAL_HCOVA2D covariance1 = _observation_mat2D * covariance * (_observation_mat2D.transpose());
 		
-		covariance1 += measure_var;
+		covariance1 += measure_noise_var;
 
 		return std::make_pair(mean1, covariance1);
 	}
