@@ -1,5 +1,6 @@
 // C++
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -82,13 +83,17 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
     }
   }
 
+  int tot_messages = reader->get_metadata().message_count;
+  int counter = 0;
+
   // Iterate over messages in the input bag
   std::shared_ptr<rosbag2_storage::SerializedBagMessage> bag_message;
   std::string topic_type;
   builtin_interfaces::msg::Time stamp;
-  std::cout<< "Start reading the bag..."<<std::endl;
+  std::cout<< "Start reading the bag... \n\t"<< tot_messages << " Messages to convert"<<std::endl;
 
   auto start_time = std::chrono::high_resolution_clock::now();
+  std::cout << std::fixed << std::setprecision(2);
 
   while (rclcpp::ok() && reader->has_next())
   {
@@ -108,6 +113,8 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
 
     // Write the modified message to the output bag
     writer->write(bag_message);
+    counter++;
+    std::cout << "[ " <<counter*100.0/tot_messages << "% ]\r";
   }
 
   std::cout<< "Finished" << std::endl;
