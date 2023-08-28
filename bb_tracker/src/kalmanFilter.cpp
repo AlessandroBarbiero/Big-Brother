@@ -129,7 +129,7 @@ namespace byte_kalman
 		covariance = covariance1;
 	}
 
-	KAL_MEAN KalmanFilter::predictState(KAL_MEAN &mean, double dt){
+	KAL_MEAN KalmanFilter::predictState(KAL_MEAN &mean, double dt __attribute__((unused))){
 		return this->_motion_mat * mean.transpose();
 	}
 
@@ -202,7 +202,7 @@ namespace byte_kalman
 			const KAL_MEAN &mean,
 			const KAL_COVA &covariance,
 			const DETECTBOX3D &measurement,
-			double dt)
+			double dt __attribute__((unused)))
 	{
 		// Project to measurement space
 		KAL_HDATA3D pa = project3D(mean, covariance);
@@ -247,7 +247,7 @@ namespace byte_kalman
 			const KAL_MEAN &mean,
 			const KAL_COVA &covariance,
 			const DETECTBOX2D &measurement,
-			double dt)
+			double dt __attribute__((unused)))
 	{
 		// Project to measurement space
 		KAL_HDATA2D pa = project2D(mean, covariance);
