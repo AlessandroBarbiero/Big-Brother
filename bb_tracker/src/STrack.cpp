@@ -1,4 +1,5 @@
 #include <bb_tracker/STrack.h>
+#define MILLIS_IN_SECONDS 1000
 
 STrack::STrack(vector<float> minwdh_, float score, std::string class_name, long unsigned int time_ms)
 {
@@ -78,8 +79,8 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	xyaah_box[3] = xyzaah[4];
 	xyaah_box[4] = xyzaah[5];
 
-	// TODO add dt
-	double dt = (current_time_ms - last_filter_update_ms)/1000;
+	// CHECK dt
+	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
 	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
@@ -113,8 +114,8 @@ void STrack::update(STrack &new_track, int frame_id)
 	xyaah_box[3] = xyzaah[4];
 	xyaah_box[4] = xyzaah[5];
 
-	// TODO add dt
-	double dt = (current_time_ms - last_filter_update_ms)/1000;
+	// CHECK dt
+	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
 	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
@@ -221,8 +222,8 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		// TODO add dt
-		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/1000;
+		// CHECK dt
+		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
 		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, dt);
 		// stracks[i]->last_filter_update_ms = current_time_ms;
 		stracks[i]->static_minwdh();
