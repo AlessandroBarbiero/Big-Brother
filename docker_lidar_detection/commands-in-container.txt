@@ -1,0 +1,32 @@
+apt update && apt install -y locales
+locale-gen en_US en_US.UTF-8
+update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+apt install -y software-properties-common
+add-apt-repository universe
+
+apt update && apt install curl -y
+curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+apt update && apt upgrade -y
+apt install ros-foxy-ros-base python3-argcomplete -y
+
+source /opt/ros/foxy/setup.bash
+mkdir -p pointpillars_ws/src
+cd pointpillars_ws/src
+
+<<Copy the right repository in the volume>>
+<<Copy the engine>>
+or
+    git clone https://github.com/NVIDIA-AI-IOT/ros2_tao_pointpillars.git
+    change cmakelists.txt and other file
+
+apt install python3-colcon-common-extensions ros-foxy-pcl-ros ros-foxy-vision-msgs -y
+
+colcon build --packages-select pp_infer
+. install/setup.bash
+
+ros2 launch pp_infer pp_infer_launch.py

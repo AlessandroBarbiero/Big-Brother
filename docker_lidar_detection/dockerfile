@@ -1,0 +1,51 @@
+# Use the base TensorRT image
+FROM nvcr.io/nvidia/tensorrt:23.03-py3
+
+# Install locales and set up en_US.UTF-8
+RUN apt update && apt install -y locales && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
+    export LANG=en_US.UTF-8
+
+# Install software-properties-common and add universe repository
+RUN apt install -y software-properties-common && \
+    add-apt-repository universe
+
+# Install curl and add ROS GPG key
+RUN apt update && apt install -y curl && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+# Add ROS repository to apt sources
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+# Update and upgrade packages
+RUN apt update && apt upgrade -y
+
+# Install ROS 2 Foxy and other packages
+RUN apt install -y ros-foxy-ros-base python3-argcomplete
+
+# Set up ROS environment
+RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
+
+# Create workspace and clone repository
+RUN mkdir -p /pointpillars_ws/src
+WORKDIR /pointpillars_ws/src
+
+# Copy the repository files to the workspace
+COPY ros2_tao_pointpillars /pointpillars_ws/src/ros2_tao_pointpillars
+COPY engine/trt.engine /opt/engine/
+
+# Install additional ROS packages
+RUN apt install -y python3-colcon-common-extensions ros-foxy-pcl-ros ros-foxy-vision-msgs
+
+# Build the workspace
+WORKDIR /pointpillars_ws
+RUN . /opt/ros/foxy/setup.bash && \
+    colcon build --packages-select pp_infer && \
+    echo "source /pointpillars_ws/install/setup.bash" >> ~/.bashrc
+
+# Source the workspace
+RUN source /pointpillars_ws/install/setup.bash
+
+# Launch the ROS node
+CMD ["ros2", "launch", "pp_infer", "pp_infer_launch.py"]

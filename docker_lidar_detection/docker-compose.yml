@@ -1,0 +1,10 @@
+version: '3'
+services:
+  pp-container:
+    container_name: pp-container
+    image: nvcr.io/nvidia/tensorrt:23.03-py3
+    runtime: nvidia  # Use NVIDIA runtime for GPU support
+    volumes:
+      - /home/ale/docker/shared:/shared
+    tty: true
+    stdin_open: true
