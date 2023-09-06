@@ -7,7 +7,11 @@ package_name = 'bb_detection'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name, package_name + '/bev'],
+    packages=[package_name, 
+              package_name + '/bev', 
+              package_name + '/config', 
+              package_name + '/vista',
+              package_name + '/det3d'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -25,6 +29,7 @@ setup(
         'console_scripts': [
             'yolo_detector = bb_detection.yolo_detector:main',
             'thermal_detector = bb_detection.thermal_detector:main',
+            'lidar_detector = bb_detection.lidar_detector:main',
         ],
     },
 )
