@@ -6,10 +6,9 @@ import os
 import time
 import numpy as np
 import torch
-# TODO: fix import
-from .det3d.models import build_detector
-from .det3d.torchie import Config
-from .det3d.torchie.apis import (
+from .vista.det3d.models import build_detector
+from .vista.det3d.torchie import Config
+from .vista.det3d.torchie.apis import (
     batch_processor,
     build_optimizer,
     get_root_logger,
@@ -17,12 +16,12 @@ from .det3d.torchie.apis import (
     set_random_seed,
     train_detector,
 )
-from .det3d.torchie.trainer import get_dist_info, load_checkpoint
+from .vista.det3d.torchie.trainer import get_dist_info, load_checkpoint
 import warnings
 
-from .det3d.utils.config_tool import get_downsample_factor
-from .det3d.core.input.voxel_generator import VoxelGenerator
-from .det3d.core.anchor.target_assigner import TargetAssigner
+from .vista.det3d.utils.config_tool import get_downsample_factor
+from .vista.det3d.core.input.voxel_generator import VoxelGenerator
+from .vista.det3d.core.anchor.target_assigner import TargetAssigner
 import torch.distributed
 
 from tf_transformations import quaternion_from_euler
@@ -33,7 +32,7 @@ from rclpy.impl.rcutils_logger import RcutilsLogger as Logger
 from geometry_msgs.msg import Point, Quaternion, Twist
 from sensor_msgs.msg import PointCloud, PointCloud2
 from sensor_msgs.msg import LaserScan
-# TODO: Port from rosmot to Detection3DArray
+# Ported from rosmot to Detection3DArray
 from vision_msgs.msg import Detection3D, ObjectHypothesisWithPose, Detection3DArray
 
 logTimes = False
@@ -43,8 +42,8 @@ showTestCar = False
 warnings.filterwarnings("ignore")
 
 default_config_file = VISTA_PATH + "/configs/vista/vista.py"
-default_work_dir = OUTPUT_PATH + '/bags'
-# TODO: remove -- default_checkpoint_file = VISTA_WORKDIR + "/checkpoints/vista.pth"
+default_work_dir = OUTPUT_PATH + '/work_dir'
+default_checkpoint_file = VISTA_WORKDIR + "/checkpoints/vista.pth"
 
 cum_input_time = 0.0
 cum_inputproc_time = 0.0
@@ -58,7 +57,7 @@ class VISTADetector(Node):
     def __init__(self,
                  config_file=default_config_file,
                  work_dir=default_work_dir,
-                 # TODO: remove checkpoint_file=default_checkpoint_file,
+                 checkpoint_file=default_checkpoint_file,
                  local_rank=0,
                  gpus=1
                  ):
@@ -111,10 +110,10 @@ class VISTADetector(Node):
         self.get_logger().info(f"torch.backends.cudnn.benchmark: {torch.backends.cudnn.benchmark}")
 
         #breakpoint()
+        # FIXME: this is not working
         model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg).to(device).float().eval()
 
-        # TODO: remove this line: I don't have a checkpoint file
-        # checkpoint = load_checkpoint(model, checkpoint_file, map_location="cpu")
+        checkpoint = load_checkpoint(model, checkpoint_file, map_location="cpu")
 
         self.net = model
         self.target_assigner = cfg.target_assigner
@@ -193,7 +192,7 @@ class VISTADetector(Node):
         #Temp = np.zeros(points.shape[0])  # Comment for data from VLP16
         #points = np.c_[points, Temp]  # Comment for data from VLP16
         
-        detector.inference_model(points, msg)
+        self.inference_model(points, msg)
         
         
 
@@ -403,26 +402,25 @@ def _get_struct_fmt(is_bigendian, fields, field_names=None):
 
 ## End porting ------------------
 
+def main(args=None):
+    rclpy.init(args=args)
 
-if __name__ == "__main__":
-    
-    scan_topic = "/velodyne_points_cut_rect"
-
-    rclpy.init()
     Logger('LOG').info("Initiatizing node...")
-    # initialize like ros2
-    # rclpy.init_node('inference', log_level=rospy.DEBUG)
 
     config_file = default_config_file
-    # checkpoint_file = default_checkpoint_file
+    checkpoint_file = default_checkpoint_file
 
     Logger('LOG').info("Building the network with the following parameters: \n")
-    # Logger('LOG').info("CHECKPOINT : " + checkpoint_file)
+    Logger('LOG').info("CHECKPOINT : " + checkpoint_file)
     Logger('LOG').info("CONFIG FILE : " + config_file)
 
-    detector = VISTADetector(config_file)    #, checkpoint_file)
+    detector = VISTADetector(config_file, checkpoint_file)
 
     rclpy.spin(detector)
 
     detector.destroy_node()
     rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()
+    

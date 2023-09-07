@@ -15,19 +15,17 @@ ROOT_PATH = '/home/ale/big_brother/src/Big-Brother/'
 
 # Update the DATA_PATH to the data directory location
 DATA_PATH = '/home/ale/data'
-
-DATASET_PATH = DATA_PATH + '/datasets'
 OUTPUT_PATH = DATA_PATH + '/output'
 
 TRACKING_PATH = ROOT_PATH + '/bb_tracker'
-DETECTION_PATH = ROOT_PATH + '/bb_detection'
+DETECTION_PATH = ROOT_PATH + '/bb_detection/bb_detection'
 UTILS_PATH = ROOT_PATH + '/bb_utils'
 
 ### DETECTION
 
 # VISTA
 VISTA_PATH = DETECTION_PATH + '/vista'
-VISTA_WORKDIR = OUTPUT_PATH + '/vista'
+VISTA_WORKDIR = DATA_PATH + '/vista'
 
 # Checklist for calibration files
 INTRINSIC_PARAMS = [ 'fx', 'fy', 'cx', 'cy', 'k1', 'k2', 'k3', 'p1', 'p2' ]

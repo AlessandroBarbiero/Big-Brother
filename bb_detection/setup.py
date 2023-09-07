@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
 from glob import glob
 
@@ -7,11 +7,12 @@ package_name = 'bb_detection'
 setup(
     name=package_name,
     version='0.0.0',
-    packages=[package_name, 
-              package_name + '/bev', 
-              package_name + '/config', 
-              package_name + '/vista',
-              package_name + '/det3d'],
+    packages=find_packages(),
+    # [package_name, 
+    #           package_name + '/bev', 
+    #           package_name + '/config', 
+    #           package_name + '/vista',
+    #           package_name + '/det3d'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
