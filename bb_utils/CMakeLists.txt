@@ -15,6 +15,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 
 find_package(std_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(derived_object_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
@@ -114,6 +116,8 @@ ament_target_dependencies(rewrite_bag_timestamps
   sensor_msgs
   rosgraph_msgs
   tf2_msgs
+  derived_object_msgs
+  visualization_msgs
   )
 # ------------------
 

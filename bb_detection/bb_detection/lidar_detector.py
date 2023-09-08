@@ -29,9 +29,7 @@ from tf_transformations import quaternion_from_euler
 import rclpy
 from rclpy.node import Node
 from rclpy.impl.rcutils_logger import RcutilsLogger as Logger
-from geometry_msgs.msg import Point, Quaternion, Twist
-from sensor_msgs.msg import PointCloud, PointCloud2
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import PointCloud2
 # Ported from rosmot to Detection3DArray
 from vision_msgs.msg import Detection3D, ObjectHypothesisWithPose, Detection3DArray
 
@@ -69,7 +67,6 @@ class VISTADetector(Node):
         self.num_frame = 0
         
         # Time info
-
         self.run_info = {}
         self.run_info['input_time'] = 0.0        # time to read pc
         self.run_info['inputproc_time'] = 0.0    # time for preprocessing (voxelization)
@@ -110,7 +107,6 @@ class VISTADetector(Node):
         self.get_logger().info(f"torch.backends.cudnn.benchmark: {torch.backends.cudnn.benchmark}")
 
         #breakpoint()
-        # FIXME: this is not working
         model = build_detector(cfg.model, train_cfg=None, test_cfg=cfg.test_cfg).to(device).float().eval()
 
         checkpoint = load_checkpoint(model, checkpoint_file, map_location="cpu")
@@ -135,7 +131,7 @@ class VISTADetector(Node):
         feature_map_size = [*feature_map_size, 1][::-1]
 
         self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
-        self._sub = self.create_subscription(PointCloud2, "/lidar", self.callback)
+        self._sub = self.create_subscription(PointCloud2, "/lidar", self.callback, 10)
 
 
     def load_example_from_points(self, points):
@@ -183,15 +179,22 @@ class VISTADetector(Node):
         points = np.array(list(points_raw), dtype=np.float32)
         self.run_info['input_time'] = time.time() - input_start_time
         cum_input_time += self.run_info['input_time']
+
+        self.get_logger().info("shape{}".format(np.shape(points)))
         
         # points[:, 3] /= 255            #Uncomment for data from VLP16
         # points[:,4] = 0                #Uncomment for data from VLP16
         sweep_points_list = [points]
         # points = np.concatenate(sweep_points_list, axis=0)[:, [0, 1, 2, 4]]    #Uncomment for data from VLP16
-        #points = np.concatenate(sweep_points_list, axis=0)[:, [0, 1, 2]]  # Comment for data from VLP16
-        #Temp = np.zeros(points.shape[0])  # Comment for data from VLP16
-        #points = np.c_[points, Temp]  # Comment for data from VLP16
+        # points = np.concatenate(sweep_points_list, axis=0)[:, [0, 1, 2]]  # Comment for data from VLP16
+
+        # Add all zeros as the ring parameter
+        Temp = np.zeros(points.shape[0])  # Comment for data from VLP16
+        points = np.c_[points, Temp]  # Comment for data from VLP16
+
         
+        self.get_logger().info("shape: {}".format(np.shape(points)))
+
         self.inference_model(points, msg)
         
         
