@@ -84,6 +84,7 @@ void BYTETracker::remove_duplicate_stracks(vector<STrack> &resa, vector<STrack> 
 		}
 	}
 
+	//Sign as duplicate the element that has the shorter life
 	vector<int> dupa, dupb;
 	for (unsigned int i = 0; i < pairs.size(); i++)
 	{

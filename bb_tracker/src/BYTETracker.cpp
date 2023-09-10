@@ -174,6 +174,7 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 		}
 		else
 		{
+			// TODO: check here, it should never enter here
 			track->re_activate(*det, this->frame_id, false);
 			refind_stracks.push_back(*track);
 		}
@@ -269,6 +270,8 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	this->tracked_stracks.assign(resa.begin(), resa.end());
 	this->lost_stracks.clear();
 	this->lost_stracks.assign(resb.begin(), resb.end());
+
+	//std::cout << "End step 5" << std::endl;
 	
 	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
 	{
@@ -277,6 +280,6 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 			output_stracks.push_back(&this->tracked_stracks[i]);
 		}
 	}
-	//std::cout << "End step 5" << std::endl;
+	
 	return output_stracks;
 }

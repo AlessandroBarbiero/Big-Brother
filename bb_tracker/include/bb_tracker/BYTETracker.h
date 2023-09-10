@@ -43,10 +43,38 @@ public:
 	static std::unordered_map<int, std::string> int_to_class;
 
 private:
+	/**
+	 * Combines two vectors of STrack objects into a single vector.
+	 * Ensures uniqueness of elements in res based on 'track_id' field.
+	 *
+	 * @param tlista First vector of STrack pointer objects.
+	 * @param tlistb Second vector of STrack objects.
+	 * @return Combined vector of unique STrack pointer objects.
+	 */
 	vector<STrack*> joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb);
+	/**
+	 * Combines two vectors of STrack objects into a single vector.
+	 * Ensures uniqueness of elements in res based on 'track_id' field.
+	 *
+	 * @param tlista First vector of STrack objects.
+	 * @param tlistb Second vector of STrack objects.
+	 * @return Combined vector of unique STrack objects.
+	 */
 	vector<STrack> joint_stracks(vector<STrack> &tlista, vector<STrack> &tlistb);
 
 	vector<STrack> sub_stracks(vector<STrack> &tlista, vector<STrack> &tlistb);
+	/**
+	 * Removes duplicate elements from two sets of STrack vectors, 'stracksa' and 'stracksb'.
+	 * Duplicate elements are identified by comparing the intersection-over-union (IOU) distance between elements in 'stracksa' and 'stracksb'.
+	 * Elements that have an IOU distance less than 0.15 are considered duplicates.
+	 * The non-duplicate elements are added to 'resa' and 'resb'.
+	 * If an element is considered duplicated, keep only the one that has been tracked for the most time
+	 *
+	 * @param resa      The output vector where non-duplicate elements from 'stracksa' will be stored.
+	 * @param resb      The output vector where non-duplicate elements from 'stracksb' will be stored.
+	 * @param stracksa  The input vector of STrack elements from set A.
+	 * @param stracksb  The input vector of STrack elements from set B.
+	 */
 	void remove_duplicate_stracks(vector<STrack> &resa, vector<STrack> &resb, vector<STrack> &stracksa, vector<STrack> &stracksb);
 
 	/**
