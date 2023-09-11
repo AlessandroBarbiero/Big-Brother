@@ -53,7 +53,7 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(bag_name_arg)
     ld.add_action(static_tf)
-    # ld.add_action(lidar_node)
+    ld.add_action(lidar_node)
     ld.add_action(bag_process)
     ld.add_action(rviz2_node)
     return ld
