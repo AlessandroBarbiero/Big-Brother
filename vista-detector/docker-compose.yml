@@ -1,0 +1,10 @@
+version: '3'
+services:
+  pp-container:
+    container_name: vista-container
+    image: vista-detector:latest
+    runtime: nvidia  # Use NVIDIA runtime for GPU support
+    volumes:
+      - /home/ale/docker/shared:/shared
+    tty: true
+    stdin_open: true

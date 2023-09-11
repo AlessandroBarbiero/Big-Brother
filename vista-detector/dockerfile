@@ -1,0 +1,206 @@
+FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 
+
+LABEL org.opencontainers.image.authors="alessandro.barbiero@mail.polimi.it"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN true
+ENV NUM_CORES 10
+
+
+
+RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y vim \
+			  rsync \
+			  nano \
+			  tmux \
+			  git \
+			  libssl-dev \
+			  lsb-core \
+			  bc \
+			  wget \
+    			  curl \
+    			  libfreetype6-dev \
+    			  libpng-dev \
+    			  libzmq3-dev \
+    			  pkg-config \
+    			  software-properties-common \
+    			  unzip \
+			  libsm6 \
+			  libxext6 \
+			  libfontconfig1 \
+			  libxrender1 \
+			  ffmpeg \
+    && apt-get install -y --fix-missing libboost-all-dev \
+    && apt-get clean && apt-get autoremove
+
+
+RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+
+RUN apt-get update && apt-get install -y cmake
+RUN git clone https://github.com/Kitware/CMake.git
+RUN \
+  cd CMake && \
+  mkdir build && \
+  cd build && \
+  cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && \
+  make -j4 && \
+  make install && \
+  ldconfig && \
+  cd ../.. && \
+  cmake --version
+
+
+RUN export PATH=/usr/bin/cmake:$PATH
+
+# spcov v1.1 is not optimal
+#RUN git clone https://github.com/traveller59/spconv.git && cd spconv && git checkout 42d92ee && git submodule update --init --recursive && cd ..
+#RUN git clone https://github.com/traveller59/spconv.git --recursive
+RUN git clone -b v1.1 https://github.com/traveller59/spconv.git --recursive
+
+#-------------------ADDED to fix errror with 20.04--------------------- for 18.04 comment this part
+RUN apt-get install -y software-properties-common && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test && \
+    apt update && \
+    apt install g++-7 -y
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 && \
+                         #--slave /usr/bin/g++ g++ /usr/bin/g++-7 &&\
+    update-alternatives --config gcc &&\
+    gcc --version &&\
+    g++ --version
+
+# This one if you want the **all** toolchain programs (with the triplet names) to also point to gcc-7. 
+# For example, this is needed if building Debian packages.
+RUN ls -la /usr/bin/ | grep -oP "[\S]*(gcc|g\+\+)(-[a-z]+)*[\s]" | xargs bash -c 'for link in ${@:1}; do ln -s -f "/usr/bin/${link}-${0}" "/usr/bin/${link}"; done' 7
+
+
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
+ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+ENV FORCE_CUDA="1"
+
+RUN export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
+RUN export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu
+RUN export CUDA_BIN_PATH=/usr/local/cuda-11.3/bin
+RUN export CMAKE_CUDA_COMPILER=/usr/local/cuda-11.3/bin/gcc
+RUN export CUDACXX=/usr/local/cuda-11.3/bin
+RUN export CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-11.3
+RUN export DCMAKE_CUDA_COMPILER=/usr/local/cuda-11.3/bin/nvcc
+
+
+# ---------------------- ROS FOXY ---------------------------
+
+# Install locales and set up en_US.UTF-8
+RUN apt update && apt install -y locales && \
+    locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 && \
+    export LANG=en_US.UTF-8
+
+# Install software-properties-common and add universe repository
+RUN apt install -y software-properties-common && \
+    add-apt-repository universe
+
+# Install curl and add ROS GPG key
+RUN apt update && apt install -y curl && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+# Add ROS repository to apt sources
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+# Update and upgrade packages
+RUN apt update && apt upgrade -y
+
+# Install ROS 2 Foxy and other packages
+RUN apt install -y ros-foxy-ros-base python3-argcomplete
+
+# Set up ROS environment
+RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
+
+# -----------------------------------------------------------------
+
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda clean -t && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
+
+ENV PATH "/opt/conda/bin:$PATH"
+ENV PATH "/opt/conda/envs:$PATH"
+ENV PATH "/opt/conda/envs/mht_vista/bin:$PATH"
+
+
+ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
+ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
+ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+ENV FORCE_CUDA=1 
+ 
+ENV PATH="/usr/local/cuda-11.3/bin${PATH:+:${PATH}}"  
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu" 
+ENV CUDA_BIN_PATH="/usr/local/cuda-11.3/bin" 
+ENV CMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/gcc" 
+ENV CUDACXX="/usr/local/cuda-11.3/bin"
+ENV CUDA_TOOLKIT_ROOT_DIR="/usr/local/cuda-11.3"
+ENV DCMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/nvcc"
+
+
+
+# Create workspace
+RUN mkdir -p /ros2_ws/src
+
+RUN apt-get update && apt-get -y upgrade
+RUN apt-get install libgl1-mesa-glx libglib2.0-0 -y
+RUN apt-get install openmpi-bin openmpi-common libopenmpi-dev libgtk2.0-dev git -y
+
+# Copy the repository files to the workspace
+COPY detector /ros2_ws/src/detector
+
+COPY ./mht_reqs.txt /exp/mht_reqs.txt
+
+RUN conda create -y -n mht_vista python=3.8 pip 
+
+# Install torch/torchvision/torchaudio
+RUN /bin/bash -c ". activate mht_vista && \
+		  pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
+	    	  
+RUN /bin/bash -c ". activate mht_vista \
+                  && pip install -r /exp/mht_reqs.txt"
+
+RUN /bin/bash -c ". activate mht_vista && \
+                pip install spconv-cu111"
+
+COPY ./configs/.tmux.conf /.tmux.conf
+COPY ./configs/.dircolors /.dircolors
+COPY ./configs/.bashrc /.bashrc
+
+RUN /bin/bash -c "touch /.condarc"
+RUN /bin/bash -c "chmod 777 /.condarc"
+
+RUN echo "export PYTHONPATH=\"/ros2_ws/src/detector/detector/vista:/ros2_ws/src/detector/detector/vista/build:${PYTHONPATH}\"" >> /.bashrc
+
+# -----------------------------------------------------
+# Install additional ROS packages
+RUN apt install -y python3-colcon-common-extensions ros-foxy-pcl-ros ros-foxy-vision-msgs ros-foxy-sensor-msgs ros-foxy-tf-transformations
+RUN apt clean && apt autoremove -y
+
+# Build the workspace
+WORKDIR /ros2_ws
+RUN /bin/bash -c 'source /opt/ros/foxy/setup.bash' && \
+    colcon build --packages-select detector && \
+    echo "source /ros2_ws/install/setup.bash" >> ~/.bashrc
+
+# Source the workspace
+RUN /bin/bash -c 'source /ros2_ws/install/setup.bash'
+
+
+
+
+
+
+
+
+# Launch the ROS node
+# CMD ["ros2", "launch", "detector", "lidar_detector.launch.py"]
+CMD ["bash"]
