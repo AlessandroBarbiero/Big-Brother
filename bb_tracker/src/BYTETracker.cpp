@@ -177,6 +177,7 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 			// TODO: check here, it should never enter here
 			track->re_activate(*det, this->frame_id, false);
 			refind_stracks.push_back(*track);
+			std::cout<<"ByteTracker: it should not enter here. Check this. Line: "<< __LINE__ << std::endl;
 		}
 	}
 
