@@ -37,6 +37,7 @@ COPY engine/trt.engine /opt/engine/
 
 # Install additional ROS packages
 RUN apt install -y python3-colcon-common-extensions ros-foxy-pcl-ros ros-foxy-vision-msgs
+RUN apt clean && apt autoremove
 
 # Build the workspace
 WORKDIR /pointpillars_ws
