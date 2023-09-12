@@ -57,7 +57,7 @@ RUN export PATH=/usr/bin/cmake:$PATH
 # spcov v1.1 is not optimal
 #RUN git clone https://github.com/traveller59/spconv.git && cd spconv && git checkout 42d92ee && git submodule update --init --recursive && cd ..
 #RUN git clone https://github.com/traveller59/spconv.git --recursive
-RUN git clone -b v1.1 https://github.com/traveller59/spconv.git --recursive
+# -> RUN git clone -b v1.1 https://github.com/traveller59/spconv.git --recursive
 
 #-------------------ADDED to fix errror with 20.04--------------------- for 18.04 comment this part
 RUN apt-get install -y software-properties-common && \
@@ -76,18 +76,17 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 && \
 RUN ls -la /usr/bin/ | grep -oP "[\S]*(gcc|g\+\+)(-[a-z]+)*[\s]" | xargs bash -c 'for link in ${@:1}; do ln -s -f "/usr/bin/${link}-${0}" "/usr/bin/${link}"; done' 7
 
 
-ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
+ENV TORCH_CUDA_ARCH_LIST="5.0 5.1 5.2 5.3 6.0 6.1 7.0+PTX"
 ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
-ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
-ENV FORCE_CUDA="1"
+ENV FORCE_CUDA=1 
 
-RUN export PATH=/usr/local/cuda-11.3/bin${PATH:+:${PATH}}
-RUN export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu
-RUN export CUDA_BIN_PATH=/usr/local/cuda-11.3/bin
-RUN export CMAKE_CUDA_COMPILER=/usr/local/cuda-11.3/bin/gcc
-RUN export CUDACXX=/usr/local/cuda-11.3/bin
-RUN export CUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda-11.3
-RUN export DCMAKE_CUDA_COMPILER=/usr/local/cuda-11.3/bin/nvcc
+ENV PATH="/usr/local/cuda-11.3/bin${PATH:+:${PATH}}"  
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu" 
+ENV CUDA_BIN_PATH="/usr/local/cuda-11.3/bin" 
+ENV CMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/gcc" 
+ENV CUDACXX="/usr/local/cuda-11.3/bin"
+ENV CUDA_TOOLKIT_ROOT_DIR="/usr/local/cuda-11.3"
+ENV DCMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/nvcc"
 
 
 # ---------------------- ROS FOXY ---------------------------
@@ -120,32 +119,6 @@ RUN echo "source /opt/ros/foxy/setup.bash" >> ~/.bashrc
 
 # -----------------------------------------------------------------
 
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
-    rm ~/miniconda.sh && \
-    /opt/conda/bin/conda clean -t && \
-    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
-    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc
-
-ENV PATH "/opt/conda/bin:$PATH"
-ENV PATH "/opt/conda/envs:$PATH"
-ENV PATH "/opt/conda/envs/mht_vista/bin:$PATH"
-
-
-ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
-ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
-ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
-ENV FORCE_CUDA=1 
- 
-ENV PATH="/usr/local/cuda-11.3/bin${PATH:+:${PATH}}"  
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu" 
-ENV CUDA_BIN_PATH="/usr/local/cuda-11.3/bin" 
-ENV CMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/gcc" 
-ENV CUDACXX="/usr/local/cuda-11.3/bin"
-ENV CUDA_TOOLKIT_ROOT_DIR="/usr/local/cuda-11.3"
-ENV DCMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/nvcc"
-
-
 
 # Create workspace
 RUN mkdir -p /ros2_ws/src
@@ -159,24 +132,17 @@ COPY detector /ros2_ws/src/detector
 
 COPY ./mht_reqs.txt /exp/mht_reqs.txt
 
-RUN conda create -y -n mht_vista python=3.8 pip 
-
 # Install torch/torchvision/torchaudio
-RUN /bin/bash -c ". activate mht_vista && \
-		  pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
+RUN apt-get install python3-pip -y
+RUN /bin/bash -c "pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
 	    	  
-RUN /bin/bash -c ". activate mht_vista \
-                  && pip install -r /exp/mht_reqs.txt"
+RUN /bin/bash -c "pip install -r /exp/mht_reqs.txt"
 
-RUN /bin/bash -c ". activate mht_vista && \
-                pip install spconv-cu111"
+RUN /bin/bash -c "pip install spconv-cu113"
 
 COPY ./configs/.tmux.conf /.tmux.conf
 COPY ./configs/.dircolors /.dircolors
 COPY ./configs/.bashrc /.bashrc
-
-RUN /bin/bash -c "touch /.condarc"
-RUN /bin/bash -c "chmod 777 /.condarc"
 
 RUN echo "export PYTHONPATH=\"/ros2_ws/src/detector/detector/vista:/ros2_ws/src/detector/detector/vista/build:${PYTHONPATH}\"" >> /.bashrc
 
@@ -194,9 +160,11 @@ RUN /bin/bash -c 'source /opt/ros/foxy/setup.bash' && \
 # Source the workspace
 RUN /bin/bash -c 'source /ros2_ws/install/setup.bash'
 
+RUN mkdir /home/vista && mkdir /home/vista/checkpoints
+COPY ./vista.pth /home/vista/checkpoints/vista.pth
 
-
-
+# Build vista and det3d
+RUN cd /ros2_ws/src/detector/detector/vista && python3 setup.py build develop
 
 
 

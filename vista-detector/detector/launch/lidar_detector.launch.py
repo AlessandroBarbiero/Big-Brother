@@ -3,7 +3,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     lidar_node = Node(
-        package="bb_detection",
+        package="detector",
         executable="lidar_detector",
         remappings=[
             ("/lidar", "/carla/sensors_home/static_lidar"),
