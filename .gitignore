@@ -54,6 +54,6 @@ CATKIN_IGNORE
 .vscode/
 
 # Folders of external projects
-vista/
-det3d/
+# vista/
+# det3d/
 ros2_tao_pointpillars/
