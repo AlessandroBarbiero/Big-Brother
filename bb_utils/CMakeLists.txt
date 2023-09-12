@@ -20,17 +20,23 @@ find_package(derived_object_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
 
 find_package(bb_interfaces REQUIRED) 
+
 find_package(message_filters REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 # Add to run launch files
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}
 )
+
+# Add to include header files
+include_directories(include)
 
 # %%%%%%%%%%%%%%%%%%%%%%% TO USE IMGUI
 
@@ -70,6 +76,7 @@ set(LIBRARIES "glfw;Vulkan::Vulkan")
 # Use vulkan headers from glfw:
 include_directories(${GLFW_DIR}/deps)
 
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # EXECUTABLES
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -88,6 +95,32 @@ ament_target_dependencies(bb_visualizer
 target_link_libraries(bb_visualizer
   ${LIBRARIES}
 )
+
+# %%%%%%%%% BAG CONVERTER %%%%%%%%%
+add_executable(rewrite_bag_timestamps src/rewrite_bag_timestamps.cpp)
+ament_target_dependencies(rewrite_bag_timestamps 
+  rosbag2_cpp 
+  rclcpp
+  sensor_msgs
+  rosgraph_msgs
+  tf2_msgs
+  derived_object_msgs
+  visualization_msgs
+  )
+# ------------------
+
+# %%%%%%%%% BB_BENCHMARK %%%%%%%%%%%
+add_executable(bb_benchmark 
+  src/bb_benchmark.cpp
+  )
+ament_target_dependencies(bb_benchmark
+  rclcpp
+  tf2_ros
+  tf2_geometry_msgs
+  vision_msgs
+  visualization_msgs
+  )
+# -----------
 
 
 
@@ -108,41 +141,19 @@ ament_target_dependencies(bb_listener
   )
 # ---------------
 
-#--------------- BAG CONVERTER
-add_executable(rewrite_bag_timestamps src/rewrite_bag_timestamps.cpp)
-ament_target_dependencies(rewrite_bag_timestamps 
-  rosbag2_cpp 
-  rclcpp
-  sensor_msgs
-  rosgraph_msgs
-  tf2_msgs
-  derived_object_msgs
-  visualization_msgs
-  )
-# ------------------
-
-# target_include_directories(bb_node PUBLIC
-#   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-#   $<INSTALL_INTERFACE:include>)
-
 
 install(TARGETS 
   bb_visualizer
   bb_talker
   bb_listener
   rewrite_bag_timestamps
+  bb_benchmark
   DESTINATION lib/${PROJECT_NAME})
 
 
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
