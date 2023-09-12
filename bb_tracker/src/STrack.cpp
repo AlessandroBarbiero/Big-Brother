@@ -1,7 +1,7 @@
 #include <bb_tracker/STrack.h>
 #define MILLIS_IN_SECONDS 1000
 
-STrack::STrack(vector<float> minwdh_, float score, std::string class_name, long unsigned int time_ms)
+STrack::STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms)
 {
 	_minwdh.resize(6);
 	_minwdh.assign(minwdh_.begin(), minwdh_.end());

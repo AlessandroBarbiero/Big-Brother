@@ -95,7 +95,7 @@ private:
 		vector<vector<int> > &matches, vector<int> &unmatched_a, vector<int> &unmatched_b);
 	vector<vector<float> > iou_distance(vector<STrack*> &atracks, vector<STrack> &btracks, int &dist_size, int &dist_size_size);
 	vector<vector<float> > iou_distance(vector<STrack> &atracks, vector<STrack> &btracks);
-	vector<vector<float> > ious(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs);
+	vector<vector<float> > ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs);
 
 	double lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol, 
 		bool extend_cost = false, float cost_limit = LONG_MAX, bool return_cost = true);
