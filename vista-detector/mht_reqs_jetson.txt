@@ -31,7 +31,7 @@ glob2==0.6
 more-itertools==7.2.0
 numpy==1.21.1
 pyquaternion==0.9.5
-libgeos-dev             # dependency of shapely
+libgeos             # dependency of shapely it doesn't work, need another fix         <---------------------
 Shapely==1.7.0
 ipdb
 gorilla

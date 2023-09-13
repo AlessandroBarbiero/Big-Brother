@@ -147,14 +147,16 @@ RUN /bin/bash -c "pip install torch==1.8.1 torchvision==0.9.1 torchaudio==0.9.0 
 
 # Use for Jetson
 RUN /bin/bash -c "pip install -r /exp/mht_reqs_jetson.txt"
+# RUN apt install -y build-essential mesa-common-dev mesa-utils freeglut3-dev ninja-build git cmake && \
+#     git clone --recursive https://gitlab.kitware.com/vtk/vtk.git && \
+#     cd vtk && \
+#     mkdir build && \
+#     cd build && \
+#     cmake -GNinja -DVTK_WRAP_PYTHON=ON ../vtk/  && \
+#     ninja
+RUN /bin/bash -c "pip install \"https://github.com/finsberg/vtk-aarch64/releases/download/vtk-9.2.6-cp310/vtk-9.2.6.dev0-cp310-cp310-linux_aarch64.whl\""
+
 # RUN /bin/bash -c "pip install -r /exp/mht_reqs.txt"
-RUN apt install -y build-essential mesa-common-dev mesa-utils freeglut3-dev ninja-build git cmake && \
-    git clone --recursive https://gitlab.kitware.com/vtk/vtk.git && \
-    cd vtk && \
-    mkdir build && \
-    cd build && \
-    cmake -GNinja -DVTK_WRAP_PYTHON=ON ../vtk/  && \
-    ninja
 
 RUN /bin/bash -c "pip install spconv-cu113"
 
