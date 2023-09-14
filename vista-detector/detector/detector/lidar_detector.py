@@ -258,13 +258,13 @@ class VISTADetector(Node):
                 detection_a.bbox.center.orientation.z = rot_q[2] #np.sin(rots[index] / 2)[2]
                 detection_a.bbox.center.orientation.w = rot_q[3] #np.cos(rots[index] / 2)[2]
 
-                detection_a.bbox.center.position.x = locs[index, 0]
-                detection_a.bbox.center.position.y = locs[index, 1]
-                detection_a.bbox.center.position.z = locs[index, 2]
+                detection_a.bbox.center.position.x = float(locs[index, 0])
+                detection_a.bbox.center.position.y = float(locs[index, 1])
+                detection_a.bbox.center.position.z = float(locs[index, 2])
 
-                detection_a.bbox.size.x = dims[index, 0]
-                detection_a.bbox.size.y = dims[index, 1]
-                detection_a.bbox.size.z = dims[index, 2]
+                detection_a.bbox.size.x = float(dims[index, 0])
+                detection_a.bbox.size.y = float(dims[index, 1])
+                detection_a.bbox.size.z = float(dims[index, 2])
 
                 # Old comments
                 #box_a.dimensions.x = dims[index, 1]
@@ -308,7 +308,7 @@ class VISTADetector(Node):
 
 
         self._pub.publish(detections_msg)
-        self.get_logger().info("Published msg: " + str(msg.header.stamp.secs) + "." + str(msg.header.stamp.nsecs))
+        self.get_logger().info("Published msg: " + str(msg.header.stamp.sec) + "." + str(msg.header.stamp.nanosec))
 
 
 ## -----------------------------------------------------------
