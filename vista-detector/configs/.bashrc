@@ -141,15 +141,10 @@ fi
 
 BASH_COLOR=${GREEN}
 
-# Hide conda current env in the prompt
-if hash conda 2>/dev/null; then
-    conda config --set changeps1 False
-fi
-
 # format bash
 # RESET=${WHITE}
-PS1='\[${GREEN}\]┌─────── \[${YELLOW}\] cozza/dl:multi-hypothesis-tracking \[${BLUE}\] [\w]\[${YELLOW}\]\n\[${GREEN}\]└─ ${CONDA_DEFAULT_ENV} λ \[${RESET}\]'
-# VIRTUAL_ENV_DISABLE_PROMPT=1 source ~/Enthought/Canopy_64bit/User/bin/activate
+PS1='\[${GREEN}\]┌─────── \[${YELLOW}\] barbiero:multi-sensor-odt \[${BLUE}\] [\w]\[${YELLOW}\]\n\[${GREEN}\]└─ ${CONDA_DEFAULT_ENV} λ \[${RESET}\]'
+
 
 # If this is an gnome-terminal set the title to user@host:dir
 # For konsole, just modify the preferences to print %w
@@ -162,9 +157,6 @@ xterm*|rxvt*)
     ;;
 esac
 
-# Uncomment to use my own conda env
-# export PATH=$HOME/.miniconda/bin:$PATH
-
 # History stuff
 export HISTFILESIZE=1000000000
 export HISTSIZE=1000000
@@ -172,8 +164,6 @@ export HISTTIMEFORMAT="%F %T "
 shopt -s cmdhist
 shopt -s histappend
 
-# added by Miniconda3 installer
-export PATH="$HOME/miniconda3/bin:$PATH"
 
 #################################################################################
 
