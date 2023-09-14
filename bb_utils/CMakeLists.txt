@@ -33,6 +33,7 @@ find_package(image_geometry REQUIRED)
 
 # Add to run launch files
 install(DIRECTORY
+  config
   launch
   DESTINATION share/${PROJECT_NAME}
 )

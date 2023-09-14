@@ -1,0 +1,6 @@
+bb_benchmark:
+   ros__parameters:
+      fps: 10
+      match_thresh: 0.8
+      fixed_frame: map
+      show_range: true
