@@ -9,7 +9,9 @@ ENV NUM_CORES 10
 # For Jetson use:
 RUN apt-get update && apt-get install -y --no-install-recommends apt-utils
 RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/arm64/3bf863cc.pub
+# -------------------
 # RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+# -------------------
 
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y vim \
@@ -55,11 +57,6 @@ RUN \
 
 RUN export PATH=/usr/bin/cmake:$PATH
 
-# spcov v1.1 is not optimal
-#RUN git clone https://github.com/traveller59/spconv.git && cd spconv && git checkout 42d92ee && git submodule update --init --recursive && cd ..
-#RUN git clone https://github.com/traveller59/spconv.git --recursive
-# -> RUN git clone -b v1.1 https://github.com/traveller59/spconv.git --recursive
-
 #-------------------ADDED to fix errror with 20.04--------------------- for 18.04 comment this part
 RUN apt-get install -y software-properties-common && \
     add-apt-repository ppa:ubuntu-toolchain-r/test && \
@@ -67,7 +64,6 @@ RUN apt-get install -y software-properties-common && \
     apt install g++-7 -y
 
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 && \
-                         #--slave /usr/bin/g++ g++ /usr/bin/g++-7 &&\
     update-alternatives --config gcc &&\
     gcc --version &&\
     g++ --version
@@ -78,14 +74,18 @@ RUN ls -la /usr/bin/ | grep -oP "[\S]*(gcc|g\+\+)(-[a-z]+)*[\s]" | xargs bash -c
 
 # For Jetson use:
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX 7.2 8.7"
+# -----------------
 # ENV TORCH_CUDA_ARCH_LIST="5.0 5.1 5.2 5.3 6.0 6.1 7.0+PTX"
+# -----------------
 ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
 ENV FORCE_CUDA=1 
 
 ENV PATH="/usr/local/cuda-11.3/bin${PATH:+:${PATH}}"  
 # For Jetson use:
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/aarch64-linux-gnu"
+# -------------------
 # ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/cuda-11.3/lib64:/usr/lib/x86_64-linux-gnu" 
+# -------------------
 ENV CUDA_BIN_PATH="/usr/local/cuda-11.3/bin" 
 ENV CMAKE_CUDA_COMPILER="/usr/local/cuda-11.3/bin/gcc" 
 ENV CUDACXX="/usr/local/cuda-11.3/bin"
@@ -136,27 +136,26 @@ COPY detector /ros2_ws/src/detector
 
 # Use for Jetson
 COPY ./mht_reqs_jetson.txt /exp/mht_reqs_jetson.txt
+# ---------------
 # COPY ./mht_reqs.txt /exp/mht_reqs.txt
+# ---------------
 
 # Install torch/torchvision/torchaudio
 RUN apt-get install python3-pip -y
 
 # Use for Jetson
 RUN /bin/bash -c "pip install torch==1.8.1 torchvision==0.9.1 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html"
+# ---------------------
 # RUN /bin/bash -c "pip install torch==1.8.1+cu111 torchvision==0.9.1+cu111 torchaudio==0.8.1 -f https://download.pytorch.org/whl/torch_stable.html"
+# ---------------------
 
 # Use for Jetson
+RUN apt-get install libgeos-dev llvm-10-dev -y
 RUN /bin/bash -c "pip install -r /exp/mht_reqs_jetson.txt"
-# RUN apt install -y build-essential mesa-common-dev mesa-utils freeglut3-dev ninja-build git cmake && \
-#     git clone --recursive https://gitlab.kitware.com/vtk/vtk.git && \
-#     cd vtk && \
-#     mkdir build && \
-#     cd build && \
-#     cmake -GNinja -DVTK_WRAP_PYTHON=ON ../vtk/  && \
-#     ninja
 RUN /bin/bash -c "pip install \"https://github.com/finsberg/vtk-aarch64/releases/download/vtk-9.2.6-cp310/vtk-9.2.6.dev0-cp310-cp310-linux_aarch64.whl\""
-
+# -----------
 # RUN /bin/bash -c "pip install -r /exp/mht_reqs.txt"
+# -----------
 
 RUN /bin/bash -c "pip install spconv-cu113"
 
