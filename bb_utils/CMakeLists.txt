@@ -13,6 +13,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(OpenCV REQUIRED)
 
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
@@ -28,6 +29,7 @@ find_package(bb_interfaces REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(image_geometry REQUIRED)
 
 # Add to run launch files
 install(DIRECTORY
@@ -119,6 +121,8 @@ ament_target_dependencies(bb_benchmark
   tf2_geometry_msgs
   vision_msgs
   visualization_msgs
+  OpenCV
+  image_geometry
   )
 # -----------
 
