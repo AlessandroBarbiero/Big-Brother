@@ -4,3 +4,17 @@ bb_benchmark:
       match_thresh: 0.8
       fixed_frame: map
       show_range: true
+      camera_list: [
+         "/carla/sensors_home/static_rgb_camera/camera_info", 
+         "/carla/sensors_home/static_termic_camera/camera_info"
+         ]
+      camera_max_distances: [
+         30, 40
+      ]
+      lidar_list: [
+         "/sensors_home/static_lidar"
+      ]
+      lidar_max_distances: [
+         50
+      ]
+      

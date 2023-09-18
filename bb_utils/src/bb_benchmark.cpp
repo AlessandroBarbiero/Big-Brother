@@ -1,6 +1,5 @@
 #include <bb_utils/bb_benchmark.hpp>
 
-
 BBBenchmark::BBBenchmark()
 : Node("bb_benchmark"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
@@ -13,21 +12,137 @@ BBBenchmark::BBBenchmark()
   fixed_frame_desc.description = "The fixed frame the bb_benchmark has to use, all the tracks has to give a transform for this frame, usually the frame of the ground truth";
   auto s_range_desc = rcl_interfaces::msg::ParameterDescriptor{};
   s_range_desc.description = "Set to true to show the range of sensors, this is the range within which the accuracy is computed";
+
+  auto camera_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  camera_list_desc.description = "List of the camera info topics";
+  auto cameras_max_dist_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  cameras_max_dist_desc.description = "List of the max distances for object detected by cameras, respect the order of 'camera_list'";
+
+  auto lidar_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  lidar_list_desc.description = "List of the lidar tf";
+  auto lidar_max_dist_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  lidar_max_dist_desc.description = "List of the max distances for object detected by lidars, respect the order of 'lidar_list'";
+
+  std::vector<std::string> cameras = {"cam1"};
+  std::vector<int64_t> cameras_max_dist = {0};
+
+  std::vector<std::string> lidars = {"lid1"};
+  std::vector<int64_t> lidars_max_dist = {0};
+
   this->declare_parameter("fps", 30, fps_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "map", fixed_frame_desc);
   this->declare_parameter("show_range", true, s_range_desc);
+  this->declare_parameter("camera_list", cameras, camera_list_desc);
+  this->declare_parameter("camera_max_distances", cameras_max_dist, cameras_max_dist_desc);
+  this->declare_parameter("lidar_list", lidars, lidar_list_desc);
+  this->declare_parameter("lidar_max_distances", lidars_max_dist, lidar_max_dist_desc);
 
-  _fps =            get_parameter("fps").as_int();
-  _match_thresh =   get_parameter("match_thresh").as_double();
-  _fixed_frame =    get_parameter("fixed_frame").as_string();
-  _show_range  =    get_parameter("show_range").as_bool();
+  _fps =              get_parameter("fps").as_int();
+  _match_thresh =     get_parameter("match_thresh").as_double();
+  _fixed_frame =      get_parameter("fixed_frame").as_string();
+  _show_range  =      get_parameter("show_range").as_bool();
+  cameras =           get_parameter("camera_list").as_string_array();
+  cameras_max_dist =  get_parameter("camera_max_distances").as_integer_array();
+  lidars =            get_parameter("lidar_list").as_string_array();
+  lidars_max_dist =   get_parameter("lidar_max_distances").as_integer_array();
 
-  _tracker_out = this->create_subscription<vision_msgs::msg::Detection3DArray>(
+  rclcpp::QoS qos_transient_local(rclcpp::KeepLast(10));
+  qos_transient_local.transient_local();
+
+  if(_show_range){
+    // Add a subscriber for each camera info topic 
+    int id = 0;
+    for (auto camera_topic : cameras){
+      rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_sub;
+      std::function<void(std::shared_ptr<sensor_msgs::msg::CameraInfo>)> callback_fun = std::bind(
+        &BBBenchmark::publish_camera_FOV, this, _1, id, cameras_max_dist[id]);
+      
+      cam_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(camera_topic, rclcpp::QoS(rclcpp::KeepLast(1)), callback_fun);
+      _cameras_sub.push_back(cam_sub);
+      _last_transform_camera.push_back(geometry_msgs::msg::Transform());
+      id++;
+    }
+    
+    _sensor_range_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/sensor_range", qos_transient_local);
+    
+    publish_lidar_range(lidars, lidars_max_dist);
+  }
+
+  _tracker_out_sub = this->create_subscription<vision_msgs::msg::Detection3DArray>(
       "bytetrack/active_tracks", 10, std::bind(&BBBenchmark::tracker_out, this, _1));
+
+
+  _static_ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
+      "carla/markers/static", qos_transient_local, std::bind(&BBBenchmark::save_static_gt, this, _1));
+  _ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
+      "carla/markers", rclcpp::QoS(rclcpp::KeepLast(1)), std::bind(&BBBenchmark::save_gt, this, _1));
 
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
 
+}
+
+void BBBenchmark::save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg){
+  if(msg->markers[0].header.frame_id!=_fixed_frame)
+    RCLCPP_WARN(this->get_logger(), "static gt should have the same tf as fixed frame");
+
+  _static_objects.resize(msg->markers.size());
+  for(auto marker: msg->markers){
+    vision_msgs::msg::BoundingBox3D bbox;
+    bbox.center=marker.pose;
+    bbox.size=marker.scale;
+    _static_objects.push_back(bbox);
+  }
+
+  RCLCPP_INFO(this->get_logger(), "Static Objects saved!");
+}
+
+void BBBenchmark::save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg)
+{
+  _moving_objects = msg;
+}
+
+void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg)
+{
+  _moving_objects_bbox.clear();
+  _moving_objects_bbox.resize(msg->markers.size());
+  for(auto marker: msg->markers){
+    vision_msgs::msg::BoundingBox3D bbox;
+    bbox.center=marker.pose;
+    bbox.size=marker.scale;
+    _moving_objects_bbox.push_back(bbox);
+  }
+
+  // RCLCPP_INFO_STREAM(this->get_logger(), "Moving Objects saved! " << _moving_objects_bbox.size() << " Objects");
+}
+
+void BBBenchmark::publish_lidar_range(std::vector<std::string> lidars, std::vector<int64_t> lidars_max_dist)
+{
+    for (long unsigned int i = 0; i < lidars.size(); i++)
+    {
+        visualization_msgs::msg::Marker marker = getLidarRangeMarker(lidars[i], i, static_cast<float>(lidars_max_dist[i]));
+        _sensor_range_pub->publish(marker);
+    }
+}
+
+visualization_msgs::msg::Marker BBBenchmark::getLidarRangeMarker(std::string frame_id, int id, float range){
+  visualization_msgs::msg::Marker marker;
+  marker.header.frame_id = frame_id;
+  marker.ns = "lidar_range";
+  marker.id = id;
+  marker.type = visualization_msgs::msg::Marker::SPHERE;
+  marker.action = visualization_msgs::msg::Marker::ADD;
+  marker.lifetime = rclcpp::Duration(0.0);
+  marker.color.r = 255;
+  marker.color.g = 255;
+  marker.color.b = 0;
+  marker.color.a = 0.1;
+  marker.pose = geometry_msgs::msg::Pose();
+  marker.scale.x = range;
+  marker.scale.y = range;
+  marker.scale.z = range;
+
+  return marker;
 }
 
 void BBBenchmark::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
@@ -158,12 +273,8 @@ vector<vector<float> > BBBenchmark::ious(vector<vector<float> > &aminmaxs, vecto
 	return ious;
 }
 
-
 void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
 {
-
-  RCLCPP_INFO(this->get_logger(), "Received Track");
-  
   if (detections_message->detections.empty())
     //Something
     return;
@@ -173,18 +284,33 @@ void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray
     change_frame(detections_message, _fixed_frame);
   }
 
+  // Convert markers in bbox only when it is necessary to compare
+  save_gt_bbox(_moving_objects);
+
 }
 
+void BBBenchmark::publish_camera_FOV(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance)
+{
+  geometry_msgs::msg::TransformStamped tf_result;
+  try {
+    tf_result = _tf_buffer.lookupTransform(_fixed_frame, cam_info_message->header.frame_id, rclcpp::Time(0));
+  } catch (tf2::TransformException& ex) {
+    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << cam_info_message->header.frame_id);
+    return;
+  }
+
+  if(tf_result.transform != _last_transform_camera[id]){
+    _last_transform_camera[id] = tf_result.transform;
+    geometry_msgs::msg::Pose pose;
+    shape_msgs::msg::Mesh mesh = getCameraFOVMesh(*cam_info_message.get(), max_distance);
+    visualization_msgs::msg::Marker marker = getCameraFOVMarker(pose, mesh, id, cam_info_message->header.frame_id);
+
+    _sensor_range_pub->publish(marker);
+  }
+
+}
 
 // Taken inspiration from https://github.com/ros-planning/moveit_calibration/blob/foxy/moveit_calibration_gui/handeye_calibration_rviz_plugin/src/handeye_context_widget.cpp
-//   void camera_callback(const vision_msgs::msg::Detection2D::ConstSharedPtr& detection, const vision_msgs::msg::Detection2D::ConstSharedPtr& features) const
-// {
-//   shape_msgs::Mesh mesh = getCameraFOVMesh(*camera_info_, calibration_display_->fov_marker_size_property_->getFloat());
-//       visual_tools_->setBaseFrame(to_frame.toStdString());
-//       visual_tools_->setAlpha(calibration_display_->fov_marker_alpha_property_->getFloat());
-//       visual_tools_->publishMesh(fov_pose_, mesh, rvt::YELLOW, 1.0, "fov", 1);
-// }
-
 shape_msgs::msg::Mesh BBBenchmark::getCameraFOVMesh(const sensor_msgs::msg::CameraInfo& camera_info, double max_dist)
 {
   shape_msgs::msg::Mesh mesh;
@@ -226,16 +352,19 @@ shape_msgs::msg::Mesh BBBenchmark::getCameraFOVMesh(const sensor_msgs::msg::Came
 }
 
 visualization_msgs::msg::Marker BBBenchmark::getCameraFOVMarker(const geometry_msgs::msg::Pose& pose,
-                                                                const shape_msgs::msg::Mesh& mesh, std::string frame_id)
+                                                                const shape_msgs::msg::Mesh& mesh, int id, std::string frame_id)
 {
   visualization_msgs::msg::Marker marker;
   marker.header.frame_id = frame_id;
   marker.ns = "camera_fov";
-  marker.id = 0;
+  marker.id = id;
   marker.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
   marker.action = visualization_msgs::msg::Marker::ADD;
   marker.lifetime = rclcpp::Duration(0.0);
-  // marker.color = ...;
+  marker.color.r = 255;
+  marker.color.g = 255;
+  marker.color.b = 0;
+  marker.color.a = 0.1;
   marker.pose = pose;
   marker.scale.x = 1.0;
   marker.scale.y = 1.0;
@@ -249,6 +378,12 @@ visualization_msgs::msg::Marker BBBenchmark::getCameraFOVMarker(const geometry_m
   return marker;
 }
 
+
+
+
+
+
+// %%%%%%%%%%%%%%%%%%%% MAIN %%%%%%%%%%%%%%%%%%%%%
 
 int main(int argc, char * argv[])
 {
