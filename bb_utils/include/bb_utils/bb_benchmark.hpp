@@ -49,6 +49,7 @@ class BBBenchmark : public rclcpp::Node
     bool _show_range;
     int _fps;
     float _match_thresh;
+    float _alpha_range;
 
     std::string _fixed_frame;
     tf2_ros::Buffer _tf_buffer;

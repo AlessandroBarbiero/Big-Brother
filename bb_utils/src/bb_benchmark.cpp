@@ -12,6 +12,8 @@ BBBenchmark::BBBenchmark()
   fixed_frame_desc.description = "The fixed frame the bb_benchmark has to use, all the tracks has to give a transform for this frame, usually the frame of the ground truth";
   auto s_range_desc = rcl_interfaces::msg::ParameterDescriptor{};
   s_range_desc.description = "Set to true to show the range of sensors, this is the range within which the accuracy is computed";
+  auto alpha_range_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  alpha_range_desc.description = "Alpha value for sensor range markers, 1 means thay are solid, 0 they are invisible";
 
   auto camera_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
   camera_list_desc.description = "List of the camera info topics";
@@ -33,6 +35,7 @@ BBBenchmark::BBBenchmark()
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "map", fixed_frame_desc);
   this->declare_parameter("show_range", true, s_range_desc);
+  this->declare_parameter("alpha_range", 0.1, alpha_range_desc);
   this->declare_parameter("camera_list", cameras, camera_list_desc);
   this->declare_parameter("camera_max_distances", cameras_max_dist, cameras_max_dist_desc);
   this->declare_parameter("lidar_list", lidars, lidar_list_desc);
@@ -42,6 +45,7 @@ BBBenchmark::BBBenchmark()
   _match_thresh =     get_parameter("match_thresh").as_double();
   _fixed_frame =      get_parameter("fixed_frame").as_string();
   _show_range  =      get_parameter("show_range").as_bool();
+  _alpha_range =      get_parameter("alpha_range").as_double();
   cameras =           get_parameter("camera_list").as_string_array();
   cameras_max_dist =  get_parameter("camera_max_distances").as_integer_array();
   lidars =            get_parameter("lidar_list").as_string_array();
@@ -136,7 +140,7 @@ visualization_msgs::msg::Marker BBBenchmark::getLidarRangeMarker(std::string fra
   marker.color.r = 255;
   marker.color.g = 255;
   marker.color.b = 0;
-  marker.color.a = 0.1;
+  marker.color.a = _alpha_range;
   marker.pose = geometry_msgs::msg::Pose();
   marker.scale.x = range;
   marker.scale.y = range;
@@ -287,6 +291,10 @@ void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray
   // Convert markers in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
 
+  //TODO: Exclude bbox outside range in gt, use image_geometry::PinholeCameraModel and project3dToPixel() uv>0 and <width/height for cameras, point in sphere for lidar
+  
+  //TODO: Compare with ious bounding boxes to see right and wrong detections
+
 }
 
 void BBBenchmark::publish_camera_FOV(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance)
@@ -364,7 +372,7 @@ visualization_msgs::msg::Marker BBBenchmark::getCameraFOVMarker(const geometry_m
   marker.color.r = 255;
   marker.color.g = 255;
   marker.color.b = 0;
-  marker.color.a = 0.1;
+  marker.color.a = _alpha_range;
   marker.pose = pose;
   marker.scale.x = 1.0;
   marker.scale.y = 1.0;

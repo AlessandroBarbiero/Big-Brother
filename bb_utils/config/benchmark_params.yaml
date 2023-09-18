@@ -4,6 +4,7 @@ bb_benchmark:
       match_thresh: 0.8
       fixed_frame: map
       show_range: true
+      alpha_range: 0.1
       camera_list: [
          "/carla/sensors_home/static_rgb_camera/camera_info", 
          "/carla/sensors_home/static_termic_camera/camera_info"
