@@ -25,72 +25,108 @@ BBBenchmark::BBBenchmark()
   auto lidar_max_dist_desc = rcl_interfaces::msg::ParameterDescriptor{};
   lidar_max_dist_desc.description = "List of the max distances for object detected by lidars, respect the order of 'lidar_list'";
 
-  std::vector<std::string> cameras = {"cam1"};
-  std::vector<int64_t> cameras_max_dist = {0};
+  _cameras = {"cam1"};
+  _cameras_max_dist = {0};
 
-  std::vector<std::string> lidars = {"lid1"};
-  std::vector<int64_t> lidars_max_dist = {0};
+  _lidars = {"lid1"};
+  _lidars_max_dist = {0};
 
   this->declare_parameter("fps", 30, fps_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "map", fixed_frame_desc);
   this->declare_parameter("show_range", true, s_range_desc);
   this->declare_parameter("alpha_range", 0.1, alpha_range_desc);
-  this->declare_parameter("camera_list", cameras, camera_list_desc);
-  this->declare_parameter("camera_max_distances", cameras_max_dist, cameras_max_dist_desc);
-  this->declare_parameter("lidar_list", lidars, lidar_list_desc);
-  this->declare_parameter("lidar_max_distances", lidars_max_dist, lidar_max_dist_desc);
+  this->declare_parameter("camera_list", _cameras, camera_list_desc);
+  this->declare_parameter("camera_max_distances", _cameras_max_dist, cameras_max_dist_desc);
+  this->declare_parameter("lidar_list", _lidars, lidar_list_desc);
+  this->declare_parameter("lidar_max_distances", _lidars_max_dist, lidar_max_dist_desc);
 
   _fps =              get_parameter("fps").as_int();
   _match_thresh =     get_parameter("match_thresh").as_double();
   _fixed_frame =      get_parameter("fixed_frame").as_string();
   _show_range  =      get_parameter("show_range").as_bool();
   _alpha_range =      get_parameter("alpha_range").as_double();
-  cameras =           get_parameter("camera_list").as_string_array();
-  cameras_max_dist =  get_parameter("camera_max_distances").as_integer_array();
-  lidars =            get_parameter("lidar_list").as_string_array();
-  lidars_max_dist =   get_parameter("lidar_max_distances").as_integer_array();
+  _cameras =           get_parameter("camera_list").as_string_array();
+  _cameras_max_dist =  get_parameter("camera_max_distances").as_integer_array();
+  _lidars =            get_parameter("lidar_list").as_string_array();
+  _lidars_max_dist =   get_parameter("lidar_max_distances").as_integer_array();
 
   rclcpp::QoS qos_transient_local(rclcpp::KeepLast(10));
   qos_transient_local.transient_local();
 
-  if(_show_range){
-    // Add a subscriber for each camera info topic 
-    int id = 0;
-    for (auto camera_topic : cameras){
-      rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_sub;
-      std::function<void(std::shared_ptr<sensor_msgs::msg::CameraInfo>)> callback_fun = std::bind(
-        &BBBenchmark::publish_camera_FOV, this, _1, id, cameras_max_dist[id]);
-      
-      cam_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(camera_topic, rclcpp::QoS(rclcpp::KeepLast(1)), callback_fun);
-      _cameras_sub.push_back(cam_sub);
-      _last_transform_camera.push_back(geometry_msgs::msg::Transform());
-      id++;
-    }
+
+  // Add a subscriber for each camera info topic 
+  int id = 0;
+  for (auto camera_topic : _cameras){
+    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_sub;
+    std::function<void(std::shared_ptr<sensor_msgs::msg::CameraInfo>)> callback_fun = std::bind(
+      &BBBenchmark::camera_info_callback, this, _1, id, _cameras_max_dist[id]);
     
+    cam_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(camera_topic, rclcpp::QoS(rclcpp::KeepLast(1)), callback_fun);
+    _cameras_sub.push_back(cam_sub);
+    _last_transform_camera.push_back(geometry_msgs::msg::Transform());
+    _tf2_transform_camera.push_back(tf2::Transform());
+    _camera_models.push_back(image_geometry::PinholeCameraModel());
+    id++;
+  }
+
+  _lidar_ready = false;
+
+  if(_show_range){
     _sensor_range_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/sensor_range", qos_transient_local);
     
-    publish_lidar_range(lidars, lidars_max_dist);
+    publish_lidar_range(_lidars, _lidars_max_dist);
   }
 
   _tracker_out_sub = this->create_subscription<vision_msgs::msg::Detection3DArray>(
       "bytetrack/active_tracks", 10, std::bind(&BBBenchmark::tracker_out, this, _1));
-
 
   _static_ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
       "carla/markers/static", qos_transient_local, std::bind(&BBBenchmark::save_static_gt, this, _1));
   _ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
       "carla/markers", rclcpp::QoS(rclcpp::KeepLast(1)), std::bind(&BBBenchmark::save_gt, this, _1));
 
+  _debug_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("benchmark/debug", 10);
+
+
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
 
+}
+
+void BBBenchmark::init_lidar_tf(){
+  _last_transform_lidar.resize(_lidars.size());
+  _tf2_transform_lidar.resize(_lidars.size());
+  geometry_msgs::msg::TransformStamped tf_result;
+  for(long unsigned int id=0; id<_lidars.size(); id++){
+    try {
+      tf_result = _tf_buffer.lookupTransform(_lidars[id], _fixed_frame, rclcpp::Time(0));
+    } catch (tf2::TransformException& ex) {
+      RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << _lidars[id]);
+      return;
+    }
+    _last_transform_lidar[id] = tf_result.transform;
+    tf2::Quaternion q(
+      _last_transform_lidar[id].rotation.x,
+      _last_transform_lidar[id].rotation.y,
+      _last_transform_lidar[id].rotation.z,
+      _last_transform_lidar[id].rotation.w
+    );
+    tf2::Vector3 p(
+      _last_transform_lidar[id].translation.x,
+      _last_transform_lidar[id].translation.y,
+      _last_transform_lidar[id].translation.z
+    );
+    tf2::Transform transform(q, p);
+    _tf2_transform_lidar[id] = transform;
+  }
+  _lidar_ready=true;
 }
 
 void BBBenchmark::save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg){
   if(msg->markers[0].header.frame_id!=_fixed_frame)
     RCLCPP_WARN(this->get_logger(), "static gt should have the same tf as fixed frame");
 
-  _static_objects.resize(msg->markers.size());
+  _static_objects.reserve(msg->markers.size());
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
@@ -109,7 +145,7 @@ void BBBenchmark::save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> 
 void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg)
 {
   _moving_objects_bbox.clear();
-  _moving_objects_bbox.resize(msg->markers.size());
+  _moving_objects_bbox.reserve(msg->markers.size());
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
@@ -142,9 +178,9 @@ visualization_msgs::msg::Marker BBBenchmark::getLidarRangeMarker(std::string fra
   marker.color.b = 0;
   marker.color.a = _alpha_range;
   marker.pose = geometry_msgs::msg::Pose();
-  marker.scale.x = range;
-  marker.scale.y = range;
-  marker.scale.z = range;
+  marker.scale.x = range*2;
+  marker.scale.y = range*2;
+  marker.scale.z = range*2;
 
   return marker;
 }
@@ -288,20 +324,135 @@ void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray
     change_frame(detections_message, _fixed_frame);
   }
 
-  // Convert markers in bbox only when it is necessary to compare
+  // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
-
-  //TODO: Exclude bbox outside range in gt, use image_geometry::PinholeCameraModel and project3dToPixel() uv>0 and <width/height for cameras, point in sphere for lidar
+  // Put moving and static objects together
+  vector<vision_msgs::msg::BoundingBox3D> all_objects(_static_objects);
+  all_objects.insert(all_objects.end(), _moving_objects_bbox.begin(), _moving_objects_bbox.end());
+  // Retrive objects on cameras and lidars
+  vector<vision_msgs::msg::BoundingBox3D> on_camera = filter_camera(all_objects);
+  vector<vision_msgs::msg::BoundingBox3D> on_lidar = filter_lidar(all_objects);
+  vector<vision_msgs::msg::BoundingBox3D> objects_to_compare = obj_union(on_camera, on_lidar);
+  RCLCPP_INFO_STREAM(this->get_logger(), "Objects seen by cameras: " << on_camera.size() << " Objects seen by lidars: " << on_lidar.size());
+  RCLCPP_INFO_STREAM(this->get_logger(), "Objects total: " << objects_to_compare.size());
+  show_objects(on_camera, "Objects_on_camera");
+  show_objects(on_lidar, "Objects_on_lidar");
+  show_objects(objects_to_compare, "Objects_in_sensor_range");
   
   //TODO: Compare with ious bounding boxes to see right and wrong detections
 
 }
 
-void BBBenchmark::publish_camera_FOV(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance)
+// Custom comparison function for BoundingBoxes
+bool customCompare(const vision_msgs::msg::BoundingBox3D& obj1, const vision_msgs::msg::BoundingBox3D& obj2) {
+    if (obj1.center.position.x != obj2.center.position.x) return obj1.center.position.x < obj2.center.position.x;
+    if (obj1.center.position.y != obj2.center.position.y) return obj1.center.position.y < obj2.center.position.y;
+    return obj1.center.position.z < obj2.center.position.z;
+
+}
+
+vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::obj_union(vector<vision_msgs::msg::BoundingBox3D> list_a, vector<vision_msgs::msg::BoundingBox3D> list_b){
+  vector<vision_msgs::msg::BoundingBox3D> v;
+  v.resize(list_a.size() + list_b.size());
+  std::vector<vision_msgs::msg::BoundingBox3D>::iterator it;
+
+  std::sort(list_a.begin(),list_a.end(), customCompare);
+  std::sort(list_b.begin(),list_b.end(), customCompare);
+
+  it=std::set_union(list_a.begin(), list_a.end(), list_b.begin(), list_b.end(), v.begin(), customCompare);
+
+  v.resize(it-v.begin());
+  return v;
+}
+
+void BBBenchmark::show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, std::string ns){
+  visualization_msgs::msg::MarkerArray msg;
+  msg.markers.reserve(objects.size());
+  for(unsigned long int i = 0; i<objects.size(); i++){
+    visualization_msgs::msg::Marker marker;
+    marker.header.frame_id = _fixed_frame;
+    marker.ns = ns;
+    marker.id = i;
+    marker.type = visualization_msgs::msg::Marker::CUBE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+    marker.lifetime = rclcpp::Duration(0.0);
+    marker.color.r = 0;
+    marker.color.g = 255;
+    marker.color.b = 0;
+    marker.color.a = 1.0;
+    marker.pose = objects[i].center;
+    marker.scale = objects[i].size;
+    msg.markers.push_back(marker);
+  }
+  _debug_pub->publish(msg);
+}
+
+vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_camera(vector<vision_msgs::msg::BoundingBox3D> objects){
+  vector<vision_msgs::msg::BoundingBox3D> on_camera;
+  for(unsigned long int j=0; j<objects.size(); j++){
+    tf2::Vector3 v_origin( objects[j].center.position.x,
+                    objects[j].center.position.y, 
+                    objects[j].center.position.z);
+
+    for(unsigned long int id=0; id<_camera_models.size(); id++){
+      if(_camera_models[id].initialized()){
+        // Move the point in the tf of the camera
+        tf2::Vector3 v = _tf2_transform_camera[id] * v_origin;
+
+        // Check if point inside image
+        if(v.z()<0 || v.z()>_cameras_max_dist[id])   // Object behind the camera or further then max dist
+          break;
+        cv::Point3d point3d(v.x(), v.y(), v.z());
+        cv::Point2d point = _camera_models[id].project3dToPixel(point3d);
+
+        if( point.x>0 && 
+            point.y>0 && 
+            point.x<_camera_models[id].cameraInfo().width && 
+            point.y<_camera_models[id].cameraInfo().height
+            ){
+          on_camera.push_back(objects[j]);
+          break; // Go to next object, otherwise try with the other cameras
+        }
+      }
+    }
+  }
+  return on_camera;
+}
+
+vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_lidar(vector<vision_msgs::msg::BoundingBox3D> objects){
+  vector<vision_msgs::msg::BoundingBox3D> on_lidar;
+  if(!_lidar_ready){
+    init_lidar_tf();
+  }
+
+  for(unsigned long int j=0; j<objects.size(); j++){
+    tf2::Vector3 v_origin( objects[j].center.position.x,
+                    objects[j].center.position.y, 
+                    objects[j].center.position.z);
+    for(unsigned long int id=0; id<_lidars.size(); id++){
+      // Move the point in the tf of the camera
+      tf2::Vector3 v = _tf2_transform_lidar[id] * v_origin;
+      // std::cout << "vector: " 
+      //           << v.x() << " , "
+      //           << v.y() << " , "
+      //           << v.z()
+      //           << " length: " << v.length() << std::endl;
+      // Check if point inside lidar_range
+      if(v.length()<_lidars_max_dist[id]){
+        on_lidar.push_back(objects[j]);
+        break; // Go to next object, otherwise try with the other lidars
+      }
+    }
+  }
+
+  return on_lidar;
+}
+
+void BBBenchmark::camera_info_callback(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance)
 {
   geometry_msgs::msg::TransformStamped tf_result;
   try {
-    tf_result = _tf_buffer.lookupTransform(_fixed_frame, cam_info_message->header.frame_id, rclcpp::Time(0));
+    tf_result = _tf_buffer.lookupTransform(cam_info_message->header.frame_id, _fixed_frame, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
     RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << cam_info_message->header.frame_id);
     return;
@@ -309,11 +460,27 @@ void BBBenchmark::publish_camera_FOV(std::shared_ptr<sensor_msgs::msg::CameraInf
 
   if(tf_result.transform != _last_transform_camera[id]){
     _last_transform_camera[id] = tf_result.transform;
-    geometry_msgs::msg::Pose pose;
-    shape_msgs::msg::Mesh mesh = getCameraFOVMesh(*cam_info_message.get(), max_distance);
-    visualization_msgs::msg::Marker marker = getCameraFOVMarker(pose, mesh, id, cam_info_message->header.frame_id);
+    _camera_models[id].fromCameraInfo(cam_info_message);
+    tf2::Quaternion q(
+      _last_transform_camera[id].rotation.x,
+      _last_transform_camera[id].rotation.y,
+      _last_transform_camera[id].rotation.z,
+      _last_transform_camera[id].rotation.w
+    );
+    tf2::Vector3 p(
+      _last_transform_camera[id].translation.x,
+      _last_transform_camera[id].translation.y,
+      _last_transform_camera[id].translation.z
+    );
+    tf2::Transform transform(q, p);
+    _tf2_transform_camera[id] = transform;
 
-    _sensor_range_pub->publish(marker);
+    if(_show_range){
+      geometry_msgs::msg::Pose pose;
+      shape_msgs::msg::Mesh mesh = getCameraFOVMesh(*cam_info_message.get(), max_distance);
+      visualization_msgs::msg::Marker marker = getCameraFOVMarker(pose, mesh, id, cam_info_message->header.frame_id);
+      _sensor_range_pub->publish(marker);
+    }
   }
 
 }

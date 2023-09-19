@@ -10,12 +10,12 @@ bb_benchmark:
          "/carla/sensors_home/static_termic_camera/camera_info"
          ]
       camera_max_distances: [
-         30, 40
+         30, 50
       ]
       lidar_list: [
-         "/sensors_home/static_lidar"
+         "sensors_home/static_lidar"
       ]
       lidar_max_distances: [
-         50
+         30
       ]
       

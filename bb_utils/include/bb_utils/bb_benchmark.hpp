@@ -32,17 +32,22 @@ class BBBenchmark : public rclcpp::Node
 
   private:
     void tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
-    void publish_camera_FOV(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance);
+    void camera_info_callback(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance);
     void save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
     void save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
     void save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
+    void show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, std::string ns);
 
+    vector<vision_msgs::msg::BoundingBox3D> filter_camera(vector<vision_msgs::msg::BoundingBox3D> objects);
+    vector<vision_msgs::msg::BoundingBox3D> filter_lidar(vector<vision_msgs::msg::BoundingBox3D> objects);
     vector<vector<float> > ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs);
     shape_msgs::msg::Mesh getCameraFOVMesh(const sensor_msgs::msg::CameraInfo& camera_info, double max_dist);
     visualization_msgs::msg::Marker getCameraFOVMarker(const geometry_msgs::msg::Pose& pose,
                                                                 const shape_msgs::msg::Mesh& mesh, int id, std::string frame_id);
     visualization_msgs::msg::Marker getLidarRangeMarker(std::string frame_id, int id, float range);
     void publish_lidar_range(std::vector<std::string> lidars, std::vector<int64_t> lidars_max_dist);
+    void init_lidar_tf();
+    vector<vision_msgs::msg::BoundingBox3D> obj_union(vector<vision_msgs::msg::BoundingBox3D> list_a, vector<vision_msgs::msg::BoundingBox3D> list_b);
 
   private:
 
@@ -54,8 +59,17 @@ class BBBenchmark : public rclcpp::Node
     std::string _fixed_frame;
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
-    std::vector<geometry_msgs::msg::Transform> _last_transform_camera;
+    std::vector<geometry_msgs::msg::Transform> _last_transform_camera; //Used to check if it is necessary to update the saved values
+    std::vector<geometry_msgs::msg::Transform> _last_transform_lidar;
+    std::vector<tf2::Transform> _tf2_transform_camera; //The saved values used to compute the transformation
+    std::vector<tf2::Transform> _tf2_transform_lidar;
+    bool _lidar_ready;
 
+    std::vector<std::string> _cameras;
+    std::vector<int64_t> _cameras_max_dist;
+    std::vector<image_geometry::PinholeCameraModel> _camera_models;
+    std::vector<std::string> _lidars;
+    std::vector<int64_t> _lidars_max_dist;
     std::vector<vision_msgs::msg::BoundingBox3D> _static_objects;
     std::vector<vision_msgs::msg::BoundingBox3D> _moving_objects_bbox;
     visualization_msgs::msg::MarkerArray::SharedPtr _moving_objects;
@@ -66,4 +80,5 @@ class BBBenchmark : public rclcpp::Node
     std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> _cameras_sub;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _sensor_range_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _debug_pub;
 };
