@@ -170,7 +170,7 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
 
 void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object>& objects) {
     auto detections = detections_message->detections;
-    objects.resize(detections.size());
+    objects.reserve(detections.size());
     for(auto detection : detections){
       // Decode
       Object obj;
@@ -229,10 +229,10 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
 
   path_markers.markers.clear();
   text_markers.markers.clear();
-  path_markers.markers.resize(output_stracks.size());
-  text_markers.markers.resize(output_stracks.size());
-  out_message.detections.resize(output_stracks.size());
-  poses_message.poses.resize(output_stracks.size());
+  path_markers.markers.reserve(output_stracks.size());
+  text_markers.markers.reserve(output_stracks.size());
+  out_message.detections.reserve(output_stracks.size());
+  poses_message.poses.reserve(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
     auto current_track = output_stracks[i];
