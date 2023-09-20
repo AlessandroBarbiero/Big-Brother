@@ -1,4 +1,5 @@
 #include <bb_utils/bb_benchmark.hpp>
+#include <bb_utils/lapjv.h>
 
 BBBenchmark::BBBenchmark()
 : Node("bb_benchmark"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
@@ -79,7 +80,7 @@ BBBenchmark::BBBenchmark()
   }
 
   _tracker_out_sub = this->create_subscription<vision_msgs::msg::Detection3DArray>(
-      "bytetrack/active_tracks", 10, std::bind(&BBBenchmark::tracker_out, this, _1));
+      "bytetrack/active_tracks", 10, std::bind(&BBBenchmark::compute_stats, this, _1));
 
   _static_ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
       "carla/markers/static", qos_transient_local, std::bind(&BBBenchmark::save_static_gt, this, _1));
@@ -144,6 +145,8 @@ void BBBenchmark::save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> 
 
 void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg)
 {
+  if(msg.get()==nullptr)
+    return;
   _moving_objects_bbox.clear();
   _moving_objects_bbox.reserve(msg->markers.size());
   for(auto marker: msg->markers){
@@ -259,6 +262,8 @@ void BBBenchmark::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArra
   return;
 }
 
+// %%%%%%%%%%%%%%%%%%%%%%% Linear assignment %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 vector<vector<float> > BBBenchmark::ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs)
 {
 	vector<vector<float> > ious;
@@ -313,17 +318,277 @@ vector<vector<float> > BBBenchmark::ious(vector<vector<float> > &aminmaxs, vecto
 	return ious;
 }
 
-void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
+void BBBenchmark::linear_assignment(vector<vector<float> > &cost_matrix, int cost_matrix_size, int cost_matrix_size_size, float thresh,
+	vector<vector<int> > &matches, vector<int> &unmatched_a, vector<int> &unmatched_b)
 {
-  if (detections_message->detections.empty())
-    //Something
-    return;
+	if (cost_matrix.size() == 0)
+	{
+		for (int i = 0; i < cost_matrix_size; i++)
+		{
+			unmatched_a.push_back(i);
+		}
+		for (int i = 0; i < cost_matrix_size_size; i++)
+		{
+			unmatched_b.push_back(i);
+		}
+		return;
+	}
 
-  // Move all the detections to a common fixed frame
-  if(detections_message->header.frame_id != _fixed_frame){
-    change_frame(detections_message, _fixed_frame);
+	vector<int> rowsol; vector<int> colsol;
+	//unused variable
+	//float c = lapjv(cost_matrix, rowsol, colsol, true, thresh);
+	lapjv(cost_matrix, rowsol, colsol, true, thresh);
+	for (unsigned int i = 0; i < rowsol.size(); i++)
+	{
+		if (rowsol[i] >= 0)
+		{
+			vector<int> match;
+			match.push_back(i);
+			match.push_back(rowsol[i]);
+			matches.push_back(match);
+		}
+		else
+		{
+			unmatched_a.push_back(i);
+		}
+	}
+
+	for (unsigned int i = 0; i < colsol.size(); i++)
+	{
+		if (colsol[i] < 0)
+		{
+			unmatched_b.push_back(i);
+		}
+	}
+}
+
+double BBBenchmark::lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol,
+	bool extend_cost, float cost_limit, bool return_cost)
+{
+	vector<vector<float> > cost_c;
+	cost_c.assign(cost.begin(), cost.end());
+
+	vector<vector<float> > cost_c_extended;
+
+	int n_rows = cost.size();
+	int n_cols = cost[0].size();
+	rowsol.resize(n_rows);
+	colsol.resize(n_cols);
+
+	int n = 0;
+	if (n_rows == n_cols)
+	{
+		n = n_rows;
+	}
+	else
+	{
+		if (!extend_cost)
+		{
+			cout << "set extend_cost=True" << endl;
+			system("pause");
+			exit(0);
+		}
+	}
+		
+	if (extend_cost || cost_limit < LONG_MAX)
+	{
+		n = n_rows + n_cols;
+		cost_c_extended.resize(n);
+		for (unsigned int i = 0; i < cost_c_extended.size(); i++)
+			cost_c_extended[i].resize(n);
+
+		if (cost_limit < LONG_MAX)
+		{
+			for (unsigned int i = 0; i < cost_c_extended.size(); i++)
+			{
+				for (unsigned int j = 0; j < cost_c_extended[i].size(); j++)
+				{
+					cost_c_extended[i][j] = cost_limit / 2.0;
+				}
+			}
+		}
+		else
+		{
+			float cost_max = -1;
+			for (unsigned int i = 0; i < cost_c.size(); i++)
+			{
+				for (unsigned int j = 0; j < cost_c[i].size(); j++)
+				{
+					if (cost_c[i][j] > cost_max)
+						cost_max = cost_c[i][j];
+				}
+			}
+			for (unsigned int i = 0; i < cost_c_extended.size(); i++)
+			{
+				for (unsigned int j = 0; j < cost_c_extended[i].size(); j++)
+				{
+					cost_c_extended[i][j] = cost_max + 1;
+				}
+			}
+		}
+
+		for (unsigned int i = n_rows; i < cost_c_extended.size(); i++)
+		{
+			for (unsigned int j = n_cols; j < cost_c_extended[i].size(); j++)
+			{
+				cost_c_extended[i][j] = 0;
+			}
+		}
+		for (int i = 0; i < n_rows; i++)
+		{
+			for (int j = 0; j < n_cols; j++)
+			{
+				cost_c_extended[i][j] = cost_c[i][j];
+			}
+		}
+
+		cost_c.clear();
+		cost_c.assign(cost_c_extended.begin(), cost_c_extended.end());
+	}
+
+	double **cost_ptr;
+	cost_ptr = new double *[sizeof(double *) * n];
+	for (int i = 0; i < n; i++)
+		cost_ptr[i] = new double[sizeof(double) * n];
+
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			cost_ptr[i][j] = cost_c[i][j];
+		}
+	}
+
+	int* x_c = new int[sizeof(int) * n];
+	int *y_c = new int[sizeof(int) * n];
+
+	int ret = lapjv_internal(n, cost_ptr, x_c, y_c);
+	if (ret != 0)
+	{
+		cout << "Calculate Wrong!" << endl;
+		system("pause");
+		exit(0);
+	}
+
+	double opt = 0.0;
+
+	if (n != n_rows)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			if (x_c[i] >= n_cols)
+				x_c[i] = -1;
+			if (y_c[i] >= n_rows)
+				y_c[i] = -1;
+		}
+		for (int i = 0; i < n_rows; i++)
+		{
+			rowsol[i] = x_c[i];
+		}
+		for (int i = 0; i < n_cols; i++)
+		{
+			colsol[i] = y_c[i];
+		}
+
+		if (return_cost)
+		{
+			for (unsigned int i = 0; i < rowsol.size(); i++)
+			{
+				if (rowsol[i] != -1)
+				{
+					//cout << i << "\t" << rowsol[i] << "\t" << cost_ptr[i][rowsol[i]] << endl;
+					opt += cost_ptr[i][rowsol[i]];
+				}
+			}
+		}
+	}
+	else if (return_cost)
+	{
+		for (unsigned int i = 0; i < rowsol.size(); i++)
+		{
+			opt += cost_ptr[i][rowsol[i]];
+		}
+	}
+
+	for (int i = 0; i < n; i++)
+	{
+		delete[]cost_ptr[i];
+	}
+	delete[]cost_ptr;
+	delete[]x_c;
+	delete[]y_c;
+
+	return opt;
+}
+
+vector<float> to_minmax(vision_msgs::msg::BoundingBox3D &bbox){
+  vector<float> minmax;
+  minmax.resize(6);
+  minmax[0] = bbox.center.position.x - bbox.size.x/2;
+  minmax[1] = bbox.center.position.y - bbox.size.y/2;
+  minmax[2] = bbox.center.position.z - bbox.size.z/2;
+  minmax[3] = bbox.center.position.x + bbox.size.x/2;
+  minmax[4] = bbox.center.position.y + bbox.size.y/2;
+  minmax[5] = bbox.center.position.z + bbox.size.z/2;
+  return minmax;
+}
+
+vector<float> to_minmax(vision_msgs::msg::Detection3D &det){
+  vector<float> minmax;
+  vision_msgs::msg::BoundingBox3D bbox = det.bbox;
+  minmax.resize(6);
+  minmax[0] = bbox.center.position.x - bbox.size.x/2;
+  minmax[1] = bbox.center.position.y - bbox.size.y/2;
+  minmax[2] = bbox.center.position.z - bbox.size.z/2;
+  minmax[3] = bbox.center.position.x + bbox.size.x/2;
+  minmax[4] = bbox.center.position.y + bbox.size.y/2;
+  minmax[5] = bbox.center.position.z + bbox.size.z/2;
+  return minmax;
+}
+
+vector<vector<float> > BBBenchmark::iou_distance(vector<vision_msgs::msg::BoundingBox3D> &a_bboxs, vector<vision_msgs::msg::Detection3D> &b_bboxs)
+{
+	vector<vector<float> > aminmaxs, bminmaxs;
+	for (unsigned int i = 0; i < a_bboxs.size(); i++)
+	{
+		aminmaxs.push_back(to_minmax(a_bboxs[i]));
+	}
+	for (unsigned int i = 0; i < b_bboxs.size(); i++)
+	{
+		bminmaxs.push_back(to_minmax(b_bboxs[i]));
+	}
+
+	vector<vector<float> > _ious = ious(aminmaxs, bminmaxs);
+	vector<vector<float> > cost_matrix;
+	for (unsigned int i = 0; i < _ious.size(); i++)
+	{
+		vector<float> _iou;
+		for (unsigned int j = 0; j < _ious[i].size(); j++)
+		{
+			_iou.push_back(1 - _ious[i][j]);
+		}
+		cost_matrix.push_back(_iou);
+	}
+
+	return cost_matrix;
+}
+
+// -------------------------------------------------------
+template<typename T>
+vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
+  vector<T> target_vector;
+  target_vector.reserve(indices.size());
+  for (size_t i = 0; i < indices.size(); ++i) {
+    // Not handling index out of range
+    target_vector.push_back(source_vector[indices[i]]);
   }
+  return target_vector;
+}
 
+void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
+{
+  int objects_to_detect, false_positive, true_positive, missed;
+  double detA, locA, MOTP;
   // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
   // Put moving and static objects together
@@ -332,15 +597,78 @@ void BBBenchmark::tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray
   // Retrive objects on cameras and lidars
   vector<vision_msgs::msg::BoundingBox3D> on_camera = filter_camera(all_objects);
   vector<vision_msgs::msg::BoundingBox3D> on_lidar = filter_lidar(all_objects);
-  vector<vision_msgs::msg::BoundingBox3D> objects_to_compare = obj_union(on_camera, on_lidar);
-  RCLCPP_INFO_STREAM(this->get_logger(), "Objects seen by cameras: " << on_camera.size() << " Objects seen by lidars: " << on_lidar.size());
-  RCLCPP_INFO_STREAM(this->get_logger(), "Objects total: " << objects_to_compare.size());
+  vector<vision_msgs::msg::BoundingBox3D> objects_on_sight = obj_union(on_camera, on_lidar);
+  RCLCPP_INFO_STREAM(this->get_logger(), "Objects on sight: " << objects_on_sight.size() << " [by Cameras: " << on_camera.size() << " - by Lidars: " << on_lidar.size() << "]");
   show_objects(on_camera, "Objects_on_camera");
   show_objects(on_lidar, "Objects_on_lidar");
-  show_objects(objects_to_compare, "Objects_in_sensor_range");
-  
-  //TODO: Compare with ious bounding boxes to see right and wrong detections
+  show_objects(objects_on_sight, "Objects_in_sensor_range");
+  objects_to_detect = objects_on_sight.size();
 
+  //TODO: Compare with ious bounding boxes to see right and wrong detections
+  //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
+  // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
+  //         MOTP (multiple object tracking precision) uses distance instead of accuracy, low values are better MOTP = sum(d_t)/sum(matches_t)   for example d_t = 1-IoU
+  // detA -> Detection Accuracy (DetA) computed as DetA = TP / (TP+FP+m) True Positive = matching detections, False Positive = predicted detections that don't match, Misses = Ground Truth detection that don't match
+  // TODO: assA -> Associtation Accuracy (AssA). AssA = average_of( TPA / (TPA+FPA+FNA) ) for all the matched detections. 
+  //          TPA = number of matching detections with ground truth for that track in time. FPA = predicted trajectory not true. FNA = real trajectory not matched.
+  // HOTA_alpha = sqrt(DetA_alpha * AssA_alpha) where alpha is the value of the hungarian algorithm
+  // HOTA = 1/19 * sum(HOTA_alpa)_alpha from 0.05 to 1 increasing by 0.05
+
+  // TODO: MOTA = 1 - sum(m_t + FP_t + mme_t)/sum(obj_in_scene_t)     m = misses, FP = false positive, mme = mismatches (tracks are exchanged, object considered in wrong track)
+
+  if (tracked_objects->detections.empty()){
+    true_positive = 0;
+    missed = objects_to_detect;
+    false_positive = 0;
+    detA = 0;
+    locA = 0;
+    MOTP = 1;
+  }
+  else{
+    // Move all tracked and gt to a common fixed frame
+    if(tracked_objects->header.frame_id != _fixed_frame){
+      change_frame(tracked_objects, _fixed_frame);
+    }
+
+    // Find matches with hungarian algorithm
+    vector<vector<float> > dists;
+    dists = iou_distance(objects_on_sight, tracked_objects->detections);
+    vector<vector<int> > matches;
+    vector<int> missed_obj, wrong_tracked;
+    // Here I am using the same threshold for car and pedestrians, consider using a lower threshold for pedestrians
+    linear_assignment(dists, dists.size(), dists[0].size(), _match_thresh, matches, missed_obj, wrong_tracked);
+    true_positive = matches.size();
+    false_positive = wrong_tracked.size();
+    missed = missed_obj.size();
+
+    vector<int> match_gt;
+    vector<int> match_track;
+    for(auto match:matches){
+      match_gt.push_back(match[0]);
+      match_track.push_back(match[1]);
+    }
+    vector<vision_msgs::msg::BoundingBox3D> true_positive_gt =    filter_indices(objects_on_sight, match_gt);
+    vector<vision_msgs::msg::Detection3D> true_positive_track =   filter_indices(tracked_objects->detections, match_track);
+    vector<vision_msgs::msg::Detection3D> false_positive_det =    filter_indices(tracked_objects->detections, wrong_tracked);
+    vector<vision_msgs::msg::BoundingBox3D> missed_gt =           filter_indices(objects_on_sight, missed_obj);
+    show_objects(true_positive_gt, "True Positive");
+    show_objects(missed_gt, "Missed Objects");
+    float tot_iou = 0, tot_dist = 0;
+    for(auto match:matches){
+      tot_iou += 1 - dists[match[0]][match[1]];
+      tot_dist += dists[match[0]][match[1]];
+    }
+    
+    locA = tot_iou/true_positive;
+    detA = static_cast<double>(true_positive) / (true_positive + false_positive + missed);
+    MOTP = tot_dist/true_positive;
+  }
+
+  RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
+                                          "\tDetA: " << detA*100 << "%\n" << 
+                                          "\tLocA: " << locA*100 << "%\n" <<
+                                          "\tMOTP: " << MOTP
+                                          );
 }
 
 // Custom comparison function for BoundingBoxes

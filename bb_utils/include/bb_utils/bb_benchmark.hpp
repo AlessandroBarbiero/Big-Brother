@@ -31,7 +31,7 @@ class BBBenchmark : public rclcpp::Node
 
 
   private:
-    void tracker_out(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
+    void compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void camera_info_callback(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance);
     void save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
     void save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
@@ -40,7 +40,14 @@ class BBBenchmark : public rclcpp::Node
 
     vector<vision_msgs::msg::BoundingBox3D> filter_camera(vector<vision_msgs::msg::BoundingBox3D> objects);
     vector<vision_msgs::msg::BoundingBox3D> filter_lidar(vector<vision_msgs::msg::BoundingBox3D> objects);
+
     vector<vector<float> > ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs);
+    void linear_assignment(vector<vector<float> > &cost_matrix, int cost_matrix_size, int cost_matrix_size_size, float thresh,
+	                                      vector<vector<int> > &matches, vector<int> &unmatched_a, vector<int> &unmatched_b);
+    double lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol,
+	                            bool extend_cost, float cost_limit = LONG_MAX, bool return_cost = true);
+    vector<vector<float> > iou_distance(vector<vision_msgs::msg::BoundingBox3D> &a_bboxs, vector<vision_msgs::msg::Detection3D> &b_bboxs);
+
     shape_msgs::msg::Mesh getCameraFOVMesh(const sensor_msgs::msg::CameraInfo& camera_info, double max_dist);
     visualization_msgs::msg::Marker getCameraFOVMarker(const geometry_msgs::msg::Pose& pose,
                                                                 const shape_msgs::msg::Mesh& mesh, int id, std::string frame_id);

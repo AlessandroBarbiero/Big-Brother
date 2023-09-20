@@ -115,6 +115,7 @@ ament_target_dependencies(rewrite_bag_timestamps
 # %%%%%%%%% BB_BENCHMARK %%%%%%%%%%%
 add_executable(bb_benchmark 
   src/bb_benchmark.cpp
+  src/lapjv.cpp
   )
 ament_target_dependencies(bb_benchmark
   rclcpp
