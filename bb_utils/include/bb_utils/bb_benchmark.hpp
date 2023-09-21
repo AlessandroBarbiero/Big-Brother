@@ -63,6 +63,11 @@ class BBBenchmark : public rclcpp::Node
     float _match_thresh;
     float _alpha_range;
 
+    int _tot_false_positive = 0, _tot_true_positive = 0, _tot_missed = 0, _tot_objects = 0;
+    float _tot_iou_detections = 0;
+
+
+    // %%%%%% REGARDING TF
     std::string _fixed_frame;
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
@@ -72,20 +77,25 @@ class BBBenchmark : public rclcpp::Node
     std::vector<tf2::Transform> _tf2_transform_lidar;
     bool _lidar_ready;
 
+    // %%%%%%% SENSORS DATA
     std::vector<std::string> _cameras;
     std::vector<int64_t> _cameras_max_dist;
     std::vector<image_geometry::PinholeCameraModel> _camera_models;
     std::vector<std::string> _lidars;
     std::vector<int64_t> _lidars_max_dist;
+
+    // %%%%%%% GROUND TRUTH
     std::vector<vision_msgs::msg::BoundingBox3D> _static_objects;
     std::vector<vision_msgs::msg::BoundingBox3D> _moving_objects_bbox;
     visualization_msgs::msg::MarkerArray::SharedPtr _moving_objects;
 
+    // %%%%% SUBSCRIBERS
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _tracker_out_sub;
     rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr _static_ground_truth_sub;
     rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr _ground_truth_sub;
     std::vector<rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr> _cameras_sub;
 
+    // %%%%% PUBLISHERS
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _sensor_range_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _debug_pub;
 };

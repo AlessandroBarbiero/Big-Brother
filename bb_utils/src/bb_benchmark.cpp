@@ -574,6 +574,7 @@ vector<vector<float> > BBBenchmark::iou_distance(vector<vision_msgs::msg::Boundi
 }
 
 // -------------------------------------------------------
+
 template<typename T>
 vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
   vector<T> target_vector;
@@ -588,7 +589,7 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
   int objects_to_detect, false_positive, true_positive, missed;
-  double detA, locA, MOTP;
+  double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1;
   // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
   // Put moving and static objects together
@@ -607,7 +608,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   //TODO: Compare with ious bounding boxes to see right and wrong detections
   //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
   // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
-  //         MOTP (multiple object tracking precision) uses distance instead of accuracy, low values are better MOTP = sum(d_t)/sum(matches_t)   for example d_t = 1-IoU
+  // MOTP -> (multiple object tracking precision) uses distance instead of accuracy, low values are better MOTP = sum(d_t)/sum(matches_t)   for example d_t = 1-IoU
   // detA -> Detection Accuracy (DetA) computed as DetA = TP / (TP+FP+m) True Positive = matching detections, False Positive = predicted detections that don't match, Misses = Ground Truth detection that don't match
   // TODO: assA -> Associtation Accuracy (AssA). AssA = average_of( TPA / (TPA+FPA+FNA) ) for all the matched detections. 
   //          TPA = number of matching detections with ground truth for that track in time. FPA = predicted trajectory not true. FNA = real trajectory not matched.
@@ -658,16 +659,33 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
       tot_iou += 1 - dists[match[0]][match[1]];
       tot_dist += dists[match[0]][match[1]];
     }
-    
-    locA = tot_iou/true_positive;
-    detA = static_cast<double>(true_positive) / (true_positive + false_positive + missed);
-    MOTP = tot_dist/true_positive;
+    if(true_positive == 0){
+      locA = 0;
+      detA = 0;
+      MOTP = 1;
+    }else{
+      locA = tot_iou/true_positive;
+      detA = static_cast<double>(true_positive) / (true_positive + false_positive + missed);
+      MOTP = tot_dist/true_positive;
+    }
+    _tot_iou_detections+=tot_iou;
+    _tot_true_positive+= true_positive;
+    _tot_false_positive+=false_positive;
+    _tot_missed+=missed;
   }
 
+  if(_tot_true_positive != 0){
+    tot_locA = _tot_iou_detections/_tot_true_positive;
+    tot_detA = static_cast<double>(_tot_true_positive) / (_tot_true_positive + _tot_false_positive + _tot_missed);
+    tot_MOTP = _tot_iou_detections/_tot_true_positive;
+  }
   RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
                                           "\tDetA: " << detA*100 << "%\n" << 
                                           "\tLocA: " << locA*100 << "%\n" <<
-                                          "\tMOTP: " << MOTP
+                                          "\tMOTP: " << MOTP << "\n" <<
+                                          "\tTotal DetA: " << tot_detA*100 << "%\n" << 
+                                          "\tTotal LocA: " << tot_locA*100 << "%\n" <<
+                                          "\tTotal MOTP: " << tot_MOTP
                                           );
 }
 
