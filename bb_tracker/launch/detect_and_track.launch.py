@@ -62,6 +62,20 @@ def generate_launch_description():
         ]
     )
 
+    lidar_node = Node(
+        package="bb_detection",
+        executable="lidar_detector",
+        remappings=[
+            ("/lidar", "/carla/sensors_home/static_lidar"),
+            ("/detection_3d", "/bytetrack/detections")
+        ],
+        parameters=[
+            {'lidar_list': ["sensors_home/static_lidar"]},
+            {'lidar_max_distances': [30]},
+            {"fixed_frame": "map"}
+        ]
+    )
+
     static_tf = Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -98,6 +112,7 @@ def generate_launch_description():
     ld.add_action(bag_name_arg)
     ld.add_action(thermal_node)
     ld.add_action(yolo_node)
+    ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
     ld.add_action(bag_process)
