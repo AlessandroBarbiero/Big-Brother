@@ -776,7 +776,7 @@ vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_lidar(vector<vision_
                     objects[j].center.position.y, 
                     objects[j].center.position.z);
     for(unsigned long int id=0; id<_lidars.size(); id++){
-      // Move the point in the tf of the camera
+      // Move the point in the tf of the lidar
       tf2::Vector3 v = _tf2_transform_lidar[id] * v_origin;
       // std::cout << "vector: " 
       //           << v.x() << " , "
