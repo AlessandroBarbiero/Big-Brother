@@ -20,6 +20,12 @@ def generate_launch_description():
         executable="lidar_detector",
         remappings=[
             ("/lidar", "/carla/sensors_home/static_lidar"),
+            # ("/detection_3d", "something"),
+        ],
+        parameters=[
+            {'lidar_list': ["sensors_home/static_lidar"]},
+            {'lidar_max_distances': [30]},
+            {"fixed_frame": "map"}
         ],
         output='screen'
     )

@@ -30,7 +30,7 @@ setup(
         'console_scripts': [
             'yolo_detector = bb_detection.yolo_detector:main',
             'thermal_detector = bb_detection.thermal_detector:main',
-            'lidar_detector = bb_detection.lidar_detector:main',
+            'lidar_detector = bb_detection.fake_lidar_detector:main',
         ],
     },
 )

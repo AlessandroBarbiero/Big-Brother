@@ -1,0 +1,255 @@
+# ROS
+import rclpy
+from rclpy.node import Node
+from rclpy.impl.rcutils_logger import RcutilsLogger as Logger
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy
+from tf2_ros import TransformException
+from tf2_ros.transform_listener import TransformListener
+from tf2_ros.buffer import Buffer
+from tf2_geometry_msgs import do_transform_pose
+# ROS messages
+from sensor_msgs.msg import PointCloud2
+from visualization_msgs.msg import MarkerArray, Marker
+from vision_msgs.msg import Detection3D, ObjectHypothesisWithPose, Detection3DArray, BoundingBox3D
+from geometry_msgs.msg import TransformStamped, Point
+# Python
+from typing import List
+
+import numpy as np
+
+class FakeDetector(Node):
+
+    def __init__(self):
+        super().__init__('fake_lidar_detector')
+
+        self.declare_parameters(
+            namespace='',
+            parameters=[
+                ('lidar_list', ["/lidar_topic"]),
+                ('lidar_max_distances', [30]),
+                ("fixed_frame", "/map")
+            ]
+        )
+
+        self.lidar_list = self.get_parameter('lidar_list').value
+        self.lidar_max_distances = self.get_parameter('lidar_max_distances').value
+        self.fixed_frame = self.get_parameter('fixed_frame').value
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.lidar_ready = False
+
+        self._pub_detections = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+        self._sub_pc = self.create_subscription(PointCloud2, "lidar", self.callback_pc, 10)
+
+        # Subscribe to ground truth
+        trans_local_qos = QoSProfile(depth=10,
+            durability=QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
+        self._sub_gt_static = self.create_subscription(MarkerArray, "carla/markers/static", self.callback_gt_static, qos_profile=trans_local_qos)
+        self._sub_gt_moving = self.create_subscription(MarkerArray, "carla/markers", self.callback_gt_moving, 10)
+
+
+
+    def callback_gt_static(self, msg : MarkerArray):
+        self._static_objects = msg.markers
+        self.get_logger().info("Static Objects saved!")
+        return
+    
+    def callback_gt_moving(self, msg : MarkerArray):
+        self._moving_objects = msg.markers
+        return
+    
+    def init_lidar_tf(self):
+        self.last_transform_lidar = []
+        for lidar_topic in self.lidar_list:
+            try:
+                tf : TransformStamped = self.tf_buffer.lookup_transform(
+                    lidar_topic,
+                    self.fixed_frame,
+                    rclpy.time.Time())
+            except TransformException as ex:
+                self.get_logger().warn(f'Could not transform {lidar_topic} to {self.fixed_frame}: {ex}')
+                return
+
+            self.last_transform_lidar.append(tf)
+        self.lidar_ready = True
+
+    def filter_lidar(self, objects : List[Marker]):
+        '''
+        Return a filtered list of objects containing only objects visible from the lidars
+        '''
+        def distance_from_origin(position : Point):
+            return math.sqrt(position.x**2 + position.y**2 + position.z**2)
+        
+        filtered = []
+        for obj in objects:
+            lidar_tf : TransformStamped
+            for i, lidar_tf in enumerate(self.last_transform_lidar):
+                if distance_from_origin(                                                                \
+                     do_transform_pose(pose=obj.pose, transform=lidar_tf).position) \
+                       < self.lidar_max_distances[i]:
+                    filtered.append(obj)
+                    break  # Go to next object
+
+        return filtered
+
+    def callback_pc(self, msg : PointCloud2):
+        points_raw = list(read_points(msg, skip_nans=False, field_names=("y", "x",  "z", "intensity", "ring")))
+        points = np.array(list(points_raw), dtype=np.float32)
+        
+        # Add all zeros as the ring parameter
+        Temp = np.zeros(points.shape[0])
+        points = np.c_[points, Temp]    
+
+        self.get_logger().info("Received point cloud -> shape: {}".format(np.shape(points)))
+
+
+        # Fake detections
+        if not self.lidar_ready:
+            self.init_lidar_tf()
+            if not self.lidar_ready: return
+        
+        detections_msg = Detection3DArray()
+        detections_msg.header.stamp = msg.header.stamp
+        detections_msg.header.frame_id = self.fixed_frame
+  
+        all_objects = self._static_objects + self._moving_objects  
+        seen_objects = self.filter_lidar(all_objects)
+        marker : Marker
+        for marker in seen_objects:
+            detection_a = Detection3D()
+            detection_a.header = detections_msg.header
+            # create hypothesis
+            hypothesis = ObjectHypothesisWithPose()
+            if marker.ns != "":
+                hypothesis.id = marker.ns
+            else:
+                hypothesis.id = "Car"
+            hypothesis.score = 1.0
+            detection_a.results.append(hypothesis)
+
+            detection_a.bbox.center = marker.pose
+            detection_a.bbox.size = marker.scale
+
+            detections_msg.detections.append(detection_a)
+
+        self._pub_detections.publish(detections_msg)
+        self.get_logger().info("Published msg: " + str(msg.header.stamp.sec) + "." + str(msg.header.stamp.nanosec))
+
+
+
+
+## -----------------------------------------------------------
+## The code below is "ported" from 
+# https://github.com/ros/common_msgs/tree/noetic-devel/sensor_msgs/src/sensor_msgs
+import sys
+from collections import namedtuple
+import ctypes
+import math
+import struct
+from sensor_msgs.msg import PointCloud2, PointField
+
+_DATATYPES = {}
+_DATATYPES[PointField.INT8]    = ('b', 1)
+_DATATYPES[PointField.UINT8]   = ('B', 1)
+_DATATYPES[PointField.INT16]   = ('h', 2)
+_DATATYPES[PointField.UINT16]  = ('H', 2)
+_DATATYPES[PointField.INT32]   = ('i', 4)
+_DATATYPES[PointField.UINT32]  = ('I', 4)
+_DATATYPES[PointField.FLOAT32] = ('f', 4)
+_DATATYPES[PointField.FLOAT64] = ('d', 8)
+
+def read_points(cloud, field_names=None, skip_nans=False, uvs=[]):
+    """
+    Read points from a L{sensor_msgs.PointCloud2} message.
+
+    @param cloud: The point cloud to read from.
+    @type  cloud: L{sensor_msgs.PointCloud2}
+    @param field_names: The names of fields to read. If None, read all fields. [default: None]
+    @type  field_names: iterable
+    @param skip_nans: If True, then don't return any point with a NaN value.
+    @type  skip_nans: bool [default: False]
+    @param uvs: If specified, then only return the points at the given coordinates. [default: empty list]
+    @type  uvs: iterable
+    @return: Generator which yields a list of values for each point.
+    @rtype:  generator
+    """
+    assert isinstance(cloud, PointCloud2), 'cloud is not a sensor_msgs.msg.PointCloud2'
+    fmt = _get_struct_fmt(cloud.is_bigendian, cloud.fields, field_names)
+    width, height, point_step, row_step, data, isnan = cloud.width, cloud.height, cloud.point_step, cloud.row_step, cloud.data, math.isnan
+    unpack_from = struct.Struct(fmt).unpack_from
+
+    if skip_nans:
+        if uvs:
+            for u, v in uvs:
+                p = unpack_from(data, (row_step * v) + (point_step * u))
+                has_nan = False
+                for pv in p:
+                    if isnan(pv):
+                        has_nan = True
+                        break
+                if not has_nan:
+                    yield p
+        else:
+            for v in range(height):
+                offset = row_step * v
+                for u in range(width):
+                    p = unpack_from(data, offset)
+                    has_nan = False
+                    for pv in p:
+                        if isnan(pv):
+                            has_nan = True
+                            break
+                    if not has_nan:
+                        yield p
+                    offset += point_step
+    else:
+        if uvs:
+            for u, v in uvs:
+                yield unpack_from(data, (row_step * v) + (point_step * u))
+        else:
+            for v in range(height):
+                offset = row_step * v
+                for u in range(width):
+                    yield unpack_from(data, offset)
+                    offset += point_step
+
+def _get_struct_fmt(is_bigendian, fields, field_names=None):
+    fmt = '>' if is_bigendian else '<'
+
+    offset = 0
+    for field in (f for f in sorted(fields, key=lambda f: f.offset) if field_names is None or f.name in field_names):
+        if offset < field.offset:
+            fmt += 'x' * (field.offset - offset)
+            offset = field.offset
+        if field.datatype not in _DATATYPES:
+            print('Skipping unknown PointField datatype [%d]' % field.datatype, file=sys.stderr)
+        else:
+            datatype_fmt, datatype_length = _DATATYPES[field.datatype]
+            fmt    += field.count * datatype_fmt
+            offset += field.count * datatype_length
+
+    return fmt
+
+## End porting ------------------
+
+
+
+
+
+
+def main(args=None):
+    rclpy.init(args=args)
+
+    Logger('LOG').info("Initiatizing node...")
+
+    detector = FakeDetector()
+
+    rclpy.spin(detector)
+
+    detector.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == "__main__":
+    main()
+    
