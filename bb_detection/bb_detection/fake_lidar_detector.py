@@ -101,7 +101,7 @@ class FakeDetector(Node):
         Temp = np.zeros(points.shape[0])
         points = np.c_[points, Temp]    
 
-        self.get_logger().info("Received point cloud -> shape: {}".format(np.shape(points)))
+        # self.get_logger().info("Received point cloud -> shape: {}".format(np.shape(points)))
 
 
         # Fake detections
@@ -134,7 +134,7 @@ class FakeDetector(Node):
             detections_msg.detections.append(detection_a)
 
         self._pub_detections.publish(detections_msg)
-        self.get_logger().info("Published msg: " + str(msg.header.stamp.sec) + "." + str(msg.header.stamp.nanosec))
+        # self.get_logger().info("Published msg: " + str(msg.header.stamp.sec) + "." + str(msg.header.stamp.nanosec))
 
 
 
