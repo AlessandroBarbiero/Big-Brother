@@ -586,6 +586,8 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
   return target_vector;
 }
 
+// %%%%%%%%%%%%%%%%%% main part %%%%%%%%%%%%%%%
+
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
   int objects_to_detect, false_positive, true_positive, missed;
@@ -688,6 +690,8 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
                                           "\tTotal MOTP: " << tot_MOTP
                                           );
 }
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // Custom comparison function for BoundingBoxes
 bool customCompare(const vision_msgs::msg::BoundingBox3D& obj1, const vision_msgs::msg::BoundingBox3D& obj2) {

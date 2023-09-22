@@ -6,6 +6,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "bb_interfaces/msg/message.hpp"
+#include "bb_interfaces/msg/stats.hpp"
 #include "bb_interfaces/srv/change_message.hpp"
 
 #include "imgui_framework.hpp"
@@ -22,10 +23,10 @@ class BBVisualizer : public rclcpp::Node
     BBVisualizer()
     : Node("bb_visualizer"), count_(0)
     {
-      publisher_ = this->create_publisher<bb_interfaces::msg::Message>("topic", 10);
+      // publisher_ = this->create_publisher<bb_interfaces::msg::Message>("topic", 10);
 
-      timer_ = this->create_wall_timer(
-      500ms, std::bind(&BBVisualizer::timer_callback, this));
+      // timer_ = this->create_wall_timer(
+      // 500ms, std::bind(&BBVisualizer::timer_callback, this));
 
       ImGUI_f::init(1280, 720, "bb_visualizer");
       ImGUI_f::uploadFonts();
@@ -36,6 +37,8 @@ class BBVisualizer : public rclcpp::Node
       srv_ = this->create_service<bb_interfaces::srv::ChangeMessage>("change_message",  std::bind(&BBVisualizer::change_message, this, _1, _2)); 
       
     }
+
+    // TODO: Add a way to visualize the parameters sent with the message Stats.msg
 
     void change_message(const std::shared_ptr<bb_interfaces::srv::ChangeMessage::Request> request,
           std::shared_ptr<bb_interfaces::srv::ChangeMessage::Response>       response) 
@@ -104,6 +107,9 @@ class BBVisualizer : public rclcpp::Node
       ImGUI_f::render();
 
     }
+
+
+  private:
 
     bool demo = true;
     bool spawnWord_ = false;

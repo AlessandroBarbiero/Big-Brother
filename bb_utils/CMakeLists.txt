@@ -125,6 +125,7 @@ ament_target_dependencies(bb_benchmark
   visualization_msgs
   OpenCV
   image_geometry
+  bb_interfaces
   )
 # -----------
 
