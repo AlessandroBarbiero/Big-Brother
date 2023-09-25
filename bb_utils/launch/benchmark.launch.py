@@ -42,10 +42,16 @@ def generate_launch_description():
         # prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
     )
 
+    visualizer_node = Node(
+        package="bb_utils",
+        executable="bb_visualizer"
+    )
+
 
     ld = LaunchDescription([
         detect_and_track,
-        benchmark_node
+        benchmark_node,
+        visualizer_node
     ])
 
     return ld

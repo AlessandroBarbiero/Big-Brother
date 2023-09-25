@@ -16,6 +16,7 @@
 #include <shape_msgs/msg/mesh.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
+#include <bb_interfaces/msg/stats.hpp>
 
 using std::placeholders::_1;
 using namespace std;
@@ -63,8 +64,8 @@ class BBBenchmark : public rclcpp::Node
     float _match_thresh;
     float _alpha_range;
 
-    int _tot_false_positive = 0, _tot_true_positive = 0, _tot_missed = 0, _tot_objects = 0;
-    float _tot_iou_detections = 0;
+    int _tot_false_positive = 0, _tot_true_positive = 0, _tot_missed = 0, _tot_objects_to_detect = 0;
+    float _tot_iou_detections = 0, _tot_iou_dist_detections = 0;
 
 
     // %%%%%% REGARDING TF
@@ -98,4 +99,5 @@ class BBBenchmark : public rclcpp::Node
     // %%%%% PUBLISHERS
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _sensor_range_pub;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _debug_pub;
+    rclcpp::Publisher<bb_interfaces::msg::Stats>::SharedPtr _stats_pub;
 };

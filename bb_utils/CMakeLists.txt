@@ -58,8 +58,10 @@ include_directories(${GLFW_DIR}/include)
 
 # Dear ImGui
 set(IMGUI_DIR /opt/imgui/)    # -------> Set this to point to an up-to-date Dear ImGui repo
+# ImPlot
+set(IMPLOT_DIR /opt/implot/)  # -------> Set this to point to an up-to-date ImPlot repo
 
-include_directories(${IMGUI_DIR} ${IMGUI_DIR}/backends ..)
+include_directories(${IMGUI_DIR} ${IMPLOT_DIR} ${IMGUI_DIR}/backends ..)
 
 file(GLOB imgui_files
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
@@ -70,6 +72,13 @@ file(GLOB imgui_files
     ${IMGUI_DIR}/imgui_tables.cpp 
     ${IMGUI_DIR}/imgui_widgets.cpp
 )
+
+file(GLOB implot_files
+    ${IMPLOT_DIR}/implot.cpp
+    ${IMPLOT_DIR}/implot_items.cpp
+    ${IMPLOT_DIR}/implot_demo.cpp
+)
+
 # ImGui_f
 include_directories(/opt/ImGui-f/src)   # -------> Set this to point to an up-to-date ImGui-f repo
 
@@ -88,6 +97,7 @@ include_directories(${GLFW_DIR}/deps)
 add_executable(bb_visualizer 
   src/bb_visualizer.cpp 
   ${imgui_files} # added imgui files
+  ${implot_files} # added implot files
   )  
 ament_target_dependencies(bb_visualizer 
   rclcpp

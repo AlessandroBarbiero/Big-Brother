@@ -88,6 +88,7 @@ BBBenchmark::BBBenchmark()
       "carla/markers", rclcpp::QoS(rclcpp::KeepLast(1)), std::bind(&BBBenchmark::save_gt, this, _1));
 
   _debug_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("benchmark/debug", 10);
+  _stats_pub = this->create_publisher<bb_interfaces::msg::Stats>("benchmark/stats", 10);
 
 
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
@@ -591,6 +592,7 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
   int objects_to_detect, false_positive, true_positive, missed;
+  float tot_iou = 0, tot_dist = 0;
   double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1;
   // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
@@ -656,7 +658,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     vector<vision_msgs::msg::BoundingBox3D> missed_gt =           filter_indices(objects_on_sight, missed_obj);
     show_objects(true_positive_gt, "True Positive");
     show_objects(missed_gt, "Missed Objects");
-    float tot_iou = 0, tot_dist = 0;
+    
     for(auto match:matches){
       tot_iou += 1 - dists[match[0]][match[1]];
       tot_dist += dists[match[0]][match[1]];
@@ -670,16 +672,21 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
       detA = static_cast<double>(true_positive) / (true_positive + false_positive + missed);
       MOTP = tot_dist/true_positive;
     }
-    _tot_iou_detections+=tot_iou;
-    _tot_true_positive+= true_positive;
-    _tot_false_positive+=false_positive;
-    _tot_missed+=missed;
+
   }
+
+  _tot_iou_detections+=     tot_iou;
+  _tot_iou_dist_detections+=tot_dist;
+
+  _tot_true_positive+=      true_positive;
+  _tot_false_positive+=     false_positive;
+  _tot_missed+=             missed;
+  _tot_objects_to_detect+=  objects_to_detect;
 
   if(_tot_true_positive != 0){
     tot_locA = _tot_iou_detections/_tot_true_positive;
     tot_detA = static_cast<double>(_tot_true_positive) / (_tot_true_positive + _tot_false_positive + _tot_missed);
-    tot_MOTP = _tot_iou_detections/_tot_true_positive;
+    tot_MOTP = _tot_iou_dist_detections/_tot_true_positive;
   }
   RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
                                           "\tDetA: " << detA*100 << "%\n" << 
@@ -689,6 +696,25 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
                                           "\tTotal LocA: " << tot_locA*100 << "%\n" <<
                                           "\tTotal MOTP: " << tot_MOTP
                                           );
+
+  bb_interfaces::msg::Stats stats_message;
+  stats_message.det_a =                 detA;
+  stats_message.loc_a =                 locA;
+  stats_message.motp =                  MOTP;
+  stats_message.true_positive =         true_positive;
+  stats_message.false_positive =        false_positive;
+  stats_message.missed =                missed;
+  stats_message.objects_to_detect =     objects_to_detect;
+  stats_message.tot_det_a =               tot_detA;
+  stats_message.tot_loc_a =               tot_locA;
+  stats_message.tot_motp =                tot_MOTP;
+  stats_message.tot_true_positive =       _tot_true_positive;
+  stats_message.tot_false_positive =      _tot_false_positive;
+  stats_message.tot_missed =              _tot_missed;
+  stats_message.tot_objects_to_detect =   _tot_objects_to_detect;
+
+  
+  _stats_pub->publish(stats_message);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
