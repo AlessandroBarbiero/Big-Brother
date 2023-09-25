@@ -603,7 +603,9 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   vector<vision_msgs::msg::BoundingBox3D> on_camera = filter_camera(all_objects);
   vector<vision_msgs::msg::BoundingBox3D> on_lidar = filter_lidar(all_objects);
   vector<vision_msgs::msg::BoundingBox3D> objects_on_sight = obj_union(on_camera, on_lidar);
-  RCLCPP_INFO_STREAM(this->get_logger(), "Objects on sight: " << objects_on_sight.size() << " [by Cameras: " << on_camera.size() << " - by Lidars: " << on_lidar.size() << "]");
+
+  // RCLCPP_INFO_STREAM(this->get_logger(), "Objects on sight: " << objects_on_sight.size() << " [by Cameras: " << on_camera.size() << " - by Lidars: " << on_lidar.size() << "]");
+  
   show_objects(on_camera, "Objects_on_camera");
   show_objects(on_lidar, "Objects_on_lidar");
   show_objects(objects_on_sight, "Objects_in_sensor_range");
@@ -688,14 +690,15 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     tot_detA = static_cast<double>(_tot_true_positive) / (_tot_true_positive + _tot_false_positive + _tot_missed);
     tot_MOTP = _tot_iou_dist_detections/_tot_true_positive;
   }
-  RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
-                                          "\tDetA: " << detA*100 << "%\n" << 
-                                          "\tLocA: " << locA*100 << "%\n" <<
-                                          "\tMOTP: " << MOTP << "\n" <<
-                                          "\tTotal DetA: " << tot_detA*100 << "%\n" << 
-                                          "\tTotal LocA: " << tot_locA*100 << "%\n" <<
-                                          "\tTotal MOTP: " << tot_MOTP
-                                          );
+
+  // RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
+  //                                         "\tDetA: " << detA*100 << "%\n" << 
+  //                                         "\tLocA: " << locA*100 << "%\n" <<
+  //                                         "\tMOTP: " << MOTP << "\n" <<
+  //                                         "\tTotal DetA: " << tot_detA*100 << "%\n" << 
+  //                                         "\tTotal LocA: " << tot_locA*100 << "%\n" <<
+  //                                         "\tTotal MOTP: " << tot_MOTP
+  //                                         );
 
   bb_interfaces::msg::Stats stats_message;
   stats_message.det_a =                 detA;

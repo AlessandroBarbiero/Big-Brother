@@ -37,7 +37,7 @@ class BBTracker : public rclcpp::Node
   private:
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object>& objects);
     void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
-    void periodic_update();
+    void update_tracker();
     void publish_stracks(vector<STrack*>& output_stracks);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
 

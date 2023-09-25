@@ -11,7 +11,7 @@ struct Object
     vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size <--- ex cv::Rect_
     int label;
     float prob;
-	int time_ms;
+	long unsigned int time_ms;
 };
 
 class BYTETracker
@@ -23,8 +23,9 @@ public:
 	/**
 	 * Initializes the BYTETracker with specified parameters.
 	 *
-	 * @param frame_rate The frequency of the Tracker, number of executions per second.
-	 * @param track_buffer Number of frames a track is kept if it is not seen in the scene.
+	 * @param time_to_lost Milliseconds a tracked object is not seen to declare it lost.
+	 * @param unconfirmed_ttl Milliseconds an unconfirmed object is not seen before removing it.
+	 * @param lost_ttl Number of milliseconds a track is kept if it is not seen in the scene.
 	 * @param track_thresh This threshold is used to divide initially the detections into high and low score,
 	 *                     where high score detections are considered first for matching.
 	 * @param high_thresh This threshold is used to determine whether a high score detected object should be considered
@@ -34,7 +35,7 @@ public:
 	 * @param fixed_frame_desc The fixed frame the BYTETracker has to use; all the detections have to give a transform
 	 *                          for this frame.
 	 */
-	void init(int frame_rate = 30, int track_buffer = 30, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
+	void init(u_int time_to_lost = 300, u_int unconfirmed_ttl = 300, u_int lost_ttl = 1000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
 
 	vector<STrack*> update(const vector<Object>& objects);
 	Scalar get_color(int idx);
@@ -106,7 +107,7 @@ private:
 	float high_thresh;
 	float match_thresh;
 	int frame_id;
-	int track_buffer;
+	u_int time_to_lost, lost_ttl, unconfirmed_ttl;
 
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;

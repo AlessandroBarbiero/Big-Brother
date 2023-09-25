@@ -7,10 +7,12 @@ BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
   // ROS Parameters
-  auto fps_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  fps_desc.description = "Frequency of the Tracker, number of executions per second";
-  auto t_buffer_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  t_buffer_desc.description = "Number of frames a track is kept if it is not seen in the scene";
+  auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
+  auto unconfirmed_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  unconfirmed_ttl_desc.description = "Milliseconds an unconfirmed object is not seen before removing it.";
+  auto lost_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  lost_ttl_desc.description = "Number of milliseconds a track is kept if it is not seen in the scene.";
   auto t_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   t_thresh_desc.description = "This threshold is used to divide initially the detections into high and low score, high score detections are considered first for matching";
   auto h_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -19,19 +21,21 @@ BBTracker::BBTracker()
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
   auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
-  this->declare_parameter("fps", 30, fps_desc);
-  this->declare_parameter("track_buffer", 30, t_buffer_desc);
+  this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
+  this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
+  this->declare_parameter("lost_ttl", 1000, lost_ttl_desc);
   this->declare_parameter("track_thresh", 0.5, t_thresh_desc);
   this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
-  int fps =         get_parameter("fps").as_int();
-  int t_buffer =    get_parameter("track_buffer").as_int();
-  float t_thresh =  get_parameter("high_thresh").as_double();
-  float h_thresh =  get_parameter("track_thresh").as_double();
-  float m_thresh =  get_parameter("match_thresh").as_double();
-  _fixed_frame =    get_parameter("fixed_frame").as_string();
+  int time_to_lost    =   get_parameter("time_to_lost").as_int();
+  int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
+  int lost_ttl        =   get_parameter("lost_ttl").as_int();
+  float h_thresh =        get_parameter("high_thresh").as_double();
+  float t_thresh =        get_parameter("track_thresh").as_double();
+  float m_thresh =        get_parameter("match_thresh").as_double();
+  _fixed_frame =          get_parameter("fixed_frame").as_string();
 
   // ROS Subscriber and Publisher
   _detection = this->create_subscription<vision_msgs::msg::Detection3DArray>(
@@ -42,16 +46,16 @@ BBTracker::BBTracker()
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
   _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
 
-  // ROS Timer
-  std::chrono::milliseconds ms_to_call((1000/fps));
-  _timer = this->create_wall_timer(
-      ms_to_call, std::bind(&BBTracker::periodic_update, this));
+  // ROS Timer [Old version with periodic updates]
+  // std::chrono::milliseconds ms_to_call((1000/fps));
+  // _timer = this->create_wall_timer(
+  //     ms_to_call, std::bind(&BBTracker::update_tracker, this));
 
   // Reserve space trying to avoid frequent dynamical reallocation
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
 
   // Init BYTETracker object
-  _tracker.init(fps, t_buffer, t_thresh, h_thresh, m_thresh);
+  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, t_thresh, h_thresh, m_thresh);
   _num_detections = 0;
   _num_updates = 0;
   _total_ms = 0;
@@ -59,17 +63,19 @@ BBTracker::BBTracker()
   RCLCPP_INFO(this->get_logger(), "Ready to track");
 }
 
-void BBTracker::periodic_update(){
+void BBTracker::update_tracker(){
   _num_updates++;
 
   // Update the tracker
   auto start = chrono::system_clock::now();
-  // Order buffer in ascending order for time of detection
-  std::sort(_objects_buffer.begin(), _objects_buffer.end(), [](const Object &a, const Object &b)
-    { 
-        return a.time_ms < b.time_ms; 
-    }
-  );
+
+  // // Order buffer in ascending order for time of detection
+  // std::sort(_objects_buffer.begin(), _objects_buffer.end(), [](const Object &a, const Object &b)
+  //   { 
+  //       return a.time_ms < b.time_ms; 
+  //   }
+  // );
+
   // Get the Tracks for the objects currently beeing tracked
   vector<STrack*> output_stracks = _tracker.update(_objects_buffer);
   _objects_buffer.clear();
@@ -83,6 +89,7 @@ void BBTracker::periodic_update(){
   #endif
 
   publish_stracks(output_stracks);
+
   // Show Progress
   #ifndef DEBUG
   std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
@@ -214,6 +221,8 @@ void BBTracker::add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+
+  update_tracker();
 }
 
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){

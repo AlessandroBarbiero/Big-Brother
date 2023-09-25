@@ -9,18 +9,21 @@ BYTETracker::~BYTETracker()
 {
 }
 
-void BYTETracker::init(int frame_rate, int track_buffer, float track_thresh, float high_thresh, float match_thresh){
+void BYTETracker::init(u_int time_to_lost, u_int unconfirmed_ttl, u_int lost_ttl, float track_thresh, float high_thresh, float match_thresh){
 	this->track_thresh = track_thresh; //0.5;
 	this->high_thresh  = high_thresh;  //0.6;
 	this->match_thresh = match_thresh; //0.8;
+	this->time_to_lost = time_to_lost;
+	this->unconfirmed_ttl = unconfirmed_ttl;
+	this->lost_ttl = lost_ttl;
 
 	frame_id = 0;
-	float max_time_lost = track_buffer*1.0/frame_rate;
-	this->track_buffer = track_buffer;
-	std::cout << "Init ByteTrack! (Max time lost = " << max_time_lost << " seconds)"<< std::endl;
+
+	std::cout << "Init ByteTrack!"<< std::endl;
 	std::cout << "Parameters: " 
-	<< "\n\tframe_rate = " << frame_rate
-	<< "\n\ttrack_buffer = " << track_buffer
+	<< "\n\ttime_to_lost = " << time_to_lost
+	<< "\n\tunconfirmed_ttl = " << unconfirmed_ttl
+	<< "\n\tlost_ttl = " << lost_ttl
 	<< "\n\ttrack_thresh = " << track_thresh
 	<< "\n\thigh_thresh = " << high_thresh
 	<< "\n\tmatch_thresh = " << match_thresh
@@ -66,8 +69,8 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	vector<STrack*> strack_pool;
 	vector<STrack*> r_tracked_stracks;
 
-	// TODO: fix, now I'm just projecting everything with the last time of detection and then do association
-	int last_det_time_ms = objects.back().time_ms;
+	// Project everything with the last time of detection and then do association
+	long unsigned int last_det_time_ms = objects.back().time_ms;
 
 	if (objects.size() > 0)
 	{
@@ -174,7 +177,6 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 		}
 		else
 		{
-			// TODO: check here, it should never enter here
 			track->re_activate(*det, this->frame_id, false);
 			refind_stracks.push_back(*track);
 			std::cout<<"ByteTracker: it should not enter here. Check this. Line: "<< __LINE__ << std::endl;
@@ -184,10 +186,14 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	for (unsigned int i = 0; i < u_track.size(); i++)
 	{
 		STrack *track = r_tracked_stracks[u_track[i]];
-		if (track->state != TrackState::Lost)
+		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
+		}
+		else{
+			// Add object to the activated tracks without any update, the last time seen is conserved
+			activated_stracks.push_back(*track);
 		}
 	}
 
@@ -212,8 +218,14 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	for (unsigned int i = 0; i < u_unconfirmed.size(); i++)
 	{
 		STrack *track = unconfirmed[u_unconfirmed[i]];
-		track->mark_removed();
-		removed_stracks.push_back(*track);
+		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+			track->mark_removed();
+			removed_stracks.push_back(*track);
+		}
+		else{
+			// Add object to the activated tracks without any update, the last time seen is conserved
+			activated_stracks.push_back(*track);
+		}
 	}
 
 	//std::cout << "Step 4" << std::endl;
@@ -231,7 +243,8 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
-		if (this->frame_id - this->lost_stracks[i].end_frame() > this->track_buffer)
+		// if (this->frame_id - this->lost_stracks[i].end_frame() > this->track_buffer)  [OLD way with frame_id]
+		if(last_det_time_ms - this->lost_stracks[i].last_filter_update_ms > lost_ttl)
 		{
 			this->lost_stracks[i].mark_removed();
 			removed_stracks.push_back(this->lost_stracks[i]);
@@ -250,8 +263,6 @@ vector<STrack*> BYTETracker::update(const vector<Object>& objects)
 
 	this->tracked_stracks = joint_stracks(this->tracked_stracks, activated_stracks);
 	this->tracked_stracks = joint_stracks(this->tracked_stracks, refind_stracks);
-
-	//std::cout << activated_stracks.size() << std::endl;
 
 	this->lost_stracks = sub_stracks(this->lost_stracks, this->tracked_stracks);
 	for (unsigned int i = 0; i < lost_stracks.size(); i++)

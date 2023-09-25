@@ -201,10 +201,10 @@ class BBVisualizer : public rclcpp::Node
       static float history = 10.0f;
       ImGui::SliderFloat("History",&history,1,30,"%.1f s");
 
-      static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
+      static ImPlotAxisFlags flags = ImPlotAxisFlags_None;
 
       if (ImPlot::BeginPlot("##Scrolling", ImVec2(-1,300))) {
-          ImPlot::SetupAxes(nullptr, nullptr, flags, flags);
+          ImPlot::SetupAxes("Time", "Value", flags, flags);
           ImPlot::SetupAxisLimits(ImAxis_X1,t - history, t, ImGuiCond_Always);
           ImPlot::SetupAxisLimits(ImAxis_Y1,0,1);
           ImPlot::PlotLine("Detection Accuracy", &sdata1.Data[0].x, &sdata1.Data[0].y, sdata1.Data.size(), 0, sdata1.Offset, 2*sizeof(float));

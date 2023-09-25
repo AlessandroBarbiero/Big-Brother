@@ -1,7 +1,8 @@
 bb_tracker:
    ros__parameters:
-      fps: 10
-      track_buffer: 15
+      time_to_lost: 1000
+      unconfirmed_ttl: 1000
+      lost_ttl: 2000
       track_thresh: 0.5
       high_thresh: 0.6
       match_thresh: 0.8
