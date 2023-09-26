@@ -47,19 +47,27 @@ class FakeDetector(Node):
             durability=QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
         self._sub_gt_static = self.create_subscription(MarkerArray, "carla/markers/static", self.callback_gt_static, qos_profile=trans_local_qos)
         self._sub_gt_moving = self.create_subscription(MarkerArray, "carla/markers", self.callback_gt_moving, 10)
-
-
+        # Init a variable to false, it turns true every time a point cloud message is received,
+        # signaling that it's time to publish the fake detections
+        self.need_to_pub = False
 
     def callback_gt_static(self, msg : MarkerArray):
-        self._static_objects = msg.markers
+        self.static_objects = msg.markers
         self.get_logger().info("Static Objects saved!")
         return
     
     def callback_gt_moving(self, msg : MarkerArray):
-        self._moving_objects = msg.markers
+        self.moving_objects = msg.markers
+        if self.need_to_pub == True:
+            self.publish_detections(msg.markers[0].header.stamp)
+            self.need_to_pub = False
         return
     
     def init_lidar_tf(self):
+        '''
+        Update self.last_transform_lidar with the last transformations that brings
+        the lidars tf to the fixed frame
+        '''
         self.last_transform_lidar = []
         for lidar_topic in self.lidar_list:
             try:
@@ -93,27 +101,12 @@ class FakeDetector(Node):
 
         return filtered
 
-    def callback_pc(self, msg : PointCloud2):
-        points_raw = list(read_points(msg, skip_nans=False, field_names=("y", "x",  "z", "intensity", "ring")))
-        points = np.array(list(points_raw), dtype=np.float32)
-        
-        # Add all zeros as the ring parameter
-        Temp = np.zeros(points.shape[0])
-        points = np.c_[points, Temp]    
-
-        # self.get_logger().info("Received point cloud -> shape: {}".format(np.shape(points)))
-
-
-        # Fake detections
-        if not self.lidar_ready:
-            self.init_lidar_tf()
-            if not self.lidar_ready: return
-        
+    def publish_detections(self, stamp):
         detections_msg = Detection3DArray()
-        detections_msg.header.stamp = msg.header.stamp
+        detections_msg.header.stamp = stamp
         detections_msg.header.frame_id = self.fixed_frame
   
-        all_objects = self._static_objects + self._moving_objects  
+        all_objects = self.static_objects + self.moving_objects  
         seen_objects = self.filter_lidar(all_objects)
         marker : Marker
         for marker in seen_objects:
@@ -136,6 +129,13 @@ class FakeDetector(Node):
         self._pub_detections.publish(detections_msg)
         # self.get_logger().info("Published msg: " + str(msg.header.stamp.sec) + "." + str(msg.header.stamp.nanosec))
 
+
+    def callback_pc(self, msg : PointCloud2):
+        if not self.lidar_ready:
+            self.init_lidar_tf()
+            if not self.lidar_ready: return
+
+        self.need_to_pub = True
 
 
 
