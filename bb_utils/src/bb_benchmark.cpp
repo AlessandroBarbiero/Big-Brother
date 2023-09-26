@@ -129,10 +129,12 @@ void BBBenchmark::save_static_gt(std::shared_ptr<visualization_msgs::msg::Marker
     RCLCPP_WARN(this->get_logger(), "static gt should have the same tf as fixed frame");
 
   _static_objects.reserve(msg->markers.size());
+  _static_objects_id.reserve(msg->markers.size());
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
     bbox.size=marker.scale;
+    _static_objects_id.push_back(marker.id);
     _static_objects.push_back(bbox);
   }
 
@@ -149,11 +151,14 @@ void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerAr
   if(msg.get()==nullptr)
     return;
   _moving_objects_bbox.clear();
+  _moving_objects_id.clear();
   _moving_objects_bbox.reserve(msg->markers.size());
+  _moving_objects_id.reserve(msg->markers.size());
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
     bbox.size=marker.scale;
+    _moving_objects_id.push_back(marker.id);
     _moving_objects_bbox.push_back(bbox);
   }
 
@@ -593,12 +598,14 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
 {
   int objects_to_detect, false_positive, true_positive, missed;
   float tot_iou = 0, tot_dist = 0;
-  double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1;
+  double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1, MOTA;
   // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
   // Put moving and static objects together
   vector<vision_msgs::msg::BoundingBox3D> all_objects(_static_objects);
+  vector<int> all_objects_id(_static_objects_id);
   all_objects.insert(all_objects.end(), _moving_objects_bbox.begin(), _moving_objects_bbox.end());
+  all_objects_id.insert(all_objects_id.end(), _moving_objects_id.begin(), _moving_objects_id.end());
   // Retrive objects on cameras and lidars
   vector<vision_msgs::msg::BoundingBox3D> on_camera = filter_camera(all_objects);
   vector<vision_msgs::msg::BoundingBox3D> on_lidar = filter_lidar(all_objects);
@@ -654,6 +661,20 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
       match_gt.push_back(match[0]);
       match_track.push_back(match[1]);
     }
+
+    // ---Compute mismatch
+    // Save at each match the corrispondence for a given gt id -> at next match if the id is different there is an association mismatch
+    int gt_index;
+    std::string track_id;
+    for(size_t i=0; i<match_gt.size(); i++){
+      gt_index = all_objects_id[match_gt[i]];
+      track_id = tracked_objects->detections[match_track[i]].tracking_id;
+      if(_gt_index_to_track_id.count(gt_index) != 0 && _gt_index_to_track_id[gt_index] != track_id)
+        _tot_ass_mismatch++;
+      _gt_index_to_track_id[gt_index] = track_id; 
+    }
+    //------
+
     vector<vision_msgs::msg::BoundingBox3D> true_positive_gt =    filter_indices(objects_on_sight, match_gt);
     vector<vision_msgs::msg::Detection3D> true_positive_track =   filter_indices(tracked_objects->detections, match_track);
     vector<vision_msgs::msg::Detection3D> false_positive_det =    filter_indices(tracked_objects->detections, wrong_tracked);
@@ -669,6 +690,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
       locA = 0;
       detA = 0;
       MOTP = 1;
+      MOTA = 0;
     }else{
       locA = tot_iou/true_positive;
       detA = static_cast<double>(true_positive) / (true_positive + false_positive + missed);
@@ -690,6 +712,8 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     tot_detA = static_cast<double>(_tot_true_positive) / (_tot_true_positive + _tot_false_positive + _tot_missed);
     tot_MOTP = _tot_iou_dist_detections/_tot_true_positive;
   }
+
+  MOTA = 1.0 - static_cast<double>((_tot_missed + _tot_false_positive + _tot_ass_mismatch))/_tot_objects_to_detect;
 
   // RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
   //                                         "\tDetA: " << detA*100 << "%\n" << 
@@ -715,6 +739,8 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   stats_message.tot_false_positive =      _tot_false_positive;
   stats_message.tot_missed =              _tot_missed;
   stats_message.tot_objects_to_detect =   _tot_objects_to_detect;
+  stats_message.tot_ass_mismatch =        _tot_ass_mismatch;
+  stats_message.mota =                    MOTA;
 
   
   _stats_pub->publish(stats_message);

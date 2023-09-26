@@ -256,6 +256,7 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     vision_msgs::msg::Detection3D single_det = vision_msgs::msg::Detection3D();
     single_det.header = out_message.header;
     single_det.is_tracking = current_track->is_activated;
+    single_det.tracking_id = current_track->track_id;
     single_det.bbox.center.position.x = minwdh[0] + minwdh[3]/2;
     single_det.bbox.center.position.y = minwdh[1] + minwdh[4]/2;
     single_det.bbox.center.position.z = minwdh[2] + minwdh[5]/2;

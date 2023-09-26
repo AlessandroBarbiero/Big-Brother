@@ -109,9 +109,11 @@ class BBVisualizer : public rclcpp::Node
         {"TOTAL Detection Accuracy",          std::to_string(stats_message->tot_det_a)},
         {"TOTAL Localization Accuracy",       std::to_string(stats_message->tot_loc_a)},
         {"TOTAL MOTP",                        std::to_string(stats_message->tot_motp)},
+        {"TOTAL MOTA",                        std::to_string(stats_message->mota)},
         {"TOTAL True Positive",               std::to_string(stats_message->tot_true_positive)},
         {"TOTAL False Positive",              std::to_string(stats_message->tot_false_positive)},
         {"TOTAL Missed Objects",              std::to_string(stats_message->tot_missed)},
+        {"TOTAL Association Mismatch",        std::to_string(stats_message->tot_ass_mismatch)},
         {"TOTAL Objects to Detect",           std::to_string(stats_message->tot_objects_to_detect)}
       };
 
@@ -129,6 +131,7 @@ class BBVisualizer : public rclcpp::Node
       _tot_false_positive =    stats_message->tot_false_positive;
       _tot_missed =            stats_message->tot_missed;          
       _tot_objects_to_detect = stats_message->tot_objects_to_detect;
+      _MOTA =                  stats_message->mota;
 
     }
 
@@ -258,11 +261,12 @@ class BBVisualizer : public rclcpp::Node
     }
 
     void plotHistory(){
-      static ImPlot::ScrollingBuffer sdata1, sdata2;
+      static ImPlot::ScrollingBuffer sdata1, sdata2, sdata3;
       static float t = 0;
       t += ImGui::GetIO().DeltaTime;
       sdata1.AddPoint(t, _detA);
       sdata2.AddPoint(t, _locA);
+      sdata3.AddPoint(t, _MOTA);
 
       static float history = 10.0f;
       ImGui::SliderFloat("History",&history,1,30,"%.1f s");
@@ -275,6 +279,7 @@ class BBVisualizer : public rclcpp::Node
           ImPlot::SetupAxisLimits(ImAxis_Y1,0,1);
           ImPlot::PlotLine("Detection Accuracy", &sdata1.Data[0].x, &sdata1.Data[0].y, sdata1.Data.size(), 0, sdata1.Offset, 2*sizeof(float));
           ImPlot::PlotLine("Localization Accuracy", &sdata2.Data[0].x, &sdata2.Data[0].y, sdata2.Data.size(), 0, sdata2.Offset, 2*sizeof(float));
+          ImPlot::PlotLine("MOTA", &sdata3.Data[0].x, &sdata3.Data[0].y, sdata3.Data.size(), 0, sdata3.Offset, 2*sizeof(float));
           ImPlot::EndPlot();
       }
     }
@@ -373,7 +378,7 @@ class BBVisualizer : public rclcpp::Node
     // %%%%%%%%% Stats
     int _tot_false_positive, _tot_true_positive, _tot_missed, _tot_objects_to_detect;
     int _objects_to_detect, _false_positive, _true_positive, _missed;
-    double _detA, _locA, _MOTP, _tot_detA, _tot_locA, _tot_MOTP;
+    double _detA, _locA, _MOTP, _tot_detA, _tot_locA, _tot_MOTP, _MOTA;
     std::map<std::string, std::string> _statistics_map;
 
     rclcpp::TimerBase::SharedPtr imgui_timer_;

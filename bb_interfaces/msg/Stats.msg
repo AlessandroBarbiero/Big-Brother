@@ -15,11 +15,13 @@ uint32         missed
 float64       tot_det_a
 float64       tot_loc_a
 float64       tot_motp
+float64       mota
 
 uint32         tot_objects_to_detect
 uint32         tot_true_positive
 uint32         tot_false_positive
 uint32         tot_missed
+uint32         tot_ass_mismatch
 # -------------------------
 
 

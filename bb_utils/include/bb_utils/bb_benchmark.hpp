@@ -65,7 +65,11 @@ class BBBenchmark : public rclcpp::Node
     float _alpha_range;
 
     int _tot_false_positive = 0, _tot_true_positive = 0, _tot_missed = 0, _tot_objects_to_detect = 0;
+    int _tot_ass_mismatch = 0;
     float _tot_iou_detections = 0, _tot_iou_dist_detections = 0;
+
+    // %%%%%% ASSOCIATION
+    std::map<int,std::string>_gt_index_to_track_id;
 
 
     // %%%%%% REGARDING TF
@@ -87,6 +91,8 @@ class BBBenchmark : public rclcpp::Node
 
     // %%%%%%% GROUND TRUTH
     std::vector<vision_msgs::msg::BoundingBox3D> _static_objects;
+    std::vector<int> _static_objects_id;
+    std::vector<int> _moving_objects_id;
     std::vector<vision_msgs::msg::BoundingBox3D> _moving_objects_bbox;
     visualization_msgs::msg::MarkerArray::SharedPtr _moving_objects;
 
