@@ -14,26 +14,12 @@ endif()
 option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
 
 # Eigen3
-include_directories(/usr/include/eigen3)
+include_directories(/usr/include/eigen3)  # <----- Point to an updated version of eigen3
 
-# include and link dirs of cuda and tensorrt
 # cuda
 find_package(CUDA REQUIRED)
-# include_directories(/usr/local/cuda/include)
-# link_directories(/usr/local/cuda/lib64)
 include_directories(${CUDA_INCLUDE_DIRS})
 link_directories(${CUDA_LIBRARIES})
-# target_link_libraries(${PROJECT_NAME} ${CUDA_LIBRARIES})
-
-# cudnn
-# include_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/include)
-# link_directories(/data/cuda/cuda-10.2/cudnn/v8.0.4/lib64)
-# tensorrt
-# include_directories(/opt/tiger/demo/TensorRT-7.2.3.4/include)
-# link_directories(/opt/tiger/demo/TensorRT-7.2.3.4/lib)
-# cudnn and tensorrt
-include_directories(/usr/include/x86_64-linux-gnu)
-link_directories(/usr/lib/x86_64-linux-gnu)
 
 # ----------------------------
 

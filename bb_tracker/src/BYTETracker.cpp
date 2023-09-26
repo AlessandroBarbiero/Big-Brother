@@ -47,7 +47,14 @@ std::unordered_map<int, std::string> BYTETracker::int_to_class{
 	{3, "Motorcycle"}
 };
 
-vector<STrack*> BYTETracker::update(const vector<Object>& objects)
+vector<STrack*> BYTETracker::update(const vector<Object2D>& objects)
+{
+	// TODO: implement this
+	vector<STrack*> output_stracks;
+	return output_stracks;
+}
+
+vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 {
 	//std::cout << "Step 1" << std::endl;
 	////////////////// Step 1: Get detections //////////////////

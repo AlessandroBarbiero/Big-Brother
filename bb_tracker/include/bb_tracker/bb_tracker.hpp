@@ -10,6 +10,7 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
 #include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection2_d_array.hpp>
 #include <vision_msgs/msg/detection3_d.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 // extra
@@ -35,9 +36,12 @@ class BBTracker : public rclcpp::Node
     void change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame);
 
   private:
-    void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object>& objects);
-    void add_detection(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
-    void update_tracker();
+    void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects);
+    void decode_detections(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
+    void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
+    void add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message);
+    void update_tracker(std::vector<Object3D>& new_objects);
+    void update_tracker(std::vector<Object2D>& new_objects);
     void publish_stracks(vector<STrack*>& output_stracks);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
 
@@ -53,11 +57,12 @@ class BBTracker : public rclcpp::Node
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _text_publisher;
 
-    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection;
+    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection3d;
+    rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr _detection2d;
 
 
     BYTETracker _tracker;
-    vector<Object> _objects_buffer;
+    vector<Object3D> _objects_buffer;
     // Total number of detections received
     int _num_detections;
     // Total number of BYTETracker updates

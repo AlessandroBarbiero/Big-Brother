@@ -3,12 +3,21 @@
 #include "STrack.h"
 #include <Eigen/Geometry>
 #include <vision_msgs/msg/bounding_box3_d.hpp>
+#include <vision_msgs/msg/bounding_box2_d.hpp>
 #include <map>
 #include "EKF.hpp"
 
-struct Object
+struct Object3D
 {
-    vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size <--- ex cv::Rect_
+    vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size
+    int label;
+    float prob;
+	long unsigned int time_ms;
+};
+
+struct Object2D
+{
+    vision_msgs::msg::BoundingBox2D box; // float-based 2D bounding box with center.position and size 
     int label;
     float prob;
 	long unsigned int time_ms;
@@ -37,7 +46,8 @@ public:
 	 */
 	void init(u_int time_to_lost = 300, u_int unconfirmed_ttl = 300, u_int lost_ttl = 1000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
 
-	vector<STrack*> update(const vector<Object>& objects);
+	vector<STrack*> update(const vector<Object3D>& objects);
+	vector<STrack*> update(const vector<Object2D>& objects);
 	Scalar get_color(int idx);
 
 	static std::unordered_map<std::string, int> class_to_int;

@@ -40,7 +40,7 @@ def generate_launch_description():
         remappings=[
             ("/to_detect", "/carla/sensors_home/static_termic_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
-            ("/detection_3d", "/bytetrack/detections")
+            ("/detection_3d", "/bytetrack/detections3d")
         ],
         parameters=[
             {"show_debug": False}
@@ -54,7 +54,7 @@ def generate_launch_description():
             ("/to_detect", "/carla/sensors_home/static_rgb_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
             ("/depth", "/carla/sensors_home/static_depth_camera/image"),
-            ("/detection_3d", "/bytetrack/detections")
+            ("/detection_3d", "/bytetrack/detections3d")
         ],
         parameters=[
             {"confidence_threshold": 0.1},
@@ -67,7 +67,7 @@ def generate_launch_description():
         executable="lidar_detector",
         remappings=[
             ("/lidar", "/carla/sensors_home/static_lidar"),
-            ("/detection_3d", "/bytetrack/detections")
+            ("/detection_3d", "/bytetrack/detections3d")
         ],
         parameters=[
             {'lidar_list': ["sensors_home/static_lidar"]},
