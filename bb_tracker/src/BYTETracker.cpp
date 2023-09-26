@@ -36,14 +36,15 @@ std::unordered_map<std::string, int> BYTETracker::class_to_int{
 	{"vehicle", 1},
 	{"car", 1},
 	{"truck", 1},
-	{"motorcycle", 1},
+	{"motorcycle", 3},
 	{"bicycle", 2}
 };
 
 std::unordered_map<int, std::string> BYTETracker::int_to_class{
-	{0, "person"},
-	{1, "vehicle"},
-	{2, "bicycle"}
+	{0, "Person"},
+	{1, "Car"},
+	{2, "Cyclist"},
+	{3, "Motorcycle"}
 };
 
 vector<STrack*> BYTETracker::update(const vector<Object>& objects)

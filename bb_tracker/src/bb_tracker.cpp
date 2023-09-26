@@ -69,13 +69,6 @@ void BBTracker::update_tracker(){
   // Update the tracker
   auto start = chrono::system_clock::now();
 
-  // // Order buffer in ascending order for time of detection
-  // std::sort(_objects_buffer.begin(), _objects_buffer.end(), [](const Object &a, const Object &b)
-  //   { 
-  //       return a.time_ms < b.time_ms; 
-  //   }
-  // );
-
   // Get the Tracks for the objects currently beeing tracked
   vector<STrack*> output_stracks = _tracker.update(_objects_buffer);
   _objects_buffer.clear();
@@ -276,7 +269,7 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     single_det.bbox.size.z =            minwdh[5];
 
     auto hypothesis = vision_msgs::msg::ObjectHypothesisWithPose();
-    hypothesis.id = current_track->class_name; //.append(to_string(current_track.track_id));
+    hypothesis.id = current_track->class_name;
     hypothesis.score = current_track->score;
     single_det.results.push_back(hypothesis);
 
@@ -343,7 +336,8 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
     Scalar s_color = _tracker.get_color(track->track_id);
     initPathMarker(track->path_marker, s_color);
     initTextMarker(track->text_marker, s_color);
-    track->text_marker.text = std::to_string(track->track_id);
+    track->text_marker.text = track->class_name;
+    track->text_marker.text.append("-").append(::to_string(track->track_id));
   }
   track->path_marker.points.push_back(last_point);
   // path_marker.colors.push_back(s_color);

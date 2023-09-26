@@ -5,6 +5,14 @@ from image_geometry import PinholeCameraModel
 
 DEFAULT_FRAME = 'sensors_home'
 
+classes_to_detect = ['person',
+                     'pedestrian',
+                     'bicycle',
+                     'car',
+                     'motorcycle',
+                     'truck',
+                     'vehicle'
+                    ]
 
 def quaternion_multiply(q1, q2):
     q_result = Quaternion()

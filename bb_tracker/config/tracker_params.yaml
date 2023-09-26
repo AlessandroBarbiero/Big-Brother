@@ -1,6 +1,6 @@
 bb_tracker:
    ros__parameters:
-      time_to_lost: 1000
+      time_to_lost: 1500
       unconfirmed_ttl: 1000
       lost_ttl: 2000
       track_thresh: 0.5

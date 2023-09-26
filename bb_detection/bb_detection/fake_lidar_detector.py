@@ -14,8 +14,9 @@ from vision_msgs.msg import Detection3D, ObjectHypothesisWithPose, Detection3DAr
 from geometry_msgs.msg import TransformStamped, Point
 # Python
 from typing import List
-
 import numpy as np
+
+from .utility import classes_to_detect
 
 class FakeDetector(Node):
 
@@ -114,11 +115,16 @@ class FakeDetector(Node):
             detection_a.header = detections_msg.header
             # create hypothesis
             hypothesis = ObjectHypothesisWithPose()
-            if marker.ns != "":
-                hypothesis.id = marker.ns
+
+            if marker.ns.lower() in classes_to_detect:
+                hypothesis.id = marker.ns.lower()
             else:
-                hypothesis.id = "Car"
+                if marker.scale.x>1.0 or marker.scale.y>1.0:
+                    hypothesis.id = "car"
+                else:
+                    hypothesis.id = "person"
             hypothesis.score = 1.0
+
             detection_a.results.append(hypothesis)
 
             detection_a.bbox.center = marker.pose
