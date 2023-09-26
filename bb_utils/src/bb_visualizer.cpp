@@ -1,7 +1,11 @@
 #include <chrono>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <string>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -149,7 +153,7 @@ class BBVisualizer : public rclcpp::Node
       ImGuiWindowFlags window_flags = 0;
       window_flags |= ImGuiWindowFlags_NoDocking;
 
-      visualize_stats();
+      visualizeStats();
       ImGui::Begin("Framerate", NULL, window_flags);
 
 
@@ -163,6 +167,9 @@ class BBVisualizer : public rclcpp::Node
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
       ImGui::End();
 
+      if(ImGui::Button("See demo")){
+        demo = !demo;
+      }
       if(demo){
         ImGui::ShowDemoWindow(&demo);
       }
@@ -171,7 +178,7 @@ class BBVisualizer : public rclcpp::Node
 
     }
 
-    void visualize_stats(){
+    void visualizeStats(){
       ImGuiWindowFlags window_flags = 0;
       window_flags |= ImGuiWindowFlags_NoDocking;
       ImGui::Begin("Statistics", NULL, window_flags);
@@ -188,7 +195,66 @@ class BBVisualizer : public rclcpp::Node
         plotHistory();
       }
 
+      
+      if (ImGui::Button("Save data to file")){
+        writeDataToFile();
+      }
+      ImGui::SameLine();
+      ImGui::InputTextWithHint("##Input", "Notes...", _note_to_add, IM_ARRAYSIZE(_note_to_add));
+      
+      if (_saved_data){
+        ImGui::Text("Saved");
+      }
+
+      if (ImGui::Button("Show previously saved data")){
+        openDataFile();
+      }
+
       ImGui::End();
+    }
+
+    void openDataFile(){
+      // Use the 'xdg-open' command to open the file with the default text editor
+      std::string openCommand = "xdg-open " + std::string(_data_file);
+
+      // Execute the command
+      int result = system(openCommand.c_str());
+
+      if (result != 0) {
+        std::cerr << "Failed to open the file." << std::endl;
+      }
+    }
+
+    void writeDataToFile(){
+      // Open the text file in append mode
+      std::ofstream outputFile(_data_file, std::ios::app);
+
+      if (!outputFile.is_open()) {
+          std::cerr << "Failed to open the file." << std::endl;
+          return;
+      }
+
+      // Get the current date and time
+      auto currentTime = std::chrono::system_clock::now();
+      std::time_t time = std::chrono::system_clock::to_time_t(currentTime);
+
+      // Create a string to hold the formatted date and time
+      std::string dateTime = std::ctime(&time);
+      // Write the date and time to the file
+      outputFile << "\nDate and Time: " << dateTime << "\n" << "Note: " << _note_to_add << "\n";
+
+      // Write the map data to the file in a JSON-like format
+      outputFile << "{\n";
+      for (const auto& pair : _statistics_map) {
+        if(pair.first.find("TOTAL") != std::string::npos) // There is TOTAL in the name
+          outputFile << "  \"" << pair.first << "\": " << pair.second << ",\n";
+      }
+      outputFile << "}\n";
+
+      // Close the file
+      outputFile.close();
+
+      _saved_data = true;
     }
 
     void plotHistory(){
@@ -286,6 +352,10 @@ class BBVisualizer : public rclcpp::Node
 
     // Set to true to enable the demo window to take inspiration for useful ImGui visualizations
     bool demo = false;
+
+    std::string _data_file = "stats.txt";
+    bool _saved_data = false;
+    char _note_to_add[256];
 
     // bool spawnWord_ = false;
     // float spawnTimer_ = 0.0f;
