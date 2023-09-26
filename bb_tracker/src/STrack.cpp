@@ -108,11 +108,11 @@ void STrack::update(STrack &new_track, int frame_id)
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
 	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];
-	xyaah_box[1] = xyzaah[1];
-	xyaah_box[2] = xyzaah[3];
-	xyaah_box[3] = xyzaah[4];
-	xyaah_box[4] = xyzaah[5];
+	xyaah_box[0] = xyzaah[0];	// x
+	xyaah_box[1] = xyzaah[1];	// y
+	xyaah_box[2] = xyzaah[3];	// w/h
+	xyaah_box[3] = xyzaah[4];	// d/h
+	xyaah_box[4] = xyzaah[5];	// h
 
 	// CHECK dt
 	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
@@ -128,7 +128,8 @@ void STrack::update(STrack &new_track, int frame_id)
 	this->state = TrackState::Tracked;
 	this->is_activated = true;
 
-	this->score = new_track.score;
+	// The new score is the average between the old and new
+	this->score = (this->score + new_track.score)/2;
 }
 
 void STrack::static_minwdh()
@@ -144,18 +145,18 @@ void STrack::static_minwdh()
 		return;
 	}
 
-	minwdh[0] = mean[0];
-	minwdh[1] = mean[1];
-	minwdh[2] = 0.0;
-	minwdh[3] = mean[3];
-	minwdh[4] = mean[4];
-	minwdh[5] = mean[5];
+	minwdh[0] = mean[0];	// x center
+	minwdh[1] = mean[1];	// y center
+	minwdh[2] = 0.0;		// z min
+	minwdh[3] = mean[3];	// w/h
+	minwdh[4] = mean[4];	// d/h
+	minwdh[5] = mean[5];	// h 
 
 
-	minwdh[3] *= minwdh[5];
-	minwdh[4] *= minwdh[5];
-	minwdh[0] -= minwdh[3] / 2;
-	minwdh[1] -= minwdh[4] / 2;
+	minwdh[3] *= minwdh[5];			// w
+	minwdh[4] *= minwdh[5];			// d
+	minwdh[0] -= minwdh[3] / 2;		// x min
+	minwdh[1] -= minwdh[4] / 2;		// y min
 
 }
 
@@ -163,23 +164,20 @@ void STrack::static_minmax()
 {
 	minmax.clear();
 	minmax.assign(minwdh.begin(), minwdh.end());
-	// 2D
-	// tlbr[2] += tlbr[0];
-	// tlbr[3] += tlbr[1];
 
-	minmax[3] += minmax[0];
-	minmax[4] += minmax[1];
-	minmax[5] += minmax[2];
+	minmax[3] += minmax[0];		// x max
+	minmax[4] += minmax[1];		// y max
+	minmax[5] += minmax[2];		// z max
 }
 
 vector<float> STrack::minwdh_to_xyzaah(vector<float> minwdh_tmp)
 {
 	vector<float> minwdh_output = minwdh_tmp;
-	minwdh_output[0] += minwdh_output[3] / 2;
-	minwdh_output[1] += minwdh_output[4] / 2;
-	minwdh_output[2] += minwdh_output[5] / 2;
-	minwdh_output[3] /= minwdh_output[5];
-	minwdh_output[4] /= minwdh_output[5];
+	minwdh_output[0] += minwdh_output[3] / 2;	// x center
+	minwdh_output[1] += minwdh_output[4] / 2;	// y center
+	minwdh_output[2] += minwdh_output[5] / 2;	// z center
+	minwdh_output[3] /= minwdh_output[5];		// w/h
+	minwdh_output[4] /= minwdh_output[5];		// d/h
 	return minwdh_output;
 }
 
@@ -190,9 +188,9 @@ vector<float> STrack::to_xyzaah()
 
 vector<float> STrack::minmax_to_minwdh(vector<float> &minmax)
 {
-	minmax[3] -= minmax[0];
-	minmax[4] -= minmax[1];
-	minmax[5] -= minmax[2];
+	minmax[3] -= minmax[0];		// w
+	minmax[4] -= minmax[1]; 	// d
+	minmax[5] -= minmax[2]; 	// h
 	return minmax;
 }
 
