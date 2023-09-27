@@ -23,7 +23,7 @@ namespace byte_kalman
 
   	KAL_HMEAN2D EKF::projectState2D(const KAL_MEAN &mean){
 		// To project the 3d mean into a 2d world i need 
-		// Transform the point from world tf to camera tf multiplying by a transform matrix
+		// Transform the point from world tf to camera tf multiplying by a transform matrix (Rotation and translation)
 		// (Optional check if behind the camera (z>0))
 		// camera projection matix P[4x4] (PinholeCameraModel.projectionMatrix()), 
 		// convert point in homogeneous coordinates [x,y,z,1]

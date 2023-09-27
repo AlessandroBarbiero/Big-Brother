@@ -21,6 +21,13 @@ namespace byte_kalman
 	{
 		_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
 
+		// The `_observation_mat3D` matrix has the following form:
+		// [ x y t l d h v w ]
+		// [ 1 0 0 0 0 0 0 0 ]
+		// [ 0 1 0 0 0 0 0 0 ]
+		// [ 0 0 0 1 0 0 0 0 ]
+		// [ 0 0 0 0 1 0 0 0 ]
+		// [ 0 0 0 0 0 1 0 0 ]
 		_observation_mat3D = Eigen::MatrixXf::Identity(detection3D_dim, state_dim);
 		_observation_mat3D(2,2)=0;
 		_observation_mat3D(2,3)=1;
@@ -29,6 +36,12 @@ namespace byte_kalman
 		_observation_mat3D(3,4)=1;
 		_observation_mat3D(4,5)=1;
 
+		// The `_observation_mat2D` matrix has the following form:
+		// [ x y t l d h v w ]
+		// [ 1 0 0 0 0 0 0 0 ]
+		// [ 0 1 0 0 0 0 0 0 ]
+		// [ 0 0 0 1 0 0 0 0 ]
+		// [ 0 0 0 0 0 1 0 0 ]
 		_observation_mat2D = Eigen::MatrixXf::Identity(detection2D_dim, state_dim);
 		_observation_mat2D(2,2)=0;
 		_observation_mat2D(2,3)=1;

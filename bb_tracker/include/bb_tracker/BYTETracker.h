@@ -17,7 +17,7 @@ struct Object3D
 
 struct Object2D
 {
-    vision_msgs::msg::BoundingBox2D box; // float-based 2D bounding box with center.position and size 
+    vision_msgs::msg::BoundingBox2D box; // float-based 2D bounding box with center and size 
     int label;
     float prob;
 	long unsigned int time_ms;
@@ -106,7 +106,10 @@ private:
 		vector<vector<int> > &matches, vector<int> &unmatched_a, vector<int> &unmatched_b);
 	vector<vector<float> > iou_distance(vector<STrack*> &atracks, vector<STrack> &btracks, int &dist_size, int &dist_size_size);
 	vector<vector<float> > iou_distance(vector<STrack> &atracks, vector<STrack> &btracks);
+	vector<vector<float> > iou_distance2d(vector<STrack*> &atracks, vector<Object2D> &btracks, int &dist_size, int &dist_size_size);
+	vector<vector<float> > iou_distance2d(vector<STrack> &atracks, vector<Object2D> &btracks);
 	vector<vector<float> > ious(vector<vector<float> > &aminmaxs, vector<vector<float> > &bminmaxs);
+	vector<vector<float> > ious_2d(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs);
 
 	double lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol, 
 		bool extend_cost = false, float cost_limit = LONG_MAX, bool return_cost = true);

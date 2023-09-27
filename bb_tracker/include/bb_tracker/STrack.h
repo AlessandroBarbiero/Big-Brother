@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 #include "EKF.hpp"
 #include <visualization_msgs/msg/marker.hpp>
+#include "BYTETracker.h"
 
 using namespace cv;
 using namespace std;
@@ -30,7 +31,9 @@ public:
 	
 	void activate(byte_kalman::EKF &kalman_filter, int frame_id);
 	void re_activate(STrack &new_track, int frame_id, bool new_id = false);
+	void re_activate(Object2D &new_track, int frame_id, bool new_id = false);
 	void update(STrack &new_track, int frame_id);
+	void update(Object2D &new_track, int frame_id);
 
 public:
 	bool is_activated;
@@ -40,6 +43,8 @@ public:
 	vector<float> _minwdh; 	// <--- ex _tlwh
 	vector<float> minwdh;	// <--- ex tlwh
 	vector<float> minmax;	// <--- ex tlbr
+	// TODO: Remember to use this
+	vector<float> vis2D_tlbr; // Fill this value with a 2d representation in camera
 	float theta;
 	
 	int frame_id;

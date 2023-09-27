@@ -279,6 +279,62 @@ vector<vector<float> > BYTETracker::iou_distance(vector<STrack> &atracks, vector
 	return cost_matrix;
 }
 
+// TODO: implement
+vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack> &atracks, vector<Object2D> &btracks){
+	vector<vector<float> > aminmaxs, bminmaxs;
+	return aminmaxs;
+}
+
+// TODO: implement
+vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack*> &atracks, vector<Object2D> &btracks, int &dist_size, int &dist_size_size){
+	vector<vector<float> > aminmaxs, bminmaxs;
+	return aminmaxs;
+}
+
+// CHECK
+vector<vector<float> > BYTETracker::ious_2d(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs)
+{
+	vector<vector<float> > ious;
+	if (atlbrs.size()*btlbrs.size() == 0)
+		return ious;
+
+	ious.resize(atlbrs.size());
+	for (int i = 0; i < ious.size(); i++)
+	{
+		ious[i].resize(btlbrs.size());
+	}
+
+	//bbox_ious
+	for (int k = 0; k < btlbrs.size(); k++)
+	{
+		vector<float> ious_tmp;
+		float box_area = (btlbrs[k][2] - btlbrs[k][0] + 1)*(btlbrs[k][3] - btlbrs[k][1] + 1);
+		for (int n = 0; n < atlbrs.size(); n++)
+		{
+			float iw = min(atlbrs[n][2], btlbrs[k][2]) - max(atlbrs[n][0], btlbrs[k][0]) + 1;
+			if (iw > 0)
+			{
+				float ih = min(atlbrs[n][3], btlbrs[k][3]) - max(atlbrs[n][1], btlbrs[k][1]) + 1;
+				if(ih > 0)
+				{
+					float ua = (atlbrs[n][2] - atlbrs[n][0] + 1)*(atlbrs[n][3] - atlbrs[n][1] + 1) + box_area - iw * ih;
+					ious[n][k] = iw * ih / ua;
+				}
+				else
+				{
+					ious[n][k] = 0.0;
+				}
+			}
+			else
+			{
+				ious[n][k] = 0.0;
+			}
+		}
+	}
+
+	return ious;
+}
+
 double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol,
 	bool extend_cost, float cost_limit, bool return_cost)
 {

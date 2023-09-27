@@ -67,6 +67,11 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	this->start_frame = frame_id;
 }
 
+// TODO: implement
+void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id){
+	return;
+}
+
 void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
@@ -97,6 +102,11 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	this->score = new_track.score;
 	if (new_id)
 		this->track_id = next_id();
+}
+
+// TODO: implement
+void STrack::update(Object2D &new_track, int frame_id){
+	return;
 }
 
 void STrack::update(STrack &new_track, int frame_id)
