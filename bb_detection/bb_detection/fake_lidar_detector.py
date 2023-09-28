@@ -251,7 +251,11 @@ def main(args=None):
 
     detector = FakeDetector()
 
-    rclpy.spin(detector)
+    try:
+        rclpy.spin(detector)
+    except:
+        print("Lidar Detector Terminated")
+
 
     detector.destroy_node()
     rclpy.shutdown()
