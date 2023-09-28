@@ -25,10 +25,12 @@ def generate_launch_description():
     tracker_node = Node(
         package="bb_tracker",
         executable="bb_tracker",
-        # remappings=[
-        #     ("/bytetrack/detections", "/something"),
-        #     ("/bytetrack/active_tracks", "/something")
-        # ],
+        remappings=[
+            # ("/bytetrack/detections", "/something"),
+            # ("/bytetrack/active_tracks", "/something")
+            ("/bytetrack/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
+            ("/bytetrack/camera_image", "/carla/sensors_home/static_rgb_camera/image")
+        ],
         parameters=[config],
         output='screen',
         prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
@@ -54,7 +56,8 @@ def generate_launch_description():
             ("/to_detect", "/carla/sensors_home/static_rgb_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
             ("/depth", "/carla/sensors_home/static_depth_camera/image"),
-            ("/detection_3d", "/bytetrack/detections3d")
+            # ("/detection_3d", "/bytetrack/detections3d"),
+            ("/detection_2d", "/bytetrack/detections2d")
         ],
         parameters=[
             {"confidence_threshold": 0.1},
@@ -111,7 +114,7 @@ def generate_launch_description():
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
     # ld.add_action(thermal_node)
-    # ld.add_action(yolo_node)
+    ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)

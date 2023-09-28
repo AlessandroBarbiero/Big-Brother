@@ -1,27 +1,13 @@
 #pragma once
 
 #include "STrack.h"
-#include <Eigen/Geometry>
-#include <vision_msgs/msg/bounding_box3_d.hpp>
-#include <vision_msgs/msg/bounding_box2_d.hpp>
-#include <map>
 #include "EKF.hpp"
+#include <Eigen/Geometry>
+#include <map>
+#include <vector>
+#include "dataType.h"
 
-struct Object3D
-{
-    vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size
-    int label;
-    float prob;
-	long unsigned int time_ms;
-};
-
-struct Object2D
-{
-    vision_msgs::msg::BoundingBox2D box; // float-based 2D bounding box with center and size 
-    int label;
-    float prob;
-	long unsigned int time_ms;
-};
+using namespace std;
 
 class BYTETracker
 {
@@ -49,6 +35,7 @@ public:
 	vector<STrack*> update(const vector<Object3D>& objects);
 	vector<STrack*> update(const vector<Object2D>& objects);
 	Scalar get_color(int idx);
+	vector<STrack> getTrackedObj();
 
 	static std::unordered_map<std::string, int> class_to_int;
 	static std::unordered_map<int, std::string> int_to_class;

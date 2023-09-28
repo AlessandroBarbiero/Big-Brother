@@ -9,6 +9,10 @@ BYTETracker::~BYTETracker()
 {
 }
 
+vector<STrack> BYTETracker::getTrackedObj(){
+	return this->tracked_stracks;
+}
+
 void BYTETracker::init(u_int time_to_lost, u_int unconfirmed_ttl, u_int lost_ttl, float track_thresh, float high_thresh, float match_thresh){
 	this->track_thresh = track_thresh; //0.5;
 	this->high_thresh  = high_thresh;  //0.6;

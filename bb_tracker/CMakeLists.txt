@@ -31,6 +31,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_geometry REQUIRED)
 
 # Add to include header files
 include_directories(include)
@@ -67,6 +69,8 @@ ament_target_dependencies(bb_tracker
   vision_msgs
   visualization_msgs
   OpenCV
+  cv_bridge
+  image_geometry
   # bb_interfaces
   )
 # -----------

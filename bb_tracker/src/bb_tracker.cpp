@@ -40,8 +40,19 @@ BBTracker::BBTracker()
   // ROS Subscriber and Publisher
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
           "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
-  _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
-          "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
+
+  _detection2d.subscribe(this, "bytetrack/detections2d");
+  _camera_info.subscribe(this, "bytetrack/camera_info");
+  _camera_image.subscribe(this, "bytetrack/camera_image");
+
+  _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+  _detection2d, _camera_info, _camera_image, 100);
+
+  // Register the callback function
+  _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+
+  // _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
+  //         "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
   _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
@@ -294,6 +305,38 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
   update_tracker(objects2D);
 }
 
+void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
+  cv_bridge::CvImagePtr cv_ptr;
+  image_geometry::PinholeCameraModel cam_model;
+  cam_model.fromCameraInfo(camera_info);
+  auto projMat = cam_model.projectionMatrix();
+  auto trackedObj = this->_tracker.getTrackedObj();
+  
+  try
+  {
+    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
+    for(auto det : detection_msg->detections)
+      cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
+              Size(det.bbox.size_x, det.bbox.size_y), 0, 0,
+              360, CV_RGB(255, 0, 0),
+              1, LINE_AA);
+    for(auto obj :trackedObj)
+      draw_ellipse(cv_ptr, obj, projMat);
+
+    cv::imshow("Image Window", cv_ptr->image);
+    cv::waitKey(1);
+
+  }
+  catch (cv_bridge::Exception& e)
+  {
+      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+  }
+  return;
+}
+
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat){
+
+}
 // %%%%%%%%%% Visualization
 
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
