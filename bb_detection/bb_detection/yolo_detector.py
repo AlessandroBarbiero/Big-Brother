@@ -11,8 +11,10 @@ from tf2_ros.buffer import Buffer
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
 from vision_msgs.msg import Detection3D
+from vision_msgs.msg import Detection2D
 from vision_msgs.msg import ObjectHypothesisWithPose
 from vision_msgs.msg import Detection3DArray
+from vision_msgs.msg import Detection2DArray
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import Quaternion
 # Other
@@ -66,9 +68,10 @@ class YoloDetector(Node):
         sub2 = Subscriber(self, CameraInfo, "camera_info")
         sub3 = Subscriber(self, Image, "depth")
         self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
-        self._tss.registerCallback(self.detect_3d)
+        self._tss.registerCallback(self.detect_objects)
 
         self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+        self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -93,9 +96,10 @@ class YoloDetector(Node):
             if param.name == 'show_debug' and param.value == False:
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
-    
-    
-    def detect_3d(self, data: Image, camera_info: CameraInfo, depth: Image):
+        
+
+
+    def detect_objects(self, data: Image, camera_info: CameraInfo, depth: Image):
         """
         Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes,
         It can also show the debug image if the parameter is set
@@ -141,8 +145,11 @@ class YoloDetector(Node):
         results: Results = results[0].cpu()
 
         # create detections msg
-        detections_msg = Detection3DArray()
-        detections_msg.header = data.header
+        detections3d_msg = Detection3DArray()
+        detections3d_msg.header = data.header
+
+        detections2d_msg = Detection2DArray()
+        detections2d_msg.header = data.header
 
         camera_model = PinholeCameraModel()
         camera_model.fromCameraInfo(camera_info)
@@ -150,8 +157,11 @@ class YoloDetector(Node):
 
         for box_data in results.boxes:
 
-            detection = Detection3D()
-            detection.header = detections_msg.header
+            detection3d = Detection3D()
+            detection3d.header = detections3d_msg.header
+
+            detection2d = Detection2D()
+            detection2d.header = detections2d_msg.header
 
             # get label and score
             label = self.yolo.names[int(box_data.cls)]
@@ -162,6 +172,13 @@ class YoloDetector(Node):
 
             uv_coordinates = (box[0], box[1])
             bbox_image_size = (box[2], box[3])
+
+            detection2d.bbox.center.x = float(uv_coordinates[0])
+            detection2d.bbox.center.y = float(uv_coordinates[1])
+            detection2d.bbox.size_x = float(bbox_image_size[0])
+            detection2d.bbox.size_y = float(bbox_image_size[1])
+
+
             # The depth data is stored inside the cv_dep numpy array -> y are the rows and x are columns
             z_value = cv_dep[int(uv_coordinates[1])][int(uv_coordinates[0])]
 
@@ -173,20 +190,20 @@ class YoloDetector(Node):
                             int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
 
             # Project the 3 points
-            detection.bbox.center.position.x, \
-                detection.bbox.center.position.y, \
-                    detection.bbox.center.position.z  = project_to_3D_space(camera_model, uv_coordinates, z_value)
+            detection3d.bbox.center.position.x, \
+                detection3d.bbox.center.position.y, \
+                    detection3d.bbox.center.position.z  = project_to_3D_space(camera_model, uv_coordinates, z_value)
             
             min_pt_3d = project_to_3D_space(camera_model, min_pt, z_value)
             max_pt_3d = project_to_3D_space(camera_model, max_pt, z_value)
             
-            # Add an orientation to remove the tilt of the camera and place the bbox orizontally
-            detection.bbox.center.orientation = q_to_apply
+            # Add an orientation to remove the tilt of the camera and place the bbox horizontally
+            detection3d.bbox.center.orientation = q_to_apply
 
             # Compute the size of the bounding box looking at the projections of the two vertexes
-            detection.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
-            detection.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
-            detection.bbox.size.z = self.class_to_z_val[label]
+            detection3d.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
+            detection3d.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
+            detection3d.bbox.size.z = self.class_to_z_val[label]
 
             # get track id
             track_id = ""
@@ -197,7 +214,8 @@ class YoloDetector(Node):
             hypothesis = ObjectHypothesisWithPose()
             hypothesis.id = label
             hypothesis.score = score
-            detection.results.append(hypothesis)
+            detection3d.results.append(hypothesis)
+            detection2d.results.append(hypothesis)
 
             if(self.get_parameter('show_debug').value):
                 # draw boxes for debug
@@ -217,10 +235,12 @@ class YoloDetector(Node):
                             1, color, 1, cv2.LINE_AA)
 
             # append msg
-            detections_msg.detections.append(detection)
+            detections3d_msg.detections.append(detection3d)
+            detections2d_msg.detections.append(detection2d)
 
         # publish detections
-        self._pub.publish(detections_msg)
+        self._pub.publish(detections3d_msg)
+        self._pub2d.publish(detections2d_msg)
 
         if(self.get_parameter('show_debug').value):
             # Display image
@@ -239,6 +259,7 @@ def main(args=None):
         rclpy.spin(yolo_detector)
     except:
         print("Yolo Detector Terminated")
+
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
