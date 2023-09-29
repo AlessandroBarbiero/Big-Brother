@@ -22,6 +22,9 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <bb_tracker/BYTETracker.h>
+#include <bb_tracker/dataType.h>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -54,7 +57,7 @@ class BBTracker : public rclcpp::Node
     void publish_stracks(vector<STrack*>& output_stracks);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
 
-    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat);
+    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat, VIEW_MATRIX vMat);
 
   private:
 

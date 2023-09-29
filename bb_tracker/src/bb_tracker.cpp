@@ -311,17 +311,46 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   cam_model.fromCameraInfo(camera_info);
   auto projMat = cam_model.projectionMatrix();
   auto trackedObj = this->_tracker.getTrackedObj();
+
+  geometry_msgs::msg::TransformStamped tf_result;
+  try {
+    tf_result = _tf_buffer.lookupTransform(camera_info->header.frame_id, _fixed_frame, rclcpp::Time(0));
+  } catch (tf2::TransformException& ex) {
+    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << camera_info->header.frame_id);
+    return;
+  }
+
+  tf2::Quaternion q(
+    tf_result.transform.rotation.x,
+    tf_result.transform.rotation.y,
+    tf_result.transform.rotation.z,
+    tf_result.transform.rotation.w
+  );
+  tf2::Vector3 p(
+    tf_result.transform.translation.x,
+    tf_result.transform.translation.y,
+    tf_result.transform.translation.z
+  );
+
+  tf2::Matrix3x3 rot_m(q);
   
+  VIEW_MATRIX vMat;
+  vMat << rot_m[0][0], rot_m[0][1], rot_m[0][2], p.x(),
+          rot_m[1][0], rot_m[1][1], rot_m[1][2], p.y(),
+          rot_m[2][0], rot_m[2][1], rot_m[2][2], p.z(),
+          0.0,          0.0,          0.0,        1.0;
+
+
   try
   {
     cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
     for(auto det : detection_msg->detections)
       cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
-              Size(det.bbox.size_x, det.bbox.size_y), 0, 0,
+              Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
               360, CV_RGB(255, 0, 0),
               1, LINE_AA);
     for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, projMat);
+      draw_ellipse(cv_ptr, obj, projMat, vMat);
 
     cv::imshow("Image Window", cv_ptr->image);
     cv::waitKey(1);
@@ -334,8 +363,90 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   return;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat){
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat, VIEW_MATRIX vMat){
+  // To create a matrix representing the quadric of the ellipsoid use 
+  // [1/a 0 0 cx]
+  // [0 1/b 0 cy]
+  // [0 0 1/c cz]
+  // [0  0  0  1]
+  // With a b c semiaxes
 
+  // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
+
+  // Create an Eigen 3x4 matrix and copy the values from cv::Matx34d
+  Eigen::Matrix<float, 3, 4, Eigen::RowMajor> P;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = float(projMat(i, j));
+      }
+  }
+
+  // 1 >>> Transform bbox into ellipsoid 3D
+  float a,b,c,cx,cy,cz;
+
+  vector<float> minwdh = obj.minwdh;
+
+  a = minwdh[3]/2;
+  b = minwdh[4]/2;
+  c = minwdh[5]/2;
+
+  cx = minwdh[0] + a;
+  cy = minwdh[1] + b;
+  cz = minwdh[2] + c;
+
+  Eigen::Matrix<float, 4, 4, Eigen::RowMajor> quadric;
+  quadric << 1.0f/a, 0.0f, 0.0f, cx,
+            0.0f, 1.0f/b, 0.0f, cy,
+            0.0f, 0.0f, 1.0f/c, cz,
+            0.0f, 0.0f, 0.0f, 1.0f;
+
+
+  // 2 >>> Transform Ellipsoid 3D in ellipse 2D
+  float ea, eb, ecx, ecy, theta; // Variables of the ellipse
+  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> conic;
+  // Eigen::Matrix<float, 3, 3, Eigen::RowMajor> adj_conic;
+  conic = P * vMat * quadric * vMat.transpose() * P.transpose();
+  // conic = adj_conic * 1.0/adj_conic.determinant();
+
+
+  // 3 >>> Compute parameters from conic form of ellipse
+  float A,B,C,D,E,F;
+  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> M0;
+  Eigen::Matrix<float, 2, 2, Eigen::RowMajor> M;
+
+  A = conic(0,0);
+  B = conic(0,1)+conic(1,0);
+  C = conic(1,1);
+  D = conic(0,2)+conic(2,0);
+  E = conic(1,2)+conic(2,1);
+  F = conic(2,2);
+
+  M0 << F, D/2.0f, E/2.0f,
+        D/2.0f, A, B/2.0f,
+        E/2.0f, B/2.0f, C;
+
+  M <<  A, B/2.0f,
+        B/2.0f, C;
+
+  Eigen::EigenSolver<Eigen::Matrix<float, 2, 2, Eigen::RowMajor>> solver(M);
+  auto eigenvalues = solver.eigenvalues().real();
+
+  ea = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(0)));
+  eb = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(1)));
+  ecx = (B*E - 2.0f*C*D) / (4.0f*A*C - B*B);
+  ecy = (B*D - 2.0f*A*E) / (4.0f*A*C - B*B);
+  theta = atan(B / (A - C)) / 2.0f;
+
+
+  std::cout << "quadric: \n" << quadric << "\n conic: \n" << conic << "\n\tCenter: (" << ecx << " , " << ecy << ")" << std::endl;
+
+  // 4 >>> Draw the ellipse
+  if (ecx-ea > 0 && ecx+ea < image_ptr->image.rows && ecy-eb > 0 && ecy+eb < image_ptr->image.cols){
+    cv::ellipse(image_ptr->image, Point(ecx, ecy),
+                Size(ea, eb), theta, 0,
+                360, CV_RGB(0, 0, 255),
+                1, LINE_AA);
+  }
 }
 // %%%%%%%%%% Visualization
 
@@ -476,11 +587,12 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
 
 int main(int argc, char * argv[])
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<BBTracker>());
-  rclcpp::shutdown();
-  #ifdef DEBUG
-  getchar();
-  #endif
+  try{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<BBTracker>());
+    rclcpp::shutdown();
+  }catch (...){
+    getchar();
+  }
   return 0;
 }
