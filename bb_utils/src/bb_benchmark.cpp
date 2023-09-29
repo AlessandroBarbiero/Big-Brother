@@ -594,6 +594,8 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 
 // %%%%%%%%%%%%%%%%%% main part %%%%%%%%%%%%%%%
 
+// TODO: add save all data to file csv that saves all tracked objects and ground truth
+
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
   int objects_to_detect, false_positive, true_positive, missed;
