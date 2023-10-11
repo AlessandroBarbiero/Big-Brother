@@ -406,7 +406,7 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
     //           1, LINE_AA);
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, P, vMat, camera_info->header);
+      draw_ellipse(cv_ptr, obj, P, vMat);
     // for(auto det : det_mess->detections){
     //   draw_ellipse(cv_ptr, det, P, proj_matrix, transform, cam_model);
     // }
@@ -456,7 +456,7 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
     cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, P, vMat, camera_info->header);
+      draw_ellipse(cv_ptr, obj, P, vMat);
 
     std::string window_name = "Image Window";
     cv::imshow(window_name, cv_ptr->image);
@@ -586,7 +586,7 @@ Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen
   return Q_star;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat, std_msgs::msg::Header header){
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
 
   // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
 
@@ -684,40 +684,6 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
                 -1, LINE_AA);
   }
 }
-
-// TODO: delete
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, vision_msgs::msg::Detection3D det, PROJ_MATRIX P, TRANSFORMATION vMat, tf2::Transform view_transform, image_geometry::PinholeCameraModel cam_model){
-
-  float ea, eb, theta; // Variables of the ellipse
-  ea = 50;
-  eb = 50;
-  theta = 0;
-  cv::Point2d ec;
-  cv::Point3d c(det.bbox.center.position.x, det.bbox.center.position.y, det.bbox.center.position.z);
-
-  std::cout << "\tBefore Project: (" << c.x << " , " << c.y << " , "  << c.z << ")" << endl;
-  ec = cam_model.project3dToPixel(c);
-
-  // Eigen::Vector4f cvec, projected;
-  // cvec << c.x, c.y, c.z, 1;
-  // projected = vMat * cvec;
-  // ec.x = projected(0)/projected(3);
-  // ec.y = projected(1)/projected(3);
-
-  std::cout <<
-  "\n\tCenter: (" << ec.x << " , " << ec.y << ")" << 
-  "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
-
-  // 4 >>> Draw the ellipse
-  if (ec.x-ea > 0 && ec.x+ea < image_ptr->image.rows && ec.y-eb > 0 && ec.y+eb < image_ptr->image.cols){
-    std::cout << "Ellipse in the image" << std::endl;
-    cv::ellipse(image_ptr->image, ec,
-                Size(ea, eb), theta, 0,
-                360, CV_RGB(0, 0, 255),
-                -1, LINE_AA);
-  }
-}
-
 
 
 // %%%%%%%%%% Visualization

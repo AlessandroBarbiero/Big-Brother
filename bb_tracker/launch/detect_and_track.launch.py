@@ -33,7 +33,7 @@ def generate_launch_description():
         ],
         parameters=[config],
         output='screen',
-        prefix=["xterm -font 10x20 -e gdb -ex run --args"]
+        prefix=["xterm -font 10x20 -e gdb -ex run --args"] # TODO: remove gdb
         #prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
     )
 

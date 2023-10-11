@@ -59,8 +59,7 @@ class BBTracker : public rclcpp::Node
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
 
     TRANSFORMATION getViewMatrix(std::string from_tf, std::string camera_tf);
-    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX projMat, TRANSFORMATION vMat, std_msgs::msg::Header header);
-    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, vision_msgs::msg::Detection3D det, PROJ_MATRIX P, TRANSFORMATION vMat, tf2::Transform view_transform, image_geometry::PinholeCameraModel cam_model);
+    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX projMat, TRANSFORMATION vMat);
   
     void test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
   private:
