@@ -45,11 +45,13 @@ BBTracker::BBTracker()
   _camera_info.subscribe(this, "bytetrack/camera_info");
   _camera_image.subscribe(this, "bytetrack/camera_image");
 
-  _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-  _detection2d, _camera_info, _camera_image, 100);
+  // _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+  // _detection2d, _camera_info, _camera_image, 100);
 
-  // Register the callback function
-  _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+  // _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+
+  _test_projection = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(_camera_info, _camera_image, 100);
+  _test_projection->registerCallback(std::bind(&BBTracker::test_ellipse_project, this, std::placeholders::_1, std::placeholders::_2));
 
   // _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
   //         "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
@@ -93,7 +95,8 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
     (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
   #endif
 
-  publish_stracks(output_stracks);
+  // TODO: decomment this
+  // publish_stracks(output_stracks);
 
   // Show Progress
   #ifndef DEBUG
@@ -136,7 +139,7 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects){
   #endif
 }
 
-void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
+void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, const std::string& new_frame){
   std::string old_frame = old_message->header.frame_id;
   geometry_msgs::msg::TransformStamped tf_result;
   try {
@@ -211,21 +214,21 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
 }
 
 void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects) {
-    auto detections = detections_message->detections;
-    objects.reserve(detections.size());
-    for(auto detection : detections){
-      // Decode
-      Object3D obj;
-      obj.box = detection.bbox;
-      obj.label = BYTETracker::class_to_int[detection.results[0].id];
-      obj.prob = detection.results[0].score;
-      obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
+  auto detections = detections_message->detections;
+  objects.reserve(detections.size());
+  for(auto detection : detections){
+    // Decode
+    Object3D obj;
+    obj.box = detection.bbox;
+    obj.label = BYTETracker::class_to_int[detection.results[0].id];
+    obj.prob = detection.results[0].score;
+    obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
-      objects.push_back(obj);
-    }
-    #ifdef DEBUG
-      std::cout << "Number of objects: " << objects.size() << std::endl;
-    #endif
+    objects.push_back(obj);
+  }
+  #ifdef DEBUG
+    std::cout << "Number of objects: " << objects.size() << std::endl;
+  #endif
 }
 
 void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
@@ -305,19 +308,180 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
   update_tracker(objects2D);
 }
 
+// TODO: delete
+// Function that prints the posizion of the mouse on click over image
+void mouse_callback(int event, int x, int y, int flags, void* userdata)
+{
+  if  ( event == EVENT_LBUTTONDOWN )
+  {
+    cout << "----> Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+  }
+}
+
 void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
   cv_bridge::CvImagePtr cv_ptr;
   image_geometry::PinholeCameraModel cam_model;
   cam_model.fromCameraInfo(camera_info);
   auto projMat = cam_model.projectionMatrix();
-  auto trackedObj = this->_tracker.getTrackedObj();
+
+  std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
+  // TODO: delete Fake points to test the draw
+  std::vector<STrack> trackedObj;
+  trackedObj.push_back(real_trackedObj[0]);
+  trackedObj[0].minwdh = {-30,15,0,2,2,2};
+
+
+  std::vector<STrack*> trackedObj_draw;
+  for(size_t i = 0 ; i< trackedObj.size(); i++)
+    trackedObj_draw.push_back(&trackedObj[i]);
+  publish_stracks(trackedObj_draw);
+
+  // auto det_mess = std::make_shared<vision_msgs::msg::Detection3DArray>();
+  // convert_into_detections(trackedObj_draw, det_mess.get());
+  // change_frame(det_mess, camera_info->header.frame_id);
+  // det_mess->header.stamp = camera_info->header.stamp;
+  // _det_publisher->publish(*det_mess.get());
+  // ---------
+
+  TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+
+  //std::cout << "View matrix, inverse of camera matrix: \n" << vMat << std::endl;
+
+  // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
+  // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
+  // P = [K | 0]
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
+
+  // K_MATRIX K;
+  // int k_index = 0;
+  // for (int i = 0; i < 3; ++i) {
+  //     for (int j = 0; j < 3; ++j) {
+  //         K(i, j) = camera_info->k[k_index];
+  //         k_index++;
+  //     }
+  // }
+
+  // Try to compute a Projection matrix from the fixed frame
+  // PROJ_MATRIX RT, P;
+  // RT << rot_m[0][0], rot_m[0][1], rot_m[0][2], p.x(),
+  //       rot_m[1][0], rot_m[1][1], rot_m[1][2], p.y(),
+  //       rot_m[2][0], rot_m[2][1], rot_m[2][2], p.z();
+  // P = K * RT;
+
+  // std::cout << "K matrix: \n" << K << "\nP matrix: \n" << P << std::endl;
+
+  // Try to use a 4x4 Projection matrix 
+  // TRANSFORMATION proj_matrix;
+  // proj_matrix.setZero();
+  // auto cx = static_cast<float>(camera_info->p[2]);
+  // auto cy = static_cast<float>(camera_info->p[6]);
+  // auto fx = static_cast<float>(camera_info->p[0]);
+  // auto fy = static_cast<float>(camera_info->p[5]);
+  // float far_plane = 100.0f;
+  // float near_plane = 0.01f;
+  // proj_matrix(0,0) = 2.0f * fx / camera_info->width;
+  // proj_matrix(1,1) = 2.0f * fy / camera_info->height;
+  // proj_matrix(0,2) = 2.0f * (0.5f - cx / camera_info->width);
+  // proj_matrix(1,2) = 2.0f * (cy / camera_info->height - 0.5f);
+  // proj_matrix(2,2) = -(far_plane + near_plane) / (far_plane - near_plane);
+  // proj_matrix(2,3) = -2.0f * far_plane * near_plane / (far_plane - near_plane);
+  // proj_matrix(3,2) = -1;
+
+  try
+  {
+    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
+
+    // Draw ellipses for incoming detections
+    // for(auto det : detection_msg->detections)
+    //   cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
+    //           Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
+    //           360, CV_RGB(255, 0, 0),
+    //           1, LINE_AA);
+    // Draw ellipses for tracked objects
+    for(auto obj :trackedObj)
+      draw_ellipse(cv_ptr, obj, P, vMat, camera_info->header);
+    // for(auto det : det_mess->detections){
+    //   draw_ellipse(cv_ptr, det, P, proj_matrix, transform, cam_model);
+    // }
+    std::string window_name = "Image Window";
+    cv::imshow(window_name, cv_ptr->image);
+    cv::setMouseCallback(window_name, mouse_callback);
+    cv::waitKey(1);
+
+  }
+  catch (cv_bridge::Exception& e)
+  {
+      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+  }
+  return;
+}
+
+void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
+  cv_bridge::CvImagePtr cv_ptr;
+  std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
+  // TODO: delete Fake points to test the draw
+  std::vector<STrack> trackedObj;
+  trackedObj.push_back(real_trackedObj[0]);
+  trackedObj[0].minwdh = {-30,15,0,2,2,2};
+
+  std::vector<STrack*> trackedObj_draw;
+  for(size_t i = 0 ; i< trackedObj.size(); i++)
+    trackedObj_draw.push_back(&trackedObj[i]);
+  publish_stracks(trackedObj_draw);
+  // ---------
+
+  TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+
+  // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
+  // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
+  // P = [K | 0]
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
+
+  try
+  {
+    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
+    // Draw ellipses for tracked objects
+    for(auto obj :trackedObj)
+      draw_ellipse(cv_ptr, obj, P, vMat, camera_info->header);
+
+    std::string window_name = "Image Window";
+    cv::imshow(window_name, cv_ptr->image);
+    cv::setMouseCallback(window_name, mouse_callback);
+    cv::waitKey(1);
+
+  }
+  catch (cv_bridge::Exception& e)
+  {
+      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+  }
+  return;
+}
+
+//TODO: update comment.
+// Proven to be correct -> can translate a single point in the right place
+TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_tf){
+  TRANSFORMATION vMat;
 
   geometry_msgs::msg::TransformStamped tf_result;
   try {
-    tf_result = _tf_buffer.lookupTransform(camera_info->header.frame_id, _fixed_frame, rclcpp::Time(0));
+    tf_result = _tf_buffer.lookupTransform(camera_tf, from_tf, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
-    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << camera_info->header.frame_id);
-    return;
+    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << from_tf << " - " << camera_tf);
+    return vMat.setZero();
   }
 
   tf2::Quaternion q(
@@ -334,120 +498,228 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
   tf2::Matrix3x3 rot_m(q);
   
-  VIEW_MATRIX vMat;
+  // vMat = [Rot  | center_of_other_tf_in_new_tf]
+  //        [0    |               1             ]
   vMat << rot_m[0][0], rot_m[0][1], rot_m[0][2], p.x(),
           rot_m[1][0], rot_m[1][1], rot_m[1][2], p.y(),
           rot_m[2][0], rot_m[2][1], rot_m[2][2], p.z(),
-          0.0,          0.0,          0.0,        1.0;
+          0.0,          0.0,          0.0,       1.0;  
 
+  // Same as doing these operations to find view Matrix starting from the inverse transform
+  // TRANSFORMATION cameraMat, vMat , rotMat, transMat;
+  // transMat << 1.0, 0.0, 0.0, p.x(),
+  //             0.0, 1.0, 0.0, p.y(),
+  //             0.0, 0.0, 1.0, p.z(),
+  //             0.0, 0.0, 0.0, 1.0;
+  // rotMat << rot_m[0][0], rot_m[0][1], rot_m[0][2], 0.0,
+  //           rot_m[1][0], rot_m[1][1], rot_m[1][2], 0.0,
+  //           rot_m[2][0], rot_m[2][1], rot_m[2][2], 0.0,
+  //           0.0,          0.0,          0.0,       1.0;
+  // cameraMat = transMat * rotMat;     
+  // vMat = cameraMat.inverse();  
 
-  try
-  {
-    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
-    for(auto det : detection_msg->detections)
-      cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
-              Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
-              360, CV_RGB(255, 0, 0),
-              1, LINE_AA);
-    for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, projMat, vMat);
-
-    cv::imshow("Image Window", cv_ptr->image);
-    cv::waitKey(1);
-
-  }
-  catch (cv_bridge::Exception& e)
-  {
-      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
-  }
-  return;
+  return vMat;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat, VIEW_MATRIX vMat){
-  // To create a matrix representing the quadric of the ellipsoid use 
-  // [1/a 0 0 cx]
-  // [0 1/b 0 cy]
-  // [0 0 1/c cz]
-  // [0  0  0  1]
-  // With a b c semiaxes
+/**
+ * Compute center, axes lengths, and orientation of an ellipse in dual form.
+ *
+ * @param C The ellipse in dual form [3x3].
+ *
+ * @return A tuple containing:
+ *   - centre: Ellipse center in Cartesian coordinates [2x1].
+ *   - axes: Ellipse axes lengths [2x1].
+ *   - R_matrix: Ellipse orientation as a rotation matrix [2x2].
+ */
+std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f C) {
+  if (C(2, 2) != 0) {
+      C /= -C(2, 2);
+  }
+
+  // Take the first two elements of last column and put in column vector
+  Eigen::Vector2f centre = -C.block<2, 1>(0, 2);
+
+  // T = [  I | -centre ]
+  //     [  0 |     1   ]
+  Eigen::Matrix3f T;
+  T << Eigen::Matrix2f::Identity(), -centre, 0, 0, 1;
+
+  Eigen::Matrix3f C_centre = T * C * T.transpose();
+  C_centre = 0.5 * (C_centre + C_centre.transpose());
+
+  Eigen::EigenSolver<Eigen::Matrix2f> eigensolver(C_centre.block<2, 2>(0, 0));
+  Eigen::Vector2f D = eigensolver.eigenvalues().real().cwiseSqrt();
+  Eigen::Matrix2f V = eigensolver.eigenvectors().real();
+
+  // cout << "Ellipse parameters:" << 
+  //       "\n\tcentre:\n" << centre << 
+  //       "\n\tT:\n" << T <<
+  //       "\n\tD:\n" << D <<
+  //       "\n\tV:\n" << V << endl;
+
+  return std::make_tuple(centre, D, V);
+}
+
+/**
+ * Compose a dual ellipsoid matrix given axes, rotation matrix, and center.
+ *
+ * @param axes   A vector of axis lengths.
+ * @param R      The rotation matrix.
+ * @param center The center vector.
+ * @return       The composed dual ellipsoid matrix.
+ */
+Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen::Matrix3f& R, const Eigen::Vector3f& center) {
+  Eigen::Matrix4f Q;
+  Q.setIdentity();
+  for (int i = 0; i < 3; ++i) {
+    Q(i, i) = axes[i] * axes[i];
+  }
+  Q(3, 3) = -1.0;
+
+  Eigen::Matrix4f Re_w = Eigen::Matrix4f::Identity();
+  Re_w.block<3, 3>(0, 0) = R.transpose();
+
+  Eigen::Matrix4f T_center_inv = Eigen::Matrix4f::Identity();
+  T_center_inv.block<3, 1>(0, 3) = center;
+
+  Eigen::Matrix4f Q_star = T_center_inv * Re_w.transpose() * Q * Re_w * T_center_inv.transpose();
+  return Q_star;
+}
+
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat, std_msgs::msg::Header header){
 
   // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
 
-  // Create an Eigen 3x4 matrix and copy the values from cv::Matx34d
-  Eigen::Matrix<float, 3, 4, Eigen::RowMajor> P;
-  for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 4; ++j) {
-          P(i, j) = float(projMat(i, j));
-      }
-  }
+  // The object is in the _fixed_frame tf, I want to convert its coordinate into camera frame before multiply for projection matrix
 
   // 1 >>> Transform bbox into ellipsoid 3D
-  float a,b,c,cx,cy,cz;
+  float w,d,h,a,b,c,cx,cy,cz;
 
   vector<float> minwdh = obj.minwdh;
 
-  a = minwdh[3]/2;
-  b = minwdh[4]/2;
-  c = minwdh[5]/2;
+  w = minwdh[3];
+  d = minwdh[4];
+  h = minwdh[5];
 
-  cx = minwdh[0] + a;
-  cy = minwdh[1] + b;
-  cz = minwdh[2] + c;
+  cx = minwdh[0] + w/2;
+  cy = minwdh[1] + d/2;
+  cz = minwdh[2] + h/2;
 
-  Eigen::Matrix<float, 4, 4, Eigen::RowMajor> quadric;
-  quadric << 1.0f/a, 0.0f, 0.0f, cx,
-            0.0f, 1.0f/b, 0.0f, cy,
-            0.0f, 0.0f, 1.0f/c, cz,
-            0.0f, 0.0f, 0.0f, 1.0f;
+  // std::cout << 
+  //     "Center in fixed frame: (" << cx << " , " << cy << " , " << cz << ")" <<
+  //     "\nSizes in fixed frame: (" << w << " , " << d << " , " << h << ")" << std::endl;
 
+  // Get semi-axes
+  a = w / 2.0;
+  b = d / 2.0;
+  c = h / 2.0;
+
+  // Now I have cx,cy,cz, a,b,c in the fixed frame
+  std::vector<float> semi_axis = {a,b,c};
+  tf2::Quaternion quat;
+  quat.setRPY(0,0,obj.theta);
+  tf2::Matrix3x3 rot_ellipsoid(quat);
+  Eigen::Matrix<float,3,3,Eigen::RowMajor> R;
+  R <<  rot_ellipsoid[0][0], rot_ellipsoid[0][1], rot_ellipsoid[0][2],
+        rot_ellipsoid[1][0], rot_ellipsoid[1][1], rot_ellipsoid[1][2],
+        rot_ellipsoid[2][0], rot_ellipsoid[2][1], rot_ellipsoid[2][2];
+  Eigen::Vector3f center_vec;
+  center_vec << cx,cy,cz;
+  // This is the dual ellipsoid in fixed_frame
+  Eigen::Matrix4f dual_ellipsoid_fix_f = composeDualEllipsoid(semi_axis, R, center_vec);
+  Eigen::Matrix4f dual_ellipsoid;
+  dual_ellipsoid = vMat * dual_ellipsoid_fix_f * vMat.transpose();
+  // Filter out objects behind the camera
+  if(dual_ellipsoid(2,3)/dual_ellipsoid(3,3) < 0)
+    return;
 
   // 2 >>> Transform Ellipsoid 3D in ellipse 2D
-  float ea, eb, ecx, ecy, theta; // Variables of the ellipse
-  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> conic;
-  // Eigen::Matrix<float, 3, 3, Eigen::RowMajor> adj_conic;
-  conic = P * vMat * quadric * vMat.transpose() * P.transpose();
-  // conic = adj_conic * 1.0/adj_conic.determinant();
 
+  Eigen::Matrix3f dual_ellipse;
+  dual_ellipse = P * dual_ellipsoid * P.transpose();
 
   // 3 >>> Compute parameters from conic form of ellipse
-  float A,B,C,D,E,F;
-  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> M0;
-  Eigen::Matrix<float, 2, 2, Eigen::RowMajor> M;
+  float ea, eb, ecx, ecy, theta; // Variables of the ellipse
 
-  A = conic(0,0);
-  B = conic(0,1)+conic(1,0);
-  C = conic(1,1);
-  D = conic(0,2)+conic(2,0);
-  E = conic(1,2)+conic(2,1);
-  F = conic(2,2);
+  // Method used in 3D Object Localisation from Multi-view Image Detections (TPAMI 2017)
+  std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> ellipse_params = dualEllipseToParameters(dual_ellipse);
+  Eigen::Vector2f e_center = std::get<0>(ellipse_params);
+  Eigen::Vector2f e_axis = std::get<1>(ellipse_params);
+  Eigen::Matrix2f e_rotmat = std::get<2>(ellipse_params);
+  // cout<<"ellipse center:\n"<<e_center<<
+  //       "\nellipse axis:\n" <<e_axis <<
+  //       "\nellipse rotation matrix:\n" << e_rotmat << endl;
+  ecx = e_center(0);
+  ecy = e_center(1);
+  ea = e_axis(0);
+  eb = e_axis(1);
+  theta = atan2(e_rotmat(1, 0), e_rotmat(0, 0));
+  // cout << "theta: \n" << theta << endl;
 
-  M0 << F, D/2.0f, E/2.0f,
-        D/2.0f, A, B/2.0f,
-        E/2.0f, B/2.0f, C;
-
-  M <<  A, B/2.0f,
-        B/2.0f, C;
-
-  Eigen::EigenSolver<Eigen::Matrix<float, 2, 2, Eigen::RowMajor>> solver(M);
-  auto eigenvalues = solver.eigenvalues().real();
-
-  ea = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(0)));
-  eb = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(1)));
-  ecx = (B*E - 2.0f*C*D) / (4.0f*A*C - B*B);
-  ecy = (B*D - 2.0f*A*E) / (4.0f*A*C - B*B);
-  theta = atan(B / (A - C)) / 2.0f;
+  // Ensure theta is in the range [-pi, pi]
+  if (theta < -M_PI) {
+      theta += 2 * M_PI;
+  } else if (theta > M_PI) {
+      theta -= 2 * M_PI;
+  }
+  //std::cout << "third ----> axis = " << ea << " , " << eb << " | theta = " << theta << endl;
 
 
-  std::cout << "quadric: \n" << quadric << "\n conic: \n" << conic << "\n\tCenter: (" << ecx << " , " << ecy << ")" << std::endl;
+  // std::cout << 
+  //   "dual ellipsoid: \n" << dual_ellipsoid << 
+  //   "\ndual ellipse: \n" << dual_ellipse << 
+  //   "\n\tCenter: (" << ecx << " , " << ecy << ")" << 
+  //   "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
+
+  if(ea < 0 || eb < 0){
+    return;
+  }
 
   // 4 >>> Draw the ellipse
-  if (ecx-ea > 0 && ecx+ea < image_ptr->image.rows && ecy-eb > 0 && ecy+eb < image_ptr->image.cols){
+  if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
+    std::cout << "Ellipse in the image" << std::endl;
     cv::ellipse(image_ptr->image, Point(ecx, ecy),
                 Size(ea, eb), theta, 0,
                 360, CV_RGB(0, 0, 255),
-                1, LINE_AA);
+                -1, LINE_AA);
   }
 }
+
+// TODO: delete
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, vision_msgs::msg::Detection3D det, PROJ_MATRIX P, TRANSFORMATION vMat, tf2::Transform view_transform, image_geometry::PinholeCameraModel cam_model){
+
+  float ea, eb, theta; // Variables of the ellipse
+  ea = 50;
+  eb = 50;
+  theta = 0;
+  cv::Point2d ec;
+  cv::Point3d c(det.bbox.center.position.x, det.bbox.center.position.y, det.bbox.center.position.z);
+
+  std::cout << "\tBefore Project: (" << c.x << " , " << c.y << " , "  << c.z << ")" << endl;
+  ec = cam_model.project3dToPixel(c);
+
+  // Eigen::Vector4f cvec, projected;
+  // cvec << c.x, c.y, c.z, 1;
+  // projected = vMat * cvec;
+  // ec.x = projected(0)/projected(3);
+  // ec.y = projected(1)/projected(3);
+
+  std::cout <<
+  "\n\tCenter: (" << ec.x << " , " << ec.y << ")" << 
+  "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
+
+  // 4 >>> Draw the ellipse
+  if (ec.x-ea > 0 && ec.x+ea < image_ptr->image.rows && ec.y-eb > 0 && ec.y+eb < image_ptr->image.cols){
+    std::cout << "Ellipse in the image" << std::endl;
+    cv::ellipse(image_ptr->image, ec,
+                Size(ea, eb), theta, 0,
+                360, CV_RGB(0, 0, 255),
+                -1, LINE_AA);
+  }
+}
+
+
+
 // %%%%%%%%%% Visualization
 
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
@@ -456,16 +728,14 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   visualization_msgs::msg::MarkerArray path_markers;
   visualization_msgs::msg::MarkerArray text_markers;
 
+  convert_into_detections(output_stracks, &out_message);
 
-  out_message.header.stamp = get_clock()->now();
-  out_message.header.frame_id = _fixed_frame;
   poses_message.header = out_message.header;
 
   path_markers.markers.clear();
   text_markers.markers.clear();
   path_markers.markers.reserve(output_stracks.size());
   text_markers.markers.reserve(output_stracks.size());
-  out_message.detections.reserve(output_stracks.size());
   poses_message.poses.reserve(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
@@ -484,9 +754,36 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
                 << std::endl;
     #endif
 
+    auto single_det = out_message.detections[i];
+
+    // Publish a path for each track, with relative text
+    visualization_msgs::msg::Marker text;
+    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
+    text.pose.position.z += single_det.bbox.size.z/2;
+    path_markers.markers.push_back(path_marker);
+    text_markers.markers.push_back(text);
+    poses_message.poses.push_back(single_det.bbox.center);
+  }
+
+  _det_publisher->publish(out_message);
+  _det_poses_publisher->publish(poses_message);
+  _path_publisher->publish(path_markers);
+  _text_publisher->publish(text_markers);
+
+}
+
+void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message){
+  out_message->header.stamp = get_clock()->now();
+  out_message->header.frame_id = _fixed_frame;
+  out_message->detections.reserve(in_stracks.size());
+  for (unsigned int i = 0; i < in_stracks.size(); i++)
+  {
+    auto current_track = in_stracks[i];
+    vector<float> minwdh = current_track->minwdh;
+
     // Show tracking
     vision_msgs::msg::Detection3D single_det = vision_msgs::msg::Detection3D();
-    single_det.header = out_message.header;
+    single_det.header = out_message->header;
     single_det.is_tracking = current_track->is_activated;
     single_det.tracking_id = current_track->track_id;
     single_det.bbox.center.position.x = minwdh[0] + minwdh[3]/2;
@@ -506,21 +803,9 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     hypothesis.score = current_track->score;
     single_det.results.push_back(hypothesis);
 
-    out_message.detections.push_back(single_det);
-    // Publish a path for each track, with relative text
-    visualization_msgs::msg::Marker text;
-    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
-    text.pose.position.z += single_det.bbox.size.z/2;
-    path_markers.markers.push_back(path_marker);
-    text_markers.markers.push_back(text);
-    poses_message.poses.push_back(single_det.bbox.center);
+    out_message->detections.push_back(single_det);
   }
-
-  _det_publisher->publish(out_message);
-  _det_poses_publisher->publish(poses_message);
-  _path_publisher->publish(path_markers);
-  _text_publisher->publish(text_markers);
-
+  return;
 }
 
 void initPathMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
@@ -594,5 +879,6 @@ int main(int argc, char * argv[])
   }catch (...){
     getchar();
   }
+  getchar();
   return 0;
 }

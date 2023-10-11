@@ -39,7 +39,8 @@ typedef struct t {
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> DYNAMICM;
 
 
-typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> VIEW_MATRIX;
+typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> TRANSFORMATION;
+typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
 
 
 #include <vision_msgs/msg/bounding_box3_d.hpp>
