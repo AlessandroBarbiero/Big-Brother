@@ -425,16 +425,16 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
 void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
   cv_bridge::CvImagePtr cv_ptr;
-  std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
   // TODO: delete Fake points to test the draw
-  std::vector<STrack> trackedObj;
-  trackedObj.push_back(real_trackedObj[0]);
-  trackedObj[0].minwdh = {-30,15,0,2,2,2};
+  // std::vector<STrack> trackedObj;
+  // trackedObj.push_back(real_trackedObj[0]);
+  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
 
-  std::vector<STrack*> trackedObj_draw;
-  for(size_t i = 0 ; i< trackedObj.size(); i++)
-    trackedObj_draw.push_back(&trackedObj[i]);
-  publish_stracks(trackedObj_draw);
+  // std::vector<STrack*> trackedObj_draw;
+  // for(size_t i = 0 ; i< trackedObj.size(); i++)
+  //   trackedObj_draw.push_back(&trackedObj[i]);
+  // publish_stracks(trackedObj_draw);
   // ---------
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
@@ -586,6 +586,22 @@ Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen
   return Q_star;
 }
 
+Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angle){
+  Eigen::Matrix<float,3,3,Eigen::RowMajor> R;
+  // Quaternion for general form
+  // tf2::Quaternion quat;
+  // quat.setRPY(0,0,yaw_angle);
+  // tf2::Matrix3x3 rot_ellipsoid(quat);
+  // R <<  rot_ellipsoid[0][0], rot_ellipsoid[0][1], rot_ellipsoid[0][2],
+  //       rot_ellipsoid[1][0], rot_ellipsoid[1][1], rot_ellipsoid[1][2],
+  //       rot_ellipsoid[2][0], rot_ellipsoid[2][1], rot_ellipsoid[2][2];
+
+  R <<  cos(yaw_angle), -sin(yaw_angle), 0,
+        sin(yaw_angle), cos(yaw_angle), 0,
+        0, 0, 1;
+  return R;
+}
+
 void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
 
   // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
@@ -615,14 +631,9 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   c = h / 2.0;
 
   // Now I have cx,cy,cz, a,b,c in the fixed frame
+
   std::vector<float> semi_axis = {a,b,c};
-  tf2::Quaternion quat;
-  quat.setRPY(0,0,obj.theta);
-  tf2::Matrix3x3 rot_ellipsoid(quat);
-  Eigen::Matrix<float,3,3,Eigen::RowMajor> R;
-  R <<  rot_ellipsoid[0][0], rot_ellipsoid[0][1], rot_ellipsoid[0][2],
-        rot_ellipsoid[1][0], rot_ellipsoid[1][1], rot_ellipsoid[1][2],
-        rot_ellipsoid[2][0], rot_ellipsoid[2][1], rot_ellipsoid[2][2];
+  Eigen::Matrix<float,3,3,Eigen::RowMajor> R = getRotationMatrix(obj.theta);
   Eigen::Vector3f center_vec;
   center_vec << cx,cy,cz;
   // This is the dual ellipsoid in fixed_frame
