@@ -632,6 +632,11 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
 
   // Now I have cx,cy,cz, a,b,c in the fixed frame
 
+  // Filter out objects behind the camera
+  float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
+  if(check < 0)
+    return;
+
   std::vector<float> semi_axis = {a,b,c};
   Eigen::Matrix<float,3,3,Eigen::RowMajor> R = getRotationMatrix(obj.theta);
   Eigen::Vector3f center_vec;
@@ -640,9 +645,6 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   Eigen::Matrix4f dual_ellipsoid_fix_f = composeDualEllipsoid(semi_axis, R, center_vec);
   Eigen::Matrix4f dual_ellipsoid;
   dual_ellipsoid = vMat * dual_ellipsoid_fix_f * vMat.transpose();
-  // Filter out objects behind the camera
-  if(dual_ellipsoid(2,3)/dual_ellipsoid(3,3) < 0)
-    return;
 
   // 2 >>> Transform Ellipsoid 3D in ellipse 2D
 
@@ -688,11 +690,11 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
 
   // 4 >>> Draw the ellipse
   if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
-    std::cout << "Ellipse in the image" << std::endl;
+    // std::cout << "Ellipse in the image" << std::endl;
     cv::ellipse(image_ptr->image, Point(ecx, ecy),
                 Size(ea, eb), theta, 0,
                 360, CV_RGB(0, 0, 255),
-                -1, LINE_AA);
+                1, LINE_AA);
   }
 }
 
