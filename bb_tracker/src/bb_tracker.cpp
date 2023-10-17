@@ -551,6 +551,8 @@ std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParam
   Eigen::Matrix3f C_centre = T * C * T.transpose();
   C_centre = 0.5 * (C_centre + C_centre.transpose());
 
+  cout << "C_sub = \n" << C_centre.block<2, 2>(0, 0) << endl;
+
   Eigen::EigenSolver<Eigen::Matrix2f> eigensolver(C_centre.block<2, 2>(0, 0));
   Eigen::Vector2f D = eigensolver.eigenvalues().real().cwiseSqrt();
   Eigen::Matrix2f V = eigensolver.eigenvectors().real();
@@ -735,9 +737,9 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   cy = minwdh[1] + d/2;
   cz = minwdh[2] + h/2;
 
-  // std::cout << 
-  //     "Center in fixed frame: (" << cx << " , " << cy << " , " << cz << ")" <<
-  //     "\nSizes in fixed frame: (" << w << " , " << d << " , " << h << ")" << std::endl;
+  std::cout << 
+      "Center in fixed frame: (" << cx << " , " << cy << " , " << cz << ")" <<
+      "\nSizes in fixed frame: (" << w << " , " << d << " , " << h << ")" << std::endl;
 
   // Filter out objects behind the camera
   float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
