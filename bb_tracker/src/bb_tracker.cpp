@@ -426,12 +426,12 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
 void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
   cv_bridge::CvImagePtr cv_ptr;
-  std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
   // TODO: delete Fake points to test the draw
-  std::vector<STrack> trackedObj;
-  trackedObj.push_back(std::move(real_trackedObj[0]));
-  trackedObj[0].minwdh = {-30,15,0,2,2,2};
-  trackedObj[0].theta = 0;
+  // std::vector<STrack> trackedObj;
+  // trackedObj.push_back(std::move(real_trackedObj[0]));
+  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
+  // trackedObj[0].theta = 0;
 
   // std::vector<STrack*> trackedObj_draw;
   // for(size_t i = 0 ; i< trackedObj.size(); i++)
@@ -452,8 +452,6 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
           p_index++;
       }
   }
-  // cout << "projection mat:\n" << P <<
-  //       "view mat:\n"<< vMat << endl;
 
   try
   {
@@ -551,7 +549,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
 
   Eigen::Matrix<float,1,8> ellipsoid_state;
   ellipsoid_state << cx,cy,obj.theta,w/h,d/h,h,0,0;
-  Eigen::Vector4f ellipse_state = ellipseFromEllipsoidv1(ellipsoid_state, vMat, P);
+  Eigen::Vector4f ellipse_state = ellipseFromEllipsoidv2(ellipsoid_state, vMat, P);
 
   float ea, eb, ecx, ecy, theta; // Variables of the ellipse
 
@@ -559,13 +557,9 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   ecy = ellipse_state(1);
   ea = ellipse_state(2);
   eb = ellipse_state(3);
-  // ea = 50;
-  // eb = 50;
-  theta = 0;
+  theta = 0; // TODO: add theta computed from eigenvectors
 
     std::cout << 
-  //   "dual ellipsoid: \n" << dual_ellipsoid << 
-  //   "\ndual ellipse: \n" << dual_ellipse << 
     "\n\tCenter: (" << ecx << " , " << ecy << ")" << 
     "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
 
