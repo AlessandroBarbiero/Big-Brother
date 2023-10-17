@@ -450,6 +450,8 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
           p_index++;
       }
   }
+  // cout << "projection mat:\n" << P <<
+  //       "view mat:\n"<< vMat << endl;
 
   try
   {
@@ -471,8 +473,9 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
   return;
 }
 
-//TODO: update comment.
-// Proven to be correct -> can translate a single point in the right place
+// Get the view matrix that transform a tf to another 
+// vMat = [Rot  | center_of_other_tf_in_new_tf]
+//        [0    |               1             ]
 TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_tf){
   TRANSFORMATION vMat;
 
@@ -523,6 +526,7 @@ TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_
 
 /**
  * Compute center, axes lengths, and orientation of an ellipse in dual form.
+ * Method used in 3D Object Localisation from Multi-view Image Detections (TPAMI 2017)
  *
  * @param C The ellipse in dual form [3x3].
  *
@@ -602,14 +606,124 @@ Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angle){
   return R;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
-
-  // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
-
-  // The object is in the _fixed_frame tf, I want to convert its coordinate into camera frame before multiply for projection matrix
+// Transform the state into the ellipse state inside the image represented by the View Matrix and the Projection matrix
+// It uses different matrix computations, clearer than v2 but slower
+// Returns ellipse variables:
+//  - x coordinate center
+//  - y coordinate center
+//  - semi-axis a
+//  - semi-axis b
+Eigen::Vector4f ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+  // State
+  float x = state(0),
+  y =       state(1),
+  theta =   state(2),
+  l_ratio = state(3),
+  d_ratio = state(4),
+  h =       state(5);
+  // v =       state(6),
+  // w =       state(7);
 
   // 1 >>> Transform bbox into ellipsoid 3D
-  float w,d,h,a,b,c,cx,cy,cz;
+
+  float z = h/2,
+  a = l_ratio*h/2, 
+  b = d_ratio*h/2, 
+  c = h/2;
+  std::vector<float> semi_axis = {a,b,c};
+  Eigen::Matrix<float,3,3,Eigen::RowMajor> R = getRotationMatrix(theta);
+  Eigen::Vector3f center_vec;
+  center_vec << x,y,z;
+  // This is the dual ellipsoid in fixed_frame
+  Eigen::Matrix4f dual_ellipsoid_fix_f = composeDualEllipsoid(semi_axis, R, center_vec);
+  Eigen::Matrix4f dual_ellipsoid;
+  // The object is in the _fixed_frame tf, I want to convert its coordinate into camera frame before multiply for projection matrix
+  dual_ellipsoid = vMat * dual_ellipsoid_fix_f * vMat.transpose();
+
+  // 2 >>> Transform Ellipsoid 3D in ellipse 2D
+
+  Eigen::Matrix3f dual_ellipse;
+  dual_ellipse = P * dual_ellipsoid * P.transpose();
+
+  // 3 >>> Compute parameters from conic form of ellipse
+
+  std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> ellipse_params = dualEllipseToParameters(dual_ellipse);
+  Eigen::Vector2f e_center = std::get<0>(ellipse_params);
+  Eigen::Vector2f e_axis = std::get<1>(ellipse_params);
+  Eigen::Matrix2f e_rotmat = std::get<2>(ellipse_params);
+  // cout<<"ellipse center:\n"<<e_center<<
+  //       "\nellipse axis:\n" <<e_axis <<
+  //       "\nellipse rotation matrix:\n" << e_rotmat << endl;
+
+  float etheta;
+  etheta = atan2(e_rotmat(1, 0), e_rotmat(0, 0));  // Not used yet
+  // Ensure theta is in the range [-pi, pi]
+  if (etheta < -M_PI) {
+      etheta += 2 * M_PI;
+  } else if (etheta > M_PI) {
+      etheta -= 2 * M_PI;
+  }
+
+  Eigen::Vector4f result;
+  result << 
+      e_center(0),
+      e_center(1),
+      e_axis(0),
+      e_axis(1);
+  return result;
+}
+
+// Transform the state into the ellipse state inside the image represented by the View Matrix and the Projection matrix
+// It uses a single shot equation to do so.
+// Returns ellipse variables:
+//  - x coordinate center
+//  - y coordinate center
+//  - semi-axis a
+//  - semi-axis b
+Eigen::Vector4f ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+  cout << "State: \n" << state << endl;
+  Eigen::Vector4f result;
+  // State
+  float x = state(0),
+  y =       state(1),
+  theta =   state(2),
+  l_ratio = state(3),
+  d_ratio = state(4),
+  h =       state(5),
+  v =       state(6),
+  w =       state(7),
+  // View
+  vr00 = vMat(0,0),
+  vr01 = vMat(0,1),
+  vr02 = vMat(0,2),
+  vr10 = vMat(1,0),
+  vr11 = vMat(1,1),
+  vr12 = vMat(1,2),
+  vr20 = vMat(2,0),
+  vr21 = vMat(2,1),
+  vr22 = vMat(2,2),
+  vtx = vMat(0,3),
+  vty = vMat(1,3),
+  vtz = vMat(2,3),
+  // Projection
+  fx = P(0,0),
+  fy = P(1,1),
+  cx = P(0,2),
+  cy = P(1,2);
+
+  result <<
+	 ((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*(-vr20*sin(theta)+vr21*cos(theta))*(-(cx*vr20+fx*vr00)*sin(theta)+(cx*vr21+fx*vr01)*cos(theta))+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*(vr20*cos(theta)+vr21*sin(theta))*((cx*vr20+fx*vr00)*cos(theta)+(cx*vr21+fx*vr01)*sin(theta))+(1.0/4.0)*pow(h,2)*vr22*(cx*vr22+fx*vr02)-((1.0/2.0)*h*vr22+vr20*x+vr21*y+vtz)*(cx*vtz+fx*vtx+(1.0/2.0)*h*(cx*vr22+fx*vr02)+x*(cx*vr20+fx*vr00)+y*(cx*vr21+fx*vr01)))/((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-vr20*sin(theta)+vr21*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow(vr20*cos(theta)+vr21*sin(theta),2)+ (1.0/4.0)*pow(h, 2)*pow(vr22, 2) - pow((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz, 2)) ,
+	 ((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*(-vr20*sin(theta) + vr21*cos(theta))*(-(cy*vr20 + fy*vr10)*sin(theta) + (cy*vr21 + fy*vr11)*cos(theta)) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*(vr20*cos(theta) + vr21*sin(theta))*((cy*vr20 + fy*vr10)*cos(theta) + (cy*vr21 + fy*vr11)*sin(theta)) + (1.0/4.0)*pow(h, 2)*vr22*(cy*vr22 + fy*vr12) - ((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz)*(cy*vtz + fy*vty + (1.0/2.0)*h*(cy*vr22 + fy*vr12) + x*(cy*vr20 + fy*vr10) + y*(cy*vr21 + fy*vr11)))/((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-vr20*sin(theta) + vr21*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow(vr20*cos(theta) + vr21*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(vr22, 2) - pow((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz, 2)) ,
+	(1.0/2.0)*M_SQRT2*sqrt(sqrt(sqrt(pow((-1.0/4.0*pow(d_ratio,2)*pow(h,2)*pow(-(cx*vr20+fx*vr00)*sin(theta)+(cx*vr21+fx*vr01)*cos(theta),2)-1.0/4.0*pow(d_ratio,2)*pow(h,2)*pow(-(cy*vr20+fy*vr10)*sin(theta)+(cy*vr21+fy*vr11)*cos(theta),2)-1.0/4.0*pow(h,2)*pow(l_ratio,2)*pow((cx*vr20+fx*vr00)*cos(theta)+(cx*vr21+fx*vr01)*sin(theta),2)-1.0/4.0*pow(h,2)*pow(l_ratio,2)*pow((cy*vr20+fy*vr10)*cos(theta)+(cy*vr21+fy*vr11)*sin(theta),2)-1.0/4.0*pow(h,2)*pow(cx*vr22+fx*vr02,2)-1.0/4.0*pow(h,2)*pow(cy*vr22+fy*vr12,2)
+-
+sqrt((pow((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-(cx*vr20+fx*vr00)*sin(theta)+(cx*vr21+fx*vr01)*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow((cx*vr20+fx*vr00)*cos(theta)+(cx*vr21+fx*vr01)*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(cx*vr22+fx*vr02,2)-pow(cx*vtz+fx*vtx+(1.0/2.0)*h*(cx*vr22+fx*vr02)+x*(cx*vr20+fx*vr00)+y*(cx*vr21+fx*vr01),2),2)-2*((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-(cx*vr20+fx*vr00)*sin(theta)+(cx*vr21+fx*vr01)*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow((cx*vr20+fx*vr00)*cos(theta)+(cx*vr21+fx*vr01)*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(cx*vr22+fx*vr02,2)-pow(cx*vtz+fx*vtx+(1.0/2.0)*h*(cx*vr22+fx*vr02)+x*(cx*vr20+fx*vr00)+y*(cx*vr21+fx*vr01),2))*((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-(cy*vr20+fy*vr10)*sin(theta)+(cy*vr21+fy*vr11)*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow((cy*vr20+fy*vr10)*cos(theta)+(cy*vr21+fy*vr11)*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(cy*vr22+fy*vr12,2)-pow(cy*vtz+fy*vty+(1.0/2.0)*h*(cy*vr22+fy*vr12)+x*(cy*vr20+fy*vr10)+y*(cy*vr21+fy*vr11),2))+pow((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-(cy*vr20+fy*vr10)*sin(theta)+(cy*vr21+fy*vr11)*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow((cy*vr20+fy*vr10)*cos(theta)+(cy*vr21+fy*vr11)*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(cy*vr22+fy*vr12,2)-pow(cy*vtz+fy*vty+(1.0/2.0)*h*(cy*vr22+fy*vr12)+x*(cy*vr20+fy*vr10)+y*(cy*vr21+fy*vr11),2),2)+4*pow((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*(-(cx*vr20+fx*vr00)*sin(theta)+(cx*vr21+fx*vr01)*cos(theta))*(-(cy*vr20+fy*vr10)*sin(theta)+(cy*vr21+fy*vr11)*cos(theta))+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*((cx*vr20+fx*vr00)*cos(theta)+(cx*vr21+fx*vr01)*sin(theta))*((cy*vr20+fy*vr10)*cos(theta)+(cy*vr21+fy*vr11)*sin(theta))+(1.0/4.0)*pow(h,2)*(cx*vr22+fx*vr02)*(cy*vr22+fy*vr12)-(cx*vtz+fx*vtx+(1.0/2.0)*h*(cx*vr22+fx*vr02)+x*(cx*vr20+fx*vr00)+y*(cx*vr21+fx*vr01))*(cy*vtz+fy*vty+(1.0/2.0)*h*(cy*vr22+fy*vr12)+x*(cy*vr20+fy*vr10)+y*(cy*vr21+fy*vr11)),2))/pow((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-vr20*sin(theta)+vr21*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow(vr20*cos(theta)+vr21*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(vr22,2)-pow((1.0/2.0)*h*vr22+vr20*x+vr21*y+vtz,2),2))*((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-vr20*sin(theta)+vr21*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow(vr20*cos(theta)+vr21*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(vr22,2)-pow((1.0/2.0)*h*vr22+vr20*x+vr21*y+vtz,2))+pow(cx*vtz+fx*vtx+(1.0/2.0)*h*(cx*vr22+fx*vr02)+x*(cx*vr20+fx*vr00)+y*(cx*vr21+fx*vr01),2)+pow(cy*vtz+fy*vty+(1.0/2.0)*h*(cy*vr22+fy*vr12)+x*(cy*vr20+fy*vr10)+y*(cy*vr21+fy*vr11),2))/((1.0/4.0)*pow(d_ratio,2)*pow(h,2)*pow(-vr20*sin(theta)+vr21*cos(theta),2)+(1.0/4.0)*pow(h,2)*pow(l_ratio,2)*pow(vr20*cos(theta)+vr21*sin(theta),2)+(1.0/4.0)*pow(h,2)*pow(vr22,2)-pow((1.0/2.0)*h*vr22+vr20*x+vr21*y+vtz,2)),2)))),
+  	 (1.0/2.0)*M_SQRT2*sqrt((-1.0/4.0*pow(d_ratio, 2)*pow(h, 2)*pow(-(cx*vr20 + fx*vr00)*sin(theta) + (cx*vr21 + fx*vr01)*cos(theta), 2) - 1.0/4.0*pow(d_ratio, 2)*pow(h, 2)*pow(-(cy*vr20 + fy*vr10)*sin(theta) + (cy*vr21 + fy*vr11)*cos(theta), 2) - 1.0/4.0*pow(h, 2)*pow(l_ratio, 2)*pow((cx*vr20 + fx*vr00)*cos(theta) + (cx*vr21 + fx*vr01)*sin(theta), 2) - 1.0/4.0*pow(h, 2)*pow(l_ratio, 2)*pow((cy*vr20 + fy*vr10)*cos(theta) + (cy*vr21 + fy*vr11)*sin(theta), 2) - 1.0/4.0*pow(h, 2)*pow(cx*vr22 + fx*vr02, 2) - 1.0/4.0*pow(h, 2)*pow(cy*vr22 + fy*vr12, 2) + sqrt((pow((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-(cx*vr20 + fx*vr00)*sin(theta) + (cx*vr21 + fx*vr01)*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow((cx*vr20 + fx*vr00)*cos(theta) + (cx*vr21 + fx*vr01)*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(cx*vr22 + fx*vr02, 2) - pow(cx*vtz + fx*vtx + (1.0/2.0)*h*(cx*vr22 + fx*vr02) + x*(cx*vr20 + fx*vr00) + y*(cx*vr21 + fx*vr01), 2), 2) - 2*((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-(cx*vr20 + fx*vr00)*sin(theta) + (cx*vr21 + fx*vr01)*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow((cx*vr20 + fx*vr00)*cos(theta) + (cx*vr21 + fx*vr01)*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(cx*vr22 + fx*vr02, 2) - pow(cx*vtz + fx*vtx + (1.0/2.0)*h*(cx*vr22 + fx*vr02) + x*(cx*vr20 + fx*vr00) + y*(cx*vr21 + fx*vr01), 2))*((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-(cy*vr20 + fy*vr10)*sin(theta) + (cy*vr21 + fy*vr11)*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow((cy*vr20 + fy*vr10)*cos(theta) + (cy*vr21 + fy*vr11)*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(cy*vr22 + fy*vr12, 2) - pow(cy*vtz + fy*vty + (1.0/2.0)*h*(cy*vr22 + fy*vr12) + x*(cy*vr20 + fy*vr10) + y*(cy*vr21 + fy*vr11), 2)) + pow((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-(cy*vr20 + fy*vr10)*sin(theta) + (cy*vr21 + fy*vr11)*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow((cy*vr20 + fy*vr10)*cos(theta) + (cy*vr21 + fy*vr11)*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(cy*vr22 + fy*vr12, 2) - pow(cy*vtz + fy*vty + (1.0/2.0)*h*(cy*vr22 + fy*vr12) + x*(cy*vr20 + fy*vr10) + y*(cy*vr21 + fy*vr11), 2), 2) + 4*pow((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*(-(cx*vr20 + fx*vr00)*sin(theta) + (cx*vr21 + fx*vr01)*cos(theta))*(-(cy*vr20 + fy*vr10)*sin(theta) + (cy*vr21 + fy*vr11)*cos(theta)) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*((cx*vr20 + fx*vr00)*cos(theta) + (cx*vr21 + fx*vr01)*sin(theta))*((cy*vr20 + fy*vr10)*cos(theta) + (cy*vr21 + fy*vr11)*sin(theta)) + (1.0/4.0)*pow(h, 2)*(cx*vr22 + fx*vr02)*(cy*vr22 + fy*vr12) - (cx*vtz + fx*vtx + (1.0/2.0)*h*(cx*vr22 + fx*vr02) + x*(cx*vr20 + fx*vr00) + y*(cx*vr21 + fx*vr01))*(cy*vtz + fy*vty + (1.0/2.0)*h*(cy*vr22 + fy*vr12) + x*(cy*vr20 + fy*vr10) + y*(cy*vr21 + fy*vr11)), 2))/pow((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-vr20*sin(theta) + vr21*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow(vr20*cos(theta) + vr21*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(vr22, 2) - pow((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz, 2), 2))*((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-vr20*sin(theta) + vr21*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow(vr20*cos(theta) + vr21*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(vr22, 2) - pow((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz, 2)) + pow(cx*vtz + fx*vtx + (1.0/2.0)*h*(cx*vr22 + fx*vr02) + x*(cx*vr20 + fx*vr00) + y*(cx*vr21 + fx*vr01), 2) + pow(cy*vtz + fy*vty + (1.0/2.0)*h*(cy*vr22 + fy*vr12) + x*(cy*vr20 + fy*vr10) + y*(cy*vr21 + fy*vr11), 2))/((1.0/4.0)*pow(d_ratio, 2)*pow(h, 2)*pow(-vr20*sin(theta) + vr21*cos(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(l_ratio, 2)*pow(vr20*cos(theta) + vr21*sin(theta), 2) + (1.0/4.0)*pow(h, 2)*pow(vr22, 2) - pow((1.0/2.0)*h*vr22 + vr20*x + vr21*y + vtz, 2))) ;
+  return result;
+}
+
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
+  // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
+  float w,d,h,cx,cy,cz;
 
   vector<float> minwdh = obj.minwdh;
 
@@ -625,64 +739,30 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   //     "Center in fixed frame: (" << cx << " , " << cy << " , " << cz << ")" <<
   //     "\nSizes in fixed frame: (" << w << " , " << d << " , " << h << ")" << std::endl;
 
-  // Get semi-axes
-  a = w / 2.0;
-  b = d / 2.0;
-  c = h / 2.0;
-
-  // Now I have cx,cy,cz, a,b,c in the fixed frame
-
   // Filter out objects behind the camera
   float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
   if(check < 0)
     return;
 
-  std::vector<float> semi_axis = {a,b,c};
-  Eigen::Matrix<float,3,3,Eigen::RowMajor> R = getRotationMatrix(obj.theta);
-  Eigen::Vector3f center_vec;
-  center_vec << cx,cy,cz;
-  // This is the dual ellipsoid in fixed_frame
-  Eigen::Matrix4f dual_ellipsoid_fix_f = composeDualEllipsoid(semi_axis, R, center_vec);
-  Eigen::Matrix4f dual_ellipsoid;
-  dual_ellipsoid = vMat * dual_ellipsoid_fix_f * vMat.transpose();
+  Eigen::Matrix<float,1,8> ellipsoid_state;
+  ellipsoid_state << cx,cy,obj.theta,w/h,d/h,h,0,0;
+  Eigen::Vector4f ellipse_state = ellipseFromEllipsoidv1(ellipsoid_state, vMat, P);
 
-  // 2 >>> Transform Ellipsoid 3D in ellipse 2D
-
-  Eigen::Matrix3f dual_ellipse;
-  dual_ellipse = P * dual_ellipsoid * P.transpose();
-
-  // 3 >>> Compute parameters from conic form of ellipse
   float ea, eb, ecx, ecy, theta; // Variables of the ellipse
 
-  // Method used in 3D Object Localisation from Multi-view Image Detections (TPAMI 2017)
-  std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> ellipse_params = dualEllipseToParameters(dual_ellipse);
-  Eigen::Vector2f e_center = std::get<0>(ellipse_params);
-  Eigen::Vector2f e_axis = std::get<1>(ellipse_params);
-  Eigen::Matrix2f e_rotmat = std::get<2>(ellipse_params);
-  // cout<<"ellipse center:\n"<<e_center<<
-  //       "\nellipse axis:\n" <<e_axis <<
-  //       "\nellipse rotation matrix:\n" << e_rotmat << endl;
-  ecx = e_center(0);
-  ecy = e_center(1);
-  ea = e_axis(0);
-  eb = e_axis(1);
-  theta = atan2(e_rotmat(1, 0), e_rotmat(0, 0));
-  // cout << "theta: \n" << theta << endl;
+  ecx = ellipse_state(0);
+  ecy = ellipse_state(1);
+  ea = ellipse_state(2);
+  eb = ellipse_state(3);
+  // ea = 50;
+  // eb = 50;
+  theta = 0;
 
-  // Ensure theta is in the range [-pi, pi]
-  if (theta < -M_PI) {
-      theta += 2 * M_PI;
-  } else if (theta > M_PI) {
-      theta -= 2 * M_PI;
-  }
-  //std::cout << "third ----> axis = " << ea << " , " << eb << " | theta = " << theta << endl;
-
-
-  // std::cout << 
+    std::cout << 
   //   "dual ellipsoid: \n" << dual_ellipsoid << 
   //   "\ndual ellipse: \n" << dual_ellipse << 
-  //   "\n\tCenter: (" << ecx << " , " << ecy << ")" << 
-  //   "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
+    "\n\tCenter: (" << ecx << " , " << ecy << ")" << 
+    "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
 
   if(ea < 0 || eb < 0){
     return;
