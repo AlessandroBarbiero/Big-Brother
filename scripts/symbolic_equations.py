@@ -1,5 +1,4 @@
 from sympy import *
-from long_functions import *
 import math
 init_printing(use_unicode=True)
 

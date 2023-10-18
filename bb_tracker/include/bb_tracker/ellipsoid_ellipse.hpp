@@ -203,8 +203,8 @@ ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORM
   l_ratio = state(3),
   d_ratio = state(4),
   h =       state(5),
-  v =       state(6),
-  w =       state(7),
+  // v =       state(6),
+  // w =       state(7),
   // View
   vr00 = vMat(0,0),
   vr01 = vMat(0,1),

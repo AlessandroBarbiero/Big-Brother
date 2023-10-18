@@ -299,17 +299,17 @@ vector<vector<float> > BYTETracker::ious_2d(vector<vector<float> > &atlbrs, vect
 		return ious;
 
 	ious.resize(atlbrs.size());
-	for (int i = 0; i < ious.size(); i++)
+	for (size_t i = 0; i < ious.size(); i++)
 	{
 		ious[i].resize(btlbrs.size());
 	}
 
 	//bbox_ious
-	for (int k = 0; k < btlbrs.size(); k++)
+	for (size_t k = 0; k < btlbrs.size(); k++)
 	{
 		vector<float> ious_tmp;
 		float box_area = (btlbrs[k][2] - btlbrs[k][0] + 1)*(btlbrs[k][3] - btlbrs[k][1] + 1);
-		for (int n = 0; n < atlbrs.size(); n++)
+		for (size_t n = 0; n < atlbrs.size(); n++)
 		{
 			float iw = min(atlbrs[n][2], btlbrs[k][2]) - max(atlbrs[n][0], btlbrs[k][0]) + 1;
 			if (iw > 0)

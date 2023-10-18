@@ -40,6 +40,8 @@ public:
 	static std::unordered_map<std::string, int> class_to_int;
 	static std::unordered_map<int, std::string> int_to_class;
 
+	byte_kalman::EKF kalman_filter;
+
 private:
 	/**
 	 * Combines two vectors of STrack objects into a single vector.
@@ -112,5 +114,5 @@ private:
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;
 	vector<STrack> removed_stracks;
-	byte_kalman::EKF kalman_filter;
+
 };

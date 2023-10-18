@@ -101,7 +101,7 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
 
   // Show Progress
   #ifndef DEBUG
-  std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
+  std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
   std::cout.flush();
   #endif
 
@@ -131,7 +131,7 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects){
 
   // Show Progress
   #ifndef DEBUG
-  std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
+  std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
   std::cout.flush();
   #endif
 
@@ -260,7 +260,7 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   _num_detections++;
   if (_num_detections % 50 == 0)
   {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
+      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, (Ideally %lu fps)", _num_detections, _num_updates * 1000000 / _total_ms);
   }
   if (detections_message->detections.empty())
     return;
@@ -291,7 +291,7 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
   _num_detections++;
   if (_num_detections % 50 == 0)
   {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
+      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, (Ideally %lu fps)", _num_detections, _num_updates * 1000000 / _total_ms);
   }
   if (detections_message->detections.empty())
     return;
@@ -311,26 +311,22 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
 
 // TODO: delete
 // Function that prints the posizion of the mouse on click over image
-void mouse_callback(int event, int x, int y, int flags, void* userdata)
-{
-  if  ( event == EVENT_LBUTTONDOWN )
-  {
-    cout << "----> Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-  }
-}
+// void mouse_callback(int event, int x, int y, int flags, void* userdata)
+// {
+//   if  ( event == EVENT_LBUTTONDOWN )
+//   {
+//     cout << "----> Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+//   }
+// }
 
 void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
   cv_bridge::CvImagePtr cv_ptr;
-  image_geometry::PinholeCameraModel cam_model;
-  cam_model.fromCameraInfo(camera_info);
-  auto projMat = cam_model.projectionMatrix();
 
   std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
   // TODO: delete Fake points to test the draw
   std::vector<STrack> trackedObj;
   trackedObj.push_back(real_trackedObj[0]);
   trackedObj[0].minwdh = {-30,15,0,2,2,2};
-
 
   std::vector<STrack*> trackedObj_draw;
   for(size_t i = 0 ; i< trackedObj.size(); i++)
@@ -346,8 +342,6 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
 
-  //std::cout << "View matrix, inverse of camera matrix: \n" << vMat << std::endl;
-
   // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
   // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
   // P = [K | 0]
@@ -359,41 +353,6 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
           p_index++;
       }
   }
-
-  // K_MATRIX K;
-  // int k_index = 0;
-  // for (int i = 0; i < 3; ++i) {
-  //     for (int j = 0; j < 3; ++j) {
-  //         K(i, j) = camera_info->k[k_index];
-  //         k_index++;
-  //     }
-  // }
-
-  // Try to compute a Projection matrix from the fixed frame
-  // PROJ_MATRIX RT, P;
-  // RT << rot_m[0][0], rot_m[0][1], rot_m[0][2], p.x(),
-  //       rot_m[1][0], rot_m[1][1], rot_m[1][2], p.y(),
-  //       rot_m[2][0], rot_m[2][1], rot_m[2][2], p.z();
-  // P = K * RT;
-
-  // std::cout << "K matrix: \n" << K << "\nP matrix: \n" << P << std::endl;
-
-  // Try to use a 4x4 Projection matrix 
-  // TRANSFORMATION proj_matrix;
-  // proj_matrix.setZero();
-  // auto cx = static_cast<float>(camera_info->p[2]);
-  // auto cy = static_cast<float>(camera_info->p[6]);
-  // auto fx = static_cast<float>(camera_info->p[0]);
-  // auto fy = static_cast<float>(camera_info->p[5]);
-  // float far_plane = 100.0f;
-  // float near_plane = 0.01f;
-  // proj_matrix(0,0) = 2.0f * fx / camera_info->width;
-  // proj_matrix(1,1) = 2.0f * fy / camera_info->height;
-  // proj_matrix(0,2) = 2.0f * (0.5f - cx / camera_info->width);
-  // proj_matrix(1,2) = 2.0f * (cy / camera_info->height - 0.5f);
-  // proj_matrix(2,2) = -(far_plane + near_plane) / (far_plane - near_plane);
-  // proj_matrix(2,3) = -2.0f * far_plane * near_plane / (far_plane - near_plane);
-  // proj_matrix(3,2) = -1;
 
   try
   {
@@ -408,12 +367,9 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
       draw_ellipse(cv_ptr, obj, P, vMat);
-    // for(auto det : det_mess->detections){
-    //   draw_ellipse(cv_ptr, det, P, proj_matrix, transform, cam_model);
-    // }
     std::string window_name = "Image Window";
     cv::imshow(window_name, cv_ptr->image);
-    cv::setMouseCallback(window_name, mouse_callback);
+    // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
   }
@@ -421,12 +377,19 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   {
       RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
   }
+
   return;
 }
 
 void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
   cv_bridge::CvImagePtr cv_ptr;
   std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack *> objPtr;
+  for(size_t i=0; i<trackedObj.size(); i++){
+    objPtr.push_back(&trackedObj[i]);
+  }
+  unsigned long current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
+  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
   // TODO: delete Fake points to test the draw
   // std::vector<STrack> trackedObj;
   // trackedObj.push_back(std::move(real_trackedObj[0]));
@@ -462,7 +425,7 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
 
     std::string window_name = "Image Window";
     cv::imshow(window_name, cv_ptr->image);
-    cv::setMouseCallback(window_name, mouse_callback);
+    // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
   }
@@ -571,7 +534,6 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
                 1, LINE_AA);
   }
 }
-
 
 // %%%%%%%%%% Visualization
 
