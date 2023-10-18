@@ -58,6 +58,16 @@ class BBTracker : public rclcpp::Node
     void convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
 
+    /**
+     * Get the view matrix that transforms one coordinate frame (tf) to another.
+     *
+     * @param from_tf    The source coordinate frame.
+     * @param camera_tf  The target coordinate frame.
+     * @return           The view matrix (TRANSFORMATION) that transforms from `from_tf` to `camera_tf`, where the view matrix has the form:
+     *                   [Rotation Matrix | Translation Vector]
+     *                   [0 0 0           | 1                 ]
+     *                   If the transform cannot be found, returns an identity matrix.
+     */
     TRANSFORMATION getViewMatrix(std::string from_tf, std::string camera_tf);
     void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX projMat, TRANSFORMATION vMat);
   

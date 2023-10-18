@@ -473,9 +473,6 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
   return;
 }
 
-// Get the view matrix that transform a tf to another 
-// vMat = [Rot  | center_of_other_tf_in_new_tf]
-//        [0    |               1             ]
 TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_tf){
   TRANSFORMATION vMat;
 
