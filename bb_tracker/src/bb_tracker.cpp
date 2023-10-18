@@ -538,18 +538,20 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   cy = minwdh[1] + d/2;
   cz = minwdh[2] + h/2;
 
-  std::cout << 
-      "Center in fixed frame: (" << cx << " , " << cy << " , " << cz << ")" <<
-      "\nSizes in fixed frame: (" << w << " , " << d << " , " << h << ")" << std::endl;
-
   // Filter out objects behind the camera
   float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
   if(check < 0)
     return;
 
-  Eigen::Matrix<float,1,8> ellipsoid_state;
+  KAL_MEAN ellipsoid_state;
   ellipsoid_state << cx,cy,obj.theta,w/h,d/h,h,0,0;
-  Eigen::Vector4f ellipse_state = ellipseFromEllipsoidv2(ellipsoid_state, vMat, P);
+  ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(ellipsoid_state, vMat, P);
+  // Ensure theta is in the range [-pi, pi]
+  if (ellipse_state(4) < -M_PI) {
+      ellipse_state(4) += 2 * M_PI;
+  } else if (ellipse_state(4) > M_PI) {
+      ellipse_state(4) -= 2 * M_PI;
+  }
 
   float ea, eb, ecx, ecy, theta; // Variables of the ellipse
 
@@ -557,11 +559,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   ecy = ellipse_state(1);
   ea = ellipse_state(2);
   eb = ellipse_state(3);
-  theta = 0; // TODO: add theta computed from eigenvectors
-
-    std::cout << 
-    "\n\tCenter: (" << ecx << " , " << ecy << ")" << 
-    "\n\tSemiAxes: (" << ea << " , " << eb << ")" << std::endl;
+  theta = ellipse_state(4) * 180/M_PI;
 
   if(ea < 0 || eb < 0){
     return;

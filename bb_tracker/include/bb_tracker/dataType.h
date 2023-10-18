@@ -41,6 +41,7 @@ typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> DY
 
 typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> TRANSFORMATION;
 typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
+typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> ELLIPSE_STATE; // [X_center, Y_center, semi_axis_A, semi_axis_B, theta (in radians)]
 
 
 #include <vision_msgs/msg/bounding_box3_d.hpp>
