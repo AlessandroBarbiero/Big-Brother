@@ -2,6 +2,7 @@
 #include <bb_tracker/ellipsoid_ellipse.hpp>
 
 // #define DEBUG
+#define NO_PROGRESS // Avoid printing the fps and number of detections
 #define OBJECT_BUFFER_SIZE 500
 
 BBTracker::BBTracker()
@@ -46,13 +47,12 @@ BBTracker::BBTracker()
   _camera_info.subscribe(this, "bytetrack/camera_info");
   _camera_image.subscribe(this, "bytetrack/camera_image");
 
-  // _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-  // _detection2d, _camera_info, _camera_image, 100);
+  _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+  _detection2d, _camera_info, _camera_image, 100);
+  _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
 
-  // _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
-
-  _test_projection = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(_camera_info, _camera_image, 100);
-  _test_projection->registerCallback(std::bind(&BBTracker::test_ellipse_project, this, std::placeholders::_1, std::placeholders::_2));
+  // _test_projection = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(_camera_info, _camera_image, 100);
+  // _test_projection->registerCallback(std::bind(&BBTracker::test_ellipse_project, this, std::placeholders::_1, std::placeholders::_2));
 
   // _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
   //         "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
@@ -97,12 +97,14 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   #endif
 
   // TODO: decomment this
-  // publish_stracks(output_stracks);
+  publish_stracks(output_stracks);
 
   // Show Progress
   #ifndef DEBUG
+  #ifndef NO_PROGRESS
   std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
   std::cout.flush();
+  #endif
   #endif
 
   #ifdef DEBUG
@@ -146,7 +148,7 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
   try {
     tf_result = _tf_buffer.lookupTransform(new_frame, old_frame, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
-    std::cout << "No transform exists for the given tfs" << std::endl;
+    RCLCPP_INFO_STREAM(this->get_logger(), "Change_frame-> No transform exists for the given tfs: " << old_frame << " - " << new_frame);
     return;
   }
   tf2::Quaternion q(
@@ -320,24 +322,22 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
 // }
 
 void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
-  cv_bridge::CvImagePtr cv_ptr;
+  cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
 
-  std::vector<STrack> real_trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
+  // std::vector<STrack *> objPtr;
+  // for(size_t i=0; i<trackedObj.size(); i++){
+  //   objPtr.push_back(&trackedObj[i]);
+  // }
+  // // Predict the position of the objects before drawing them
+  unsigned long current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
+  // STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
+
   // TODO: delete Fake points to test the draw
-  std::vector<STrack> trackedObj;
-  trackedObj.push_back(real_trackedObj[0]);
-  trackedObj[0].minwdh = {-30,15,0,2,2,2};
+  // std::vector<STrack> trackedObj;
+  // trackedObj.push_back(real_trackedObj[0]);
+  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
 
-  std::vector<STrack*> trackedObj_draw;
-  for(size_t i = 0 ; i< trackedObj.size(); i++)
-    trackedObj_draw.push_back(&trackedObj[i]);
-  publish_stracks(trackedObj_draw);
-
-  // auto det_mess = std::make_shared<vision_msgs::msg::Detection3DArray>();
-  // convert_into_detections(trackedObj_draw, det_mess.get());
-  // change_frame(det_mess, camera_info->header.frame_id);
-  // det_mess->header.stamp = camera_info->header.stamp;
-  // _det_publisher->publish(*det_mess.get());
   // ---------
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
@@ -356,19 +356,26 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
   try
   {
-    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
-
-    // Draw ellipses for incoming detections
-    // for(auto det : detection_msg->detections)
-    //   cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
-    //           Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
-    //           360, CV_RGB(255, 0, 0),
-    //           1, LINE_AA);
+    cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
+    cv_ptr_track = cv_bridge::toCvCopy(image, image->encoding);
+    std::cout << "Last update time: \t" << trackedObj[0].last_filter_update_ms/1000.0 << " s\nTime of detection: \t" << current_time_ms/1000.0 << " s\n" << endl;
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, P, vMat);
-    std::string window_name = "Image Window";
-    cv::imshow(window_name, cv_ptr->image);
+    {
+      draw_ellipse(cv_ptr_track, obj, P, vMat);
+    }
+
+    // Draw ellipses for incoming detections
+    for(auto det : detection_msg->detections)
+      cv::ellipse(cv_ptr_detect->image, Point(det.bbox.center.x, det.bbox.center.y),
+              Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
+              360, CV_RGB(255, 0, 0),
+              1, LINE_AA);
+
+    std::string window_name1 = "Tracked Objects";
+    cv::imshow(window_name1, cv_ptr_track->image);
+    std::string window_name2 = "Detected Objects";
+    cv::imshow(window_name2, cv_ptr_detect->image);
     // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
@@ -388,19 +395,9 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
   for(size_t i=0; i<trackedObj.size(); i++){
     objPtr.push_back(&trackedObj[i]);
   }
+  // Predict the position of the objects before drawing them
   unsigned long current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
-  // TODO: delete Fake points to test the draw
-  // std::vector<STrack> trackedObj;
-  // trackedObj.push_back(std::move(real_trackedObj[0]));
-  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
-  // trackedObj[0].theta = 0;
-
-  // std::vector<STrack*> trackedObj_draw;
-  // for(size_t i = 0 ; i< trackedObj.size(); i++)
-  //   trackedObj_draw.push_back(&trackedObj[i]);
-  // publish_stracks(trackedObj_draw);
-  // ---------
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
 
@@ -425,7 +422,6 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
 
     std::string window_name = "Image Window";
     cv::imshow(window_name, cv_ptr->image);
-    // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
   }
@@ -443,7 +439,7 @@ TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_
   try {
     tf_result = _tf_buffer.lookupTransform(camera_tf, from_tf, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
-    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << from_tf << " - " << camera_tf);
+    RCLCPP_INFO_STREAM(this->get_logger(), "getViewMatrix-> No transform exists for the given tfs: " << from_tf << " - " << camera_tf);
     return vMat.setZero();
   }
 
@@ -486,26 +482,22 @@ TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_
 
 void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
   // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
-  float w,d,h,cx,cy,cz;
+  float cx,cy,cz;
 
-  vector<float> minwdh = obj.minwdh;
+  KAL_MEAN state = obj.mean;
 
-  w = minwdh[3];
-  d = minwdh[4];
-  h = minwdh[5];
-
-  cx = minwdh[0] + w/2;
-  cy = minwdh[1] + d/2;
-  cz = minwdh[2] + h/2;
+  cx = state(0);
+  cy = state(1);
+  cz = state(5)/2.0;
 
   // Filter out objects behind the camera
   float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
-  if(check < 0)
+  if(check < 0){
+    // std::cout << "Object behind the camera" << std::endl;
     return;
+  }
 
-  KAL_MEAN ellipsoid_state;
-  ellipsoid_state << cx,cy,obj.theta,w/h,d/h,h,0,0;
-  ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(ellipsoid_state, vMat, P);
+  ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(state, vMat, P);
   // Ensure theta is in the range [-pi, pi]
   if (ellipse_state(4) < -M_PI) {
       ellipse_state(4) += 2 * M_PI;
@@ -525,7 +517,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
     return;
   }
 
-  // 4 >>> Draw the ellipse
+  // Draw the ellipse
   if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
     // std::cout << "Ellipse in the image" << std::endl;
     cv::ellipse(image_ptr->image, Point(ecx, ecy),

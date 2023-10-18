@@ -33,8 +33,8 @@ def generate_launch_description():
         ],
         parameters=[config],
         output='screen',
-        prefix=["xterm -font 10x20 -e gdb -ex run --args"] # TODO: remove gdb
-        #prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
+        #prefix=["xterm -font 10x20 -e gdb -ex run --args"] # add gdb
+        prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
     )
 
     thermal_node = Node(
@@ -115,7 +115,7 @@ def generate_launch_description():
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
     # ld.add_action(thermal_node)
-    # ld.add_action(yolo_node)
+    ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
