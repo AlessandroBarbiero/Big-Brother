@@ -78,6 +78,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 	auto current_time_ms = new_track.last_filter_update_ms;
+	double dt = (current_time_ms - this->last_filter_update_ms)/MILLIS_IN_SECONDS;
 
 	DETECTBOX3D xyaah_box;
 	xyaah_box[0] = xyzaah[0];
@@ -86,8 +87,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	xyaah_box[3] = xyzaah[4];
 	xyaah_box[4] = xyzaah[5];
 
-	// CHECK dt
-	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
+
 	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
@@ -115,9 +115,19 @@ void STrack::update(Object2D &new_track, int frame_id){
 
 void STrack::update(STrack &new_track, int frame_id)
 {
+	if(this->last_filter_update_ms > new_track.last_filter_update_ms){
+		// Saved state is more updated than detection, do not update, just delete the projection
+		this->mean_predicted = this->mean;
+		this->covariance_predicted = this->covariance;
+		static_minwdh();
+		static_minmax();
+		return;
+	}
+	
 	this->frame_id = frame_id;
 	this->tracklet_len++;
 	auto current_time_ms = new_track.last_filter_update_ms;
+	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
 
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
@@ -128,8 +138,7 @@ void STrack::update(STrack &new_track, int frame_id)
 	xyaah_box[3] = xyzaah[4];	// d/h
 	xyaah_box[4] = xyzaah[5];	// h
 
-	// CHECK dt
-	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
+
 	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
@@ -145,6 +154,7 @@ void STrack::update(STrack &new_track, int frame_id)
 	this->is_activated = true;
 
 	// The new score is the average between the old and new
+	// TODO: this can be improved
 	this->score = (this->score + new_track.score)/2;
 }
 
@@ -251,10 +261,8 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		// TODO: Use mean predicted and cov predicted
-		// CHECK dt
 		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
-		
+
 		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update
 		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
