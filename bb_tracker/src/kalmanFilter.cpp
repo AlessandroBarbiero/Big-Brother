@@ -142,6 +142,7 @@ namespace byte_kalman
 		covariance = covariance1;
 	}
 
+	// EKF override this so if the object is an EKF that function is called
 	KAL_MEAN KalmanFilter::predictState(KAL_MEAN &mean, double dt __attribute__((unused))){
 		return this->_motion_mat * mean.transpose();
 	}

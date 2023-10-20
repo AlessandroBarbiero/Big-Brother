@@ -1,5 +1,5 @@
 #include <bb_tracker/STrack.h>
-#define MILLIS_IN_SECONDS 1000
+#define MILLIS_IN_SECONDS 1000.0
 
 STrack::STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms)
 {
@@ -51,6 +51,8 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	auto mc = this->kalman_filter.initiate(xyaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
 	theta = mean[2];
 
 	static_minwdh();
@@ -86,10 +88,12 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 
 	// CHECK dt
 	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
+	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
 	theta = mean[2];
 
 	static_minwdh();
@@ -126,10 +130,12 @@ void STrack::update(STrack &new_track, int frame_id)
 
 	// CHECK dt
 	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
+	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
 	theta = mean[2];
 
 	static_minwdh();
@@ -168,6 +174,21 @@ void STrack::static_minwdh()
 	minwdh[0] -= minwdh[3] / 2;		// x min
 	minwdh[1] -= minwdh[4] / 2;		// y min
 
+}
+
+void STrack::static_minwdh_predicted()
+{
+	minwdh[0] = mean_predicted[0];	// x center
+	minwdh[1] = mean_predicted[1];	// y center
+	minwdh[2] = 0.0;				// z min
+	minwdh[3] = mean_predicted[3];	// w/h
+	minwdh[4] = mean_predicted[4];	// d/h
+	minwdh[5] = mean_predicted[5];	// h 
+
+	minwdh[3] *= minwdh[5];			// w
+	minwdh[4] *= minwdh[5];			// d
+	minwdh[0] -= minwdh[3] / 2;		// x min
+	minwdh[1] -= minwdh[4] / 2;		// y min
 }
 
 void STrack::static_minmax()
@@ -230,11 +251,22 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
+		// TODO: Use mean predicted and cov predicted
 		// CHECK dt
 		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
-		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, dt);
-		// stracks[i]->last_filter_update_ms = current_time_ms;
-		stracks[i]->static_minwdh();
+		
+		// Predict objects also in the past to exclude them from the association
+		// if(dt<=0){	// Predict new value only if the current time is after the last update
+		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
+		// 	continue;
+		// }
+
+		stracks[i]->mean_predicted = stracks[i]->mean;
+		stracks[i]->covariance_predicted = stracks[i]->covariance;
+
+		kalman_filter.predict(stracks[i]->mean_predicted, stracks[i]->covariance_predicted, dt);
+
+		stracks[i]->static_minwdh_predicted();
 		stracks[i]->static_minmax();
 	}
 }
