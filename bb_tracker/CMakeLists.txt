@@ -46,6 +46,8 @@ install(DIRECTORY
 
 file(GLOB BYTE_traker_files
     src/BYTEtracker.cpp 
+    src/update2d.cpp
+    src/update3d.cpp
     src/kalmanFilter.cpp 
     src/lapjv.cpp 
     src/STrack.cpp 
