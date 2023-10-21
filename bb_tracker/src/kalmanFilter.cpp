@@ -49,7 +49,7 @@ namespace byte_kalman
 		_observation_mat2D(3,5)=1;
 
 		this->_std_weight_position = 1. / 20;
-		this->_std_weight_velocity = 1. / 30; // Changed from 1/120 to 1/30 -> it can now follow motorbike
+		this->_std_weight_velocity = 1. / 30; // Changed from 1/120 to 1/30 -> it can now follow most motorbikes
 	}
 
 	// %%%%%%%%%%%%%%%%

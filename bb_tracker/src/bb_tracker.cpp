@@ -368,7 +368,6 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   {
     cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
     cv_ptr_track = cv_bridge::toCvCopy(image, image->encoding);
-    // std::cout << "Last update time: \t" << trackedObj[0].last_filter_update_ms/1000.0 << " s\nTime of detection: \t" << current_time_ms/1000.0 << " s\n" << endl;
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
     {
