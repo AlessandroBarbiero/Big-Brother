@@ -9,6 +9,8 @@ BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
   // ROS Parameters
+  auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
   auto unconfirmed_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -23,6 +25,7 @@ BBTracker::BBTracker()
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
   auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+  this->declare_parameter("show_img_projection", false, show_image_projection_desc);
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
   this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
   this->declare_parameter("lost_ttl", 1000, lost_ttl_desc);
@@ -31,6 +34,7 @@ BBTracker::BBTracker()
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
+  _show_img_projection=   get_parameter("show_img_projection").as_bool();
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
   int lost_ttl        =   get_parameter("lost_ttl").as_int();
@@ -45,17 +49,22 @@ BBTracker::BBTracker()
 
   _detection2d.subscribe(this, "bytetrack/detections2d");
   _camera_info.subscribe(this, "bytetrack/camera_info");
-  _camera_image.subscribe(this, "bytetrack/camera_image");
 
-  _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-  _detection2d, _camera_info, _camera_image, 100);
-  _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+  if(_show_img_projection){
+    _camera_image.subscribe(this, "bytetrack/camera_image");
+    _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+    _detection2d, _camera_info, _camera_image, 100);
+    _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+  }
+  else{
+    _sync_det2d = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>>(
+    _detection2d, _camera_info, 100);
+    _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
+  }
 
+  // Test synch to show projections without new det2d
   // _test_projection = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(_camera_info, _camera_image, 100);
   // _test_projection->registerCallback(std::bind(&BBTracker::test_ellipse_project, this, std::placeholders::_1, std::placeholders::_2));
-
-  // _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
-  //         "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
   _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
@@ -234,7 +243,7 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
   #endif
 }
 
-void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
+void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
     auto detections = detections_message->detections;
     objects.reserve(detections.size());
     for(auto detection : detections){
@@ -285,7 +294,7 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   update_tracker(objects3D);
 }
 
-void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message)
+void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
@@ -295,7 +304,7 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
   {
       RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, (Ideally %lu fps)", _num_detections, _num_updates * 1000000 / _total_ms);
   }
-  if (detections_message->detections.empty())
+  if (detection_msg->detections.empty())
     return;
 
   // Decode detections
@@ -303,7 +312,7 @@ void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArr
 
   vector<Object2D> objects2D;
   // Put detection2d array inside the object structure
-  decode_detections(detections_message, objects2D);
+  decode_detections(detection_msg, objects2D);
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
@@ -325,13 +334,14 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
 
   std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
-  // std::vector<STrack *> objPtr;
-  // for(size_t i=0; i<trackedObj.size(); i++){
-  //   objPtr.push_back(&trackedObj[i]);
-  // }
-  // // Predict the position of the objects before drawing them
+
+  // Predict the position of the objects before drawing them
+  std::vector<STrack *> objPtr;
+  for(size_t i=0; i<trackedObj.size(); i++){
+    objPtr.push_back(&trackedObj[i]);
+  }
   unsigned long current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
-  // STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
+  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
   // TODO: delete Fake points to test the draw
   // std::vector<STrack> trackedObj;
@@ -484,7 +494,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
   float cx,cy,cz;
 
-  KAL_MEAN state = obj.mean;
+  KAL_MEAN state = obj.mean_predicted;
 
   cx = state(0);
   cy = state(1);

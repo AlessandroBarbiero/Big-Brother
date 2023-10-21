@@ -48,9 +48,9 @@ class BBTracker : public rclcpp::Node
 
   private:
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects);
-    void decode_detections(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
+    void decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
     void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
-    void add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message);
+    void add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
     void update_tracker(std::vector<Object3D>& new_objects);
     void update_tracker(std::vector<Object2D>& new_objects);
@@ -74,6 +74,9 @@ class BBTracker : public rclcpp::Node
     void test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
   private:
 
+    // Set to true to visualize the projection of the objects considered by the tracker and
+    // the new detections 2D on the image, the image topic should be remapped to the correct one
+    bool _show_img_projection;
     std::string _fixed_frame;
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
@@ -92,8 +95,9 @@ class BBTracker : public rclcpp::Node
     message_filters::Subscriber<sensor_msgs::msg::CameraInfo> _camera_info;
     message_filters::Subscriber<sensor_msgs::msg::Image> _camera_image;
     std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _sync_det_camera;
+    std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>> _sync_det2d;
 
-    std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _test_projection;
+    // std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _test_projection;
 
     // rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr _detection2d;
 

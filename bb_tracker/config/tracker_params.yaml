@@ -7,3 +7,4 @@ bb_tracker:
       high_thresh: 0.6
       match_thresh: 0.8
       fixed_frame: sensors_home
+      show_img_projection: true
