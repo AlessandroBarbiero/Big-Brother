@@ -261,8 +261,8 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
-
+		double dt = (static_cast<long>(current_time_ms) - static_cast<long>(stracks[i]->last_filter_update_ms))/MILLIS_IN_SECONDS;
+		// cout << dt << endl;
 		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update
 		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
