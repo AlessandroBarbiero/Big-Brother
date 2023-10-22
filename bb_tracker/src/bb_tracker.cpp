@@ -512,7 +512,6 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   // Filter out objects behind the camera
   float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
   if(check < 0){
-    // std::cout << "Object behind the camera" << std::endl;
     return;
   }
 
@@ -530,26 +529,27 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   ecy = ellipse_state(1);
   ea = ellipse_state(2);
   eb = ellipse_state(3);
-  theta = ellipse_state(4) * 180/M_PI;
+  theta = ellipse_state(4);
 
   if(ea < 0 || eb < 0){
     return;
   }
 
-  // Draw the ellipse
+  // Check if ellispe inside the image
   if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
-    // std::cout << "Ellipse in the image" << std::endl;
+    // Draw the rectangle around the ellipse
+    cv::Point2i min_pt, max_pt;
+    vector<float> tlbr_ellipse = tlbrFromEllipse(ea,eb,ecx,ecy,theta);
+    min_pt = {static_cast<int>(tlbr_ellipse[0]), static_cast<int>(tlbr_ellipse[1])};
+    max_pt = {static_cast<int>(tlbr_ellipse[2]), static_cast<int>(tlbr_ellipse[3])};
+    cv::rectangle(image_ptr->image, cv::Rect(min_pt, max_pt), CV_RGB(255,0,0), 1, LINE_AA);
+
+    // Draw the ellipse
+    theta = theta * 180/M_PI; // Convert in degrees
     cv::ellipse(image_ptr->image, Point(ecx, ecy),
                 Size(ea, eb), theta, 0,
                 360, CV_RGB(0, 0, 255),
                 1, LINE_AA);
-
-    //TODO: Check this out-> pedestrian outside rectangle
-    if(theta>0.785398 || theta < -0.785398) //45°
-      cv::rectangle(image_ptr->image, cv::Rect(cv::Point2i(ecx-eb,ecy-ea), cv::Point2i(ecx+eb,ecy+ea)), CV_RGB(255,0,0), 1, LINE_AA);
-    else
-      cv::rectangle(image_ptr->image, cv::Rect(cv::Point2i(ecx-ea,ecy-eb), cv::Point2i(ecx+ea,ecy+eb)), CV_RGB(255,0,0), 1, LINE_AA);
-    
   }
 }
 
