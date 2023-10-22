@@ -1,5 +1,4 @@
 #include <bb_tracker/bb_tracker.hpp>
-#include <bb_tracker/ellipsoid_ellipse.hpp>
 
 // #define DEBUG
 #define NO_PROGRESS // Avoid printing the fps and number of detections
@@ -121,14 +120,25 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   #endif
 }
 
-void BBTracker::update_tracker(std::vector<Object2D>& new_objects){
+void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info){
   _num_updates++;
 
   // Update the tracker
   auto start = chrono::system_clock::now();
 
+  // Get values for 2d update from camera info
+  TRANSFORMATION V = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
+
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack*> output_stracks = _tracker.update(new_objects);
+  vector<STrack*> output_stracks = _tracker.update(new_objects, P, V, camera_info->width, camera_info->height);
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
@@ -317,7 +327,7 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 
-  update_tracker(objects2D);
+  update_tracker(objects2D, camera_info);
 }
 
 // TODO: delete
@@ -441,7 +451,7 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
   return;
 }
 
-TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_tf){
+TRANSFORMATION BBTracker::getViewMatrix(const std::string& from_tf, const std::string& camera_tf){
   TRANSFORMATION vMat;
 
   geometry_msgs::msg::TransformStamped tf_result;
@@ -489,7 +499,7 @@ TRANSFORMATION BBTracker::getViewMatrix(std::string from_tf, std::string camera_
   return vMat;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX P, TRANSFORMATION vMat){
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX& P, TRANSFORMATION& vMat){
   // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
   float cx,cy,cz;
 
@@ -533,6 +543,13 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
                 Size(ea, eb), theta, 0,
                 360, CV_RGB(0, 0, 255),
                 1, LINE_AA);
+
+    //TODO: Check this out-> pedestrian outside rectangle
+    if(theta>0.785398 || theta < -0.785398) //45°
+      cv::rectangle(image_ptr->image, cv::Rect(cv::Point2i(ecx-eb,ecy-ea), cv::Point2i(ecx+eb,ecy+ea)), CV_RGB(255,0,0), 1, LINE_AA);
+    else
+      cv::rectangle(image_ptr->image, cv::Rect(cv::Point2i(ecx-ea,ecy-eb), cv::Point2i(ecx+ea,ecy+eb)), CV_RGB(255,0,0), 1, LINE_AA);
+    
   }
 }
 

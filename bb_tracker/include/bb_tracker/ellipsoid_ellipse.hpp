@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <Eigen/Core>
@@ -19,7 +21,7 @@ using namespace std;
  *   - axes: Ellipse axes lengths [2x1].
  *   - R_matrix: Ellipse orientation as a rotation matrix [2x2].
  */
-std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f C) {
+inline std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f C) {
   if (C(2, 2) != 0) {
       C /= -C(2, 2);
   }
@@ -58,7 +60,7 @@ std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParam
  * @param center The center vector.
  * @return       The composed dual ellipsoid matrix.
  */
-Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen::Matrix3f& R, const Eigen::Vector3f& center) {
+inline Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen::Matrix3f& R, const Eigen::Vector3f& center) {
   Eigen::Matrix4f Q;
   Q.setIdentity();
   for (int i = 0; i < 3; ++i) {
@@ -82,7 +84,7 @@ Eigen::Matrix4f composeDualEllipsoid(const std::vector<float>& axes, const Eigen
  * @param yaw_angle The yaw angle in radians for the desired rotation.
  * @return          A 3x3 rotation matrix representing the rotation around the z-axis.
  */
-Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angle){
+inline Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angle){
   Eigen::Matrix<float,3,3,Eigen::RowMajor> R;
   // Quaternion for general form
   // tf2::Quaternion quat;
@@ -120,7 +122,7 @@ Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angle){
  *               - semi-axis b
  *               - theta
  */
-ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+inline ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
   // State
   float x = state(0),
   y =       state(1),
@@ -194,7 +196,7 @@ ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORM
  *               - semi-axis b
  *               - theta
  */
-ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+inline ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
   ELLIPSE_STATE result;
   // State
   float x = state(0),

@@ -1,6 +1,6 @@
 #include <bb_tracker/BYTETracker.h>
 
-vector<STrack*> BYTETracker::update(const vector<Object2D>& objects)
+vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height)
 {
 	// TODO: implement this
 	////////////////// Step 1: Get detections //////////////////
@@ -54,6 +54,10 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects)
 	// Project everything with the last time of detection and then do association
 	long unsigned int last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
+
+	////////////////// Step 2.1: Projection ////////////////////////////////
+	STrack::multi_project(strack_pool, P, V, width, height);
+	STrack::multi_project(unconfirmed, P, V, width, height);
 
 	vector<vector<float> > dists;
 	int dist_size = 0, dist_size_size = 0;

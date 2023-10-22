@@ -23,6 +23,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <bb_tracker/BYTETracker.h>
 #include <bb_tracker/dataType.h>
+#include <bb_tracker/ellipsoid_ellipse.hpp>
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
@@ -53,7 +54,7 @@ class BBTracker : public rclcpp::Node
     void add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
     void update_tracker(std::vector<Object3D>& new_objects);
-    void update_tracker(std::vector<Object2D>& new_objects);
+    void update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void publish_stracks(vector<STrack*>& output_stracks);
     void convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
@@ -68,8 +69,8 @@ class BBTracker : public rclcpp::Node
      *                   [0 0 0           | 1                 ]
      *                   If the transform cannot be found, returns an identity matrix.
      */
-    TRANSFORMATION getViewMatrix(std::string from_tf, std::string camera_tf);
-    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX projMat, TRANSFORMATION vMat);
+    TRANSFORMATION getViewMatrix(const std::string& from_tf, const std::string& camera_tf);
+    void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX& projMat, TRANSFORMATION& vMat);
   
     void test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
   private:

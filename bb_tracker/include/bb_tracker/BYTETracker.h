@@ -33,7 +33,18 @@ public:
 	void init(u_int time_to_lost = 300, u_int unconfirmed_ttl = 300, u_int lost_ttl = 1000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
 
 	vector<STrack*> update(const vector<Object3D>& objects);
-	vector<STrack*> update(const vector<Object2D>& objects);
+
+	/**
+	 * Updates the BYTETracker with data coming from a detection 2D.
+	 *
+	 * @param objects 2D detections (BBox, classification and time)
+	 * @param P Projection matrix from an object in the camera frame to an object in the image.
+	 * @param V View matrix that transform a point from the fixed frame (the one objects are saved respect to) to the camera frame
+	 * @param width width in pixels of the image the decetions are taken from
+	 * @param height height in pixels of the image the decetions are taken from
+	 * @return The list of STracks currently seen by the tracker 
+	 */
+	vector<STrack*> update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height);
 	Scalar get_color(int idx);
 	vector<STrack> getTrackedObj();
 
