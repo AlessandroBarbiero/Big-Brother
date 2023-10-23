@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include "EKF.hpp"
 #include <visualization_msgs/msg/marker.hpp>
@@ -40,6 +41,7 @@ public:
 	void re_activate(Object2D &new_track, int frame_id, bool new_id = false);
 	void update(STrack &new_track, int frame_id);
 	void update(Object2D &new_track, int frame_id);
+	void setViewProjection(std::shared_ptr<TRANSFORMATION> V, std::shared_ptr<PROJ_MATRIX> P);
 
 public:
 	bool is_activated;

@@ -36,7 +36,7 @@ namespace byte_kalman
 		return _observation_mat2D * mean.transpose();
 	}
 
-	void EKF::computeJacobians(const KAL_MEAN &mean){
+	void EKF::computeJacobianMotion(const KAL_MEAN &mean){
       	_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
 		_motion_mat(0,6) = cos(mean(2));
 		_motion_mat(0,2) = - mean(6)*sin(mean(2));
@@ -44,21 +44,24 @@ namespace byte_kalman
 		_motion_mat(1,2) = mean(6)*cos(mean(2));
 		_motion_mat(2,7) = 1.0;
 		
-      	// TODO: compute jacobian and save it into _observation_mat2D
   	}
 
+	void EKF::computeJacobianObservation2D(const KAL_MEAN &mean){
+		// TODO: compute jacobian and save it into _observation_mat2D
+	}
+
 	void EKF::predict(KAL_MEAN& mean, KAL_COVA& covariance, double dt){
-		computeJacobians(mean);
+		computeJacobianMotion(mean);
 		KalmanFilter::predict(mean, covariance, dt);
 	}
 
 	KAL_HDATA2D EKF::project2D(const KAL_MEAN& mean, const KAL_COVA& covariance){
-		computeJacobians(mean);
+		computeJacobianObservation2D(mean);
 		return KalmanFilter::project2D(mean, covariance);
 	}
 
 	KAL_HDATA3D EKF::project3D(const KAL_MEAN& mean, const KAL_COVA& covariance){
-		computeJacobians(mean);
+		// computeJacobianObservation3D(mean);  // It is not necessary, it is linear, H is definite
 		return KalmanFilter::project3D(mean, covariance);
 	}
 
