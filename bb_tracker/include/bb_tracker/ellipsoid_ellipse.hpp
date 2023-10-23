@@ -248,6 +248,10 @@ inline bool ellipseInImage(float ecx, float ecy, float ea, float eb, int width, 
   return (ea > 0 && eb > 0 && ecx-ea > 0 && ecx+ea < width && ecy-eb > 0 && ecy+eb < height);
 }
 
+inline bool boxInImage(float min_x, float min_y, float max_x, float max_y, int width, int height){
+  return (min_x>0 && min_y>0 && max_x<width && max_y<height);
+}
+
 inline bool objectBehindCamera(float cx, float cy, float cz, TRANSFORMATION &vMat){
   return (vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3) < 0);
 }

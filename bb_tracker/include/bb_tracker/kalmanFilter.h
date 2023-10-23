@@ -36,7 +36,7 @@ namespace byte_kalman
 		 * P_y(t+1) = H*P_x(t)*H^T + V2
 		 * @param mean The current state x(t) of the Kalman Filter
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
-		 * @return The predicted output y(t|t-1) mean and covariance P_y(t) in 3 dimensions
+		 * @return The projected output y(t|t-1) mean and covariance P_y(t) in 3 dimensions
 		*/
 		KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 		/**
@@ -46,7 +46,7 @@ namespace byte_kalman
 		 * P_y(t+1) = H*P_x(t)*H^T + V2
 		 * @param mean The current state x(t) of the Kalman Filter
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
-		 * @return The predicted output y(t|t-1) mean and covariance P_y(t) in 2 dimensions
+		 * @return The projected output y(t|t-1) mean and covariance P_y(t) in 2 dimensions
 		*/
 		KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <opencv2/opencv.hpp>
 #include "EKF.hpp"
 #include <visualization_msgs/msg/marker.hpp>

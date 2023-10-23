@@ -22,8 +22,10 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 
 	// STrack
 	vector<STrack*> unconfirmed;
+	vector<STrack*> unconfirmed_out_image;
 	vector<STrack*> tracked_stracks;
 	vector<STrack*> strack_pool;
+	vector<STrack*> strack_pool_out_image;
 
 	vector<STrack*> output_stracks;
 
@@ -49,19 +51,45 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	}
 
 
-	////////////////// Step 2: First association, with IoU //////////////////
+	////////////////// Step 2.1: Prediction and Projection ////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
 	long unsigned int last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
-	////////////////// Step 2.1: Projection ////////////////////////////////
-	// TODO: remember
-	// STrack::multi_project(strack_pool, P, V, width, height);
-	// STrack::multi_project(unconfirmed, P, V, width, height);
+	STrack::multi_project(strack_pool, strack_pool_out_image, P, V, width, height);
+	STrack::multi_project(unconfirmed, unconfirmed_out_image, P, V, width, height);
 
-	// Tracks not present in the image are moved to another vector -> see if they are still activated, lost or removed
+	// POOL
+	for (unsigned int i = 0; i < strack_pool_out_image.size(); i++)
+	{
+		STrack *track = strack_pool_out_image[i];
+		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		{
+			track->mark_lost();
+			lost_stracks.push_back(*track);
+		}
+		else{
+			// Add object to the activated tracks without any update, the last time seen is conserved
+			activated_stracks.push_back(*track);
+		}
+	}
 
+	// UNCONFIRMED
+	for (unsigned int i = 0; i < unconfirmed_out_image.size(); i++)
+	{
+		STrack *track = unconfirmed_out_image[i];
+		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+			track->mark_removed();
+			removed_stracks.push_back(*track);
+		}
+		else{
+			// Add object to the activated tracks without any update, the last time seen is conserved
+			activated_stracks.push_back(*track);
+		}
+	}
+
+	////////////////// Step 2.2: First association, with IoU //////////////////
 	vector<vector<float> > dists;
 	int dist_size = 0, dist_size_size = 0;
 	dists = iou_distance2d(strack_pool, detections, dist_size, dist_size_size);

@@ -115,7 +115,8 @@ void STrack::update(Object2D &new_track, int frame_id){
 
 void STrack::update(STrack &new_track, int frame_id)
 {
-	if(this->last_filter_update_ms > new_track.last_filter_update_ms){
+	auto current_time_ms = new_track.last_filter_update_ms;
+	if(this->last_filter_update_ms > current_time_ms){
 		// Saved state is more updated than detection, do not update, just delete the projection
 		this->mean_predicted = this->mean;
 		this->covariance_predicted = this->covariance;
@@ -126,7 +127,6 @@ void STrack::update(STrack &new_track, int frame_id)
 	
 	this->frame_id = frame_id;
 	this->tracklet_len++;
-	auto current_time_ms = new_track.last_filter_update_ms;
 	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
 
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
@@ -140,6 +140,7 @@ void STrack::update(STrack &new_track, int frame_id)
 
 
 	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
+
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
@@ -153,9 +154,9 @@ void STrack::update(STrack &new_track, int frame_id)
 	this->state = TrackState::Tracked;
 	this->is_activated = true;
 
-	// The new score is the average between the old and new
+	// The new score is the average between the old*2 and new
 	// TODO: this can be improved
-	this->score = (this->score + new_track.score)/2;
+	this->score = (this->score*2 + new_track.score)/3;
 }
 
 void STrack::static_minwdh()
@@ -279,11 +280,26 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 	}
 }
 
-// Project the predicted mean into the image
+
+
+// Project the predicted mean into the image, separate the objects that are outside the image in another vector
 void STrack::multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_image, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height){
+	// 1. filter out objects behind the camera
+	auto isBehindCamera = [&](STrack* x){ return objectBehindCamera(x->mean_predicted[0], x->mean_predicted[1], x->mean_predicted[5]/2.0, V); };
+	auto moveIt = std::remove_if(stracks.begin(), stracks.end(), isBehindCamera);
+	outside_image.insert(outside_image.end(), std::make_move_iterator(moveIt), std::make_move_iterator(stracks.end()));
+	stracks.erase(moveIt, stracks.end());
+
+	// 2. project the ellipsoid
 	for (unsigned int i = 0; i < stracks.size(); i++){
 		ELLIPSE_STATE e_state = ellipseFromEllipsoidv2(stracks[i]->mean_predicted, V, P);
-		// Define a Axis Aligned Bounding Box from the ellipse (it is used for the IoU) 
+		// Define an Axis Aligned Bounding Box from the ellipse (it is used for the IoU) 
 		stracks[i]->vis2D_tlbr = tlbrFromEllipse(e_state);
 	}
+
+	// 3. filter out objects outside image
+	auto isOutsideImage = [&](STrack* x){ return !boxInImage(x->vis2D_tlbr[0], x->vis2D_tlbr[1], x->vis2D_tlbr[2], x->vis2D_tlbr[3], width, height); };
+	moveIt = std::remove_if(stracks.begin(), stracks.end(), isOutsideImage);
+	outside_image.insert(outside_image.end(), std::make_move_iterator(moveIt), std::make_move_iterator(stracks.end()));
+	stracks.erase(moveIt, stracks.end());
 }
