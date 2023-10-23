@@ -280,7 +280,7 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 }
 
 // Project the predicted mean into the image
-void STrack::multi_project(vector<STrack*> &stracks, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height){
+void STrack::multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_image, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height){
 	for (unsigned int i = 0; i < stracks.size(); i++){
 		ELLIPSE_STATE e_state = ellipseFromEllipsoidv2(stracks[i]->mean_predicted, V, P);
 		// Define a Axis Aligned Bounding Box from the ellipse (it is used for the IoU) 

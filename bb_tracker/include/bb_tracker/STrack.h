@@ -20,7 +20,7 @@ public:
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
 	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms);
-	void static multi_project(vector<STrack*> &stracks, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height);
+	void static multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_image, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height);
 	void static_minwdh();
 	void static_minwdh_predicted();
 	void static_minmax();

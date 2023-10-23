@@ -21,7 +21,7 @@ using namespace std;
  *   - axes: Ellipse axes lengths [2x1].
  *   - R_matrix: Ellipse orientation as a rotation matrix [2x2].
  */
-inline std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f C) {
+inline std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f &C) {
   if (C(2, 2) != 0) {
       C /= -C(2, 2);
   }
@@ -122,7 +122,7 @@ inline Eigen::Matrix<float,3,3,Eigen::RowMajor> getRotationMatrix(float yaw_angl
  *               - semi-axis b
  *               - theta
  */
-inline ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+inline ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION &vMat, PROJ_MATRIX &P){
   // State
   float x = state(0),
   y =       state(1),
@@ -196,7 +196,7 @@ inline ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TR
  *               - semi-axis b
  *               - theta (in radians | -M_PI < theta < M_PI)
  */
-inline ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION vMat, PROJ_MATRIX P){
+inline ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION &vMat, PROJ_MATRIX &P){
   ELLIPSE_STATE result;
   // State
   float x = state(0),
@@ -243,6 +243,15 @@ inline ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TR
   return result;
 }
 
+
+inline bool ellipseInImage(float ecx, float ecy, float ea, float eb, int width, int height){
+  return (ea > 0 && eb > 0 && ecx-ea > 0 && ecx+ea < width && ecy-eb > 0 && ecy+eb < height);
+}
+
+inline bool objectBehindCamera(float cx, float cy, float cz, TRANSFORMATION &vMat){
+  return (vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3) < 0);
+}
+
 // Utility functions to draw a box around an ellipse
 
 /**
@@ -286,6 +295,6 @@ inline vector<float> tlbrFromEllipse(float ecx, float ecy, float ea, float eb, f
  *                  - theta
  * @return          Vector of floats containing the coordinates of TLBR points: [min_x, min_y, max_x, max_y].
  */
-inline vector<float> tlbrFromEllipse(ELLIPSE_STATE e_state){
+inline vector<float> tlbrFromEllipse(ELLIPSE_STATE &e_state){
   return tlbrFromEllipse(e_state[0], e_state[1], e_state[2], e_state[3], e_state[4]);
 }

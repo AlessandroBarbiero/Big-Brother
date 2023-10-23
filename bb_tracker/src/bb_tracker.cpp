@@ -259,7 +259,15 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
     for(auto detection : detections){
       // Decode
       Object2D obj;
-      obj.box = detection.bbox;
+      // if(detection.bbox.center.theta != 0){
+      //   //TODO: think about handling tilted bbox
+      // }
+      obj.tlbr = {
+        static_cast<float>(detection.bbox.center.x-detection.bbox.size_x/2),
+        static_cast<float>(detection.bbox.center.y-detection.bbox.size_y/2),
+        static_cast<float>(detection.bbox.center.x+detection.bbox.size_x/2),
+        static_cast<float>(detection.bbox.center.y+detection.bbox.size_y/2),
+         };
       obj.label = BYTETracker::class_to_int[detection.results[0].id];
       obj.prob = detection.results[0].score;
       obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
@@ -510,10 +518,8 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   cz = state(5)/2.0;
 
   // Filter out objects behind the camera
-  float check = vMat(2,0)*cx +vMat(2,1)*cy + vMat(2,2)*cz + vMat(2,3);
-  if(check < 0){
+  if(objectBehindCamera(cx,cy,cz,vMat))
     return;
-  }
 
   ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(state, vMat, P);
 
@@ -525,12 +531,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   eb = ellipse_state(3);
   theta = ellipse_state(4);
 
-  if(ea < 0 || eb < 0){
-    return;
-  }
-
-  // Check if ellipse inside the image
-  if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
+  if(ellipseInImage(ecx,ecy,ea,eb,  image_ptr->image.cols,image_ptr->image.rows)){
     // Draw the rectangle around the ellipse
     cv::Point2i min_pt, max_pt;
     vector<float> tlbr_ellipse = tlbrFromEllipse(ecx,ecy,ea,eb,theta);

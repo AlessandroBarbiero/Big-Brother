@@ -279,19 +279,68 @@ vector<vector<float> > BYTETracker::iou_distance(vector<STrack> &atracks, vector
 	return cost_matrix;
 }
 
-// TODO: implement
 vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack> &atracks, vector<Object2D> &btracks){
-	vector<vector<float> > aminmaxs, bminmaxs;
-	return aminmaxs;
+	vector<vector<float> > atlbrs, btlbrs;
+	for (size_t i = 0; i < atracks.size(); i++)
+	{
+		atlbrs.push_back(atracks[i].vis2D_tlbr);
+	}
+	for (size_t i = 0; i < btracks.size(); i++)
+	{
+		btlbrs.push_back(btracks[i].tlbr);
+	}
+
+	vector<vector<float> > _ious = ious_2d(atlbrs, btlbrs);
+	vector<vector<float> > cost_matrix;
+	for (size_t i = 0; i < _ious.size(); i++)
+	{
+		vector<float> _iou;
+		for (size_t j = 0; j < _ious[i].size(); j++)
+		{
+			_iou.push_back(1 - _ious[i][j]);
+		}
+		cost_matrix.push_back(_iou);
+	}
+
+	return cost_matrix;
 }
 
-// TODO: implement
 vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack*> &atracks, vector<Object2D> &btracks, int &dist_size, int &dist_size_size){
-	vector<vector<float> > aminmaxs, bminmaxs;
-	return aminmaxs;
+	vector<vector<float> > cost_matrix;
+	if (atracks.size() * btracks.size() == 0)
+	{
+		dist_size = atracks.size();
+		dist_size_size = btracks.size();
+		return cost_matrix;
+	}
+	vector<vector<float> > atlbrs, btlbrs;
+	for (size_t i = 0; i < atracks.size(); i++)
+	{
+		atlbrs.push_back(atracks[i]->vis2D_tlbr);
+	}
+	for (size_t i = 0; i < btracks.size(); i++)
+	{
+		btlbrs.push_back(btracks[i].tlbr);
+	}
+
+	dist_size = atracks.size();
+	dist_size_size = btracks.size();
+
+	vector<vector<float> > _ious = ious_2d(atlbrs, btlbrs);
+	
+	for (size_t i = 0; i < _ious.size();i++)
+	{
+		vector<float> _iou;
+		for (size_t j = 0; j < _ious[i].size(); j++)
+		{
+			_iou.push_back(1 - _ious[i][j]);
+		}
+		cost_matrix.push_back(_iou);
+	}
+
+	return cost_matrix;
 }
 
-// CHECK
 vector<vector<float> > BYTETracker::ious_2d(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs)
 {
 	vector<vector<float> > ious;

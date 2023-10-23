@@ -56,8 +56,11 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	////////////////// Step 2.1: Projection ////////////////////////////////
-	STrack::multi_project(strack_pool, P, V, width, height);
-	STrack::multi_project(unconfirmed, P, V, width, height);
+	// TODO: remember
+	// STrack::multi_project(strack_pool, P, V, width, height);
+	// STrack::multi_project(unconfirmed, P, V, width, height);
+
+	// Tracks not present in the image are moved to another vector -> see if they are still activated, lost or removed
 
 	vector<vector<float> > dists;
 	int dist_size = 0, dist_size_size = 0;
