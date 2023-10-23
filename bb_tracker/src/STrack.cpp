@@ -48,7 +48,7 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	xyaah_box[2] = xyzaah[3];
 	xyaah_box[3] = xyzaah[4];
 	xyaah_box[4] = xyzaah[5];
-	auto mc = this->kalman_filter.initiate(xyaah_box);
+	auto mc = this->kalman_filter.initiate3D(xyaah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 	this->mean_predicted = this->mean;
@@ -78,7 +78,6 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 	auto current_time_ms = new_track.last_filter_update_ms;
-	double dt = (current_time_ms - this->last_filter_update_ms)/MILLIS_IN_SECONDS;
 
 	DETECTBOX3D xyaah_box;
 	xyaah_box[0] = xyzaah[0];
@@ -88,7 +87,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	xyaah_box[4] = xyzaah[5];
 
 
-	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xyaah_box);
 	last_filter_update_ms = current_time_ms;
 	this->mean = mc.first;
 	this->covariance = mc.second;
@@ -108,45 +107,28 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 		this->track_id = next_id();
 }
 
-// TODO: implement
-void STrack::update(Object2D &new_track, int frame_id){
-	return;
-}
-
-void STrack::update(STrack &new_track, int frame_id)
-{
-	auto current_time_ms = new_track.last_filter_update_ms;
-	if(this->last_filter_update_ms > current_time_ms){
-		// Saved state is more updated than detection, do not update, just delete the projection
+bool STrack::checkOldDetection(unsigned long detection_time_ms){
+	if(this->last_filter_update_ms > detection_time_ms){
+		// Saved state is more updated than detection, just delete the projection
 		this->mean_predicted = this->mean;
 		this->covariance_predicted = this->covariance;
 		static_minwdh();
 		static_minmax();
-		return;
+		return true;
 	}
+	return false;
+}
+
+void STrack::updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id){
 	
 	this->frame_id = frame_id;
 	this->tracklet_len++;
-	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
-
-	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
-
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];	// x
-	xyaah_box[1] = xyzaah[1];	// y
-	xyaah_box[2] = xyzaah[3];	// w/h
-	xyaah_box[3] = xyzaah[4];	// d/h
-	xyaah_box[4] = xyzaah[5];	// h
-
-
-	auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box, dt);
-
-	last_filter_update_ms = current_time_ms;
-	this->mean = mc.first;
-	this->covariance = mc.second;
+	last_filter_update_ms = detection_time_ms;
+	this->mean = updated_values.first;
+	this->covariance = updated_values.second;
 	this->mean_predicted = this->mean;
 	this->covariance_predicted = this->covariance;
-	theta = mean[2];
+	theta = this->mean[2];
 
 	static_minwdh();
 	static_minmax();
@@ -156,7 +138,54 @@ void STrack::update(STrack &new_track, int frame_id)
 
 	// The new score is the average between the old*2 and new
 	// TODO: this can be improved
-	this->score = (this->score*2 + new_track.score)/3;
+	this->score = (this->score*2 + new_score)/3;
+}
+
+// TODO: implement
+void STrack::update(Object2D &new_track, int frame_id)
+{
+	// auto current_time_ms = new_track.time_ms;
+
+	// if(checkOldDetection(current_time_ms))
+	// 	return; // Saved state is more updated than detection, do not update
+
+	// // Handle detection and update
+	// vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+
+	// DETECTBOX2D xyaah_box;
+	// xyaah_box[0] = xyzaah[0];	// x
+	// xyaah_box[1] = xyzaah[1];	// y
+	// xyaah_box[2] = xyzaah[3];	// w/h
+	// xyaah_box[3] = xyzaah[4];	// d/h
+	// xyaah_box[4] = xyzaah[5];	// h
+
+	// auto mc = this->kalman_filter.update(this->mean_predicted, this->covariance_predicted, xyaah_box);
+
+	// auto new_score = new_track.prob;
+	// updateTrackState(mc, current_time_ms, new_score, frame_id);
+}
+
+void STrack::update(STrack &new_track, int frame_id)
+{
+	auto current_time_ms = new_track.last_filter_update_ms;
+
+	if(checkOldDetection(current_time_ms))
+		return; // Saved state is more updated than detection, do not update
+
+	// Handle detection and update
+	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+
+	DETECTBOX3D xyaah_box;
+	xyaah_box[0] = xyzaah[0];	// x
+	xyaah_box[1] = xyzaah[1];	// y
+	xyaah_box[2] = xyzaah[3];	// w/h
+	xyaah_box[3] = xyzaah[4];	// d/h
+	xyaah_box[4] = xyzaah[5];	// h
+
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xyaah_box);
+
+	auto new_score = new_track.score;
+	updateTrackState(mc, current_time_ms, new_score, frame_id);
 }
 
 void STrack::static_minwdh()

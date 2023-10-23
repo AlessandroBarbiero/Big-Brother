@@ -56,7 +56,7 @@ namespace byte_kalman
 	// %%% INITIATE %%%
 	// %%%%%%%%%%%%%%%%
 
-	KAL_DATA KalmanFilter::initiate(const DETECTBOX3D &measurement)
+	KAL_DATA KalmanFilter::initiate3D(const DETECTBOX3D &measurement)
 	{
 		KAL_MEAN mean;
 		mean(0) = measurement(0); 	// x
@@ -85,7 +85,7 @@ namespace byte_kalman
 	}
 
 	
-	KAL_DATA KalmanFilter::initiate(const DETECTBOX2D &measurement)
+	KAL_DATA KalmanFilter::initiate2D(const DETECTBOX2D &measurement)
 	{
 		KAL_MEAN mean;
 		mean(0) = measurement(0); 	// x
@@ -212,11 +212,10 @@ namespace byte_kalman
 	// %%% UPDATE %%%
 	// %%%%%%%%%%%%%%
 
-	KAL_DATA KalmanFilter::update(
+	KAL_DATA KalmanFilter::update3D(
 			const KAL_MEAN &mean,
 			const KAL_COVA &covariance,
-			const DETECTBOX3D &measurement,
-			double dt __attribute__((unused)))
+			const DETECTBOX3D &measurement)
 	{
 		// Project to measurement space
 		KAL_HDATA3D pa = project3D(mean, covariance);
@@ -263,11 +262,10 @@ namespace byte_kalman
 		return std::make_pair(new_mean, new_covariance);
 	}
 
-	KAL_DATA KalmanFilter::update(
+	KAL_DATA KalmanFilter::update2D(
 			const KAL_MEAN &mean,
 			const KAL_COVA &covariance,
-			const DETECTBOX2D &measurement,
-			double dt __attribute__((unused)))
+			const DETECTBOX2D &measurement)
 	{
 		// Project to measurement space
 		KAL_HDATA2D pa = project2D(mean, covariance);
@@ -275,13 +273,13 @@ namespace byte_kalman
 		KAL_HCOVA2D projected_cov = pa.second;
 
 		// K = (P(t)*H^T)(H*P(t)*H^T + V2)^-1
-		Eigen::Matrix<float, 4, 8> B = (covariance * (_observation_mat2D.transpose())).transpose();
+		Eigen::Matrix<float, 5, 8> B = (covariance * (_observation_mat2D.transpose())).transpose();
 		// Computes the Cholesky decomposition and performs a triangular solve to find the Kalman gain.
-		Eigen::Matrix<float, 8, 4> kalman_gain = (projected_cov.llt().solve(B)).transpose();
+		Eigen::Matrix<float, 8, 5> kalman_gain = (projected_cov.llt().solve(B)).transpose();
 
 		// Calculate the Innovation or measurement ERROR
 		// e(t) = y(t) - y~(t|t-1)
-		Eigen::Matrix<float, 1, 4> innovation = measurement - projected_mean;
+		Eigen::Matrix<float, 1, 5> innovation = measurement - projected_mean;
 
 		// Compute new STATE estimate
 		// x(t|t) = x(t+1|t) + K(t) * e(t)

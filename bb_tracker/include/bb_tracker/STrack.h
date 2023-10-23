@@ -57,8 +57,8 @@ public:
 	// if you want one of the two you can call static_minwdh() or static_minwdh_predicted() functions before static_minmax()
 	vector<float> minmax;
 
-	// TODO: Remember to use this
-	vector<float> vis2D_tlbr; // Fill this value with a 2d representation in camera
+	// 2d representation in camera of the 3d object as an axis aligned bounding box
+	vector<float> vis2D_tlbr;
 
 	float theta;
 	
@@ -79,4 +79,10 @@ public:
 
 private:
 	byte_kalman::EKF kalman_filter;
+
+	// Return true if saved state is more updated than detection, in that case the projection is deleted
+	bool checkOldDetection(unsigned long detection_time_ms);
+
+	// Update internal state of the STrack after a kalman filter update
+	void updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id);
 };
