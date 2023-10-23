@@ -48,7 +48,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 			tracked_stracks.push_back(&this->tracked_stracks[i]);
 	}
 
-	//std::cout << "Step 2" << std::endl;
+
 	////////////////// Step 2: First association, with IoU //////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association

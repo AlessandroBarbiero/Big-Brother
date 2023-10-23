@@ -516,12 +516,6 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   }
 
   ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(state, vMat, P);
-  // Ensure theta is in the range [-pi, pi]
-  if (ellipse_state(4) < -M_PI) {
-      ellipse_state(4) += 2 * M_PI;
-  } else if (ellipse_state(4) > M_PI) {
-      ellipse_state(4) -= 2 * M_PI;
-  }
 
   float ea, eb, ecx, ecy, theta; // Variables of the ellipse
 
@@ -535,11 +529,11 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
     return;
   }
 
-  // Check if ellispe inside the image
+  // Check if ellipse inside the image
   if (ecx-ea > 0 && ecx+ea < image_ptr->image.cols && ecy-eb > 0 && ecy+eb < image_ptr->image.rows){
     // Draw the rectangle around the ellipse
     cv::Point2i min_pt, max_pt;
-    vector<float> tlbr_ellipse = tlbrFromEllipse(ea,eb,ecx,ecy,theta);
+    vector<float> tlbr_ellipse = tlbrFromEllipse(ecx,ecy,ea,eb,theta);
     min_pt = {static_cast<int>(tlbr_ellipse[0]), static_cast<int>(tlbr_ellipse[1])};
     max_pt = {static_cast<int>(tlbr_ellipse[2]), static_cast<int>(tlbr_ellipse[3])};
     cv::rectangle(image_ptr->image, cv::Rect(min_pt, max_pt), CV_RGB(255,0,0), 1, LINE_AA);
