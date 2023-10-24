@@ -22,18 +22,7 @@ namespace byte_kalman
 	}
 
   	KAL_HMEAN2D EKF::projectState2D(const KAL_MEAN &mean){
-		// To project the 3d mean into a 2d world i need 
-		// Transform the point from world tf to camera tf multiplying by a transform matrix (Rotation and translation)
-		// (Optional check if behind the camera (z>0))
-		// camera projection matix P[4x4] (PinholeCameraModel.projectionMatrix()), 
-		// convert point in homogeneous coordinates [x,y,z,1]
-		// X_projected = P * X_homogeneous
-		// X_normalized = X_projected / X_projected[3]
-		// x,y are u,v 
-		// check if it is into the view of the camera (0<x<width, 0<y<height)
-		
-		// TODO: add convertion from world to camera
-		return _observation_mat2D * mean.transpose();
+		return ellipseFromEllipsoidv2(mean, *V, *P);
 	}
 
 	void EKF::computeJacobianMotion(const KAL_MEAN &mean){
@@ -46,8 +35,40 @@ namespace byte_kalman
 		
   	}
 
+	#include "computeJacobianEllipse.cpp"
+
 	void EKF::computeJacobianObservation2D(const KAL_MEAN &mean){
-		// TODO: compute jacobian and save it into _observation_mat2D
+		// State
+		float x = mean(0),
+		y 		= mean(1),
+		theta 	= mean(2),
+		l_ratio = mean(3),
+		d_ratio = mean(4),
+		h =       mean(5),
+		// v =    mean(6),
+		// w =    mean(7),
+		// View
+		vr00 	= (*V)(0,0),
+		vr01 	= (*V)(0,1),
+		vr02 	= (*V)(0,2),
+		vr10 	= (*V)(1,0),
+		vr11 	= (*V)(1,1),
+		vr12 	= (*V)(1,2),
+		vr20 	= (*V)(2,0),
+		vr21 	= (*V)(2,1),
+		vr22 	= (*V)(2,2),
+		vtx 	= (*V)(0,3),
+		vty 	= (*V)(1,3),
+		vtz 	= (*V)(2,3),
+		// Projection
+		fx 		= (*P)(0,0),
+		fy 		= (*P)(1,1),
+		cx 		= (*P)(0,2),
+		cy 		= (*P)(1,2);
+		_observation_mat2D = computeJacobianEllipse(x,y,theta,l_ratio,d_ratio,h,vr00,vr01,vr02,vr10,vr11,vr12,vr20,vr21,vr22,vtx,vty,vtz,fx,fy,cx,cy);
+		std::cout << _observation_mat2D << std::endl;
+		// TODO: check this and remove print
+
 	}
 
 	void EKF::predict(KAL_MEAN& mean, KAL_COVA& covariance, double dt){

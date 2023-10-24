@@ -3,6 +3,7 @@
 #include <memory>
 #include "dataType.h"
 #include <bb_tracker/kalmanFilter.h>
+#include <bb_tracker/ellipsoid_ellipse.hpp>
 
 namespace byte_kalman
 {
@@ -15,8 +16,8 @@ namespace byte_kalman
 		KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 		KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 
-		std::shared_ptr<TRANSFORMATION> V;
-		std::shared_ptr<PROJ_MATRIX> P;
+		std::shared_ptr<TRANSFORMATION> V; 	// View Matrix
+		std::shared_ptr<PROJ_MATRIX> P; 	// Projection Matrix
 
 	protected: 
 		// Call this before the update, the update will use the updated jacobians

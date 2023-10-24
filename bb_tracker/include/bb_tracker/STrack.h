@@ -86,5 +86,5 @@ private:
 	bool checkOldDetection(unsigned long detection_time_ms);
 
 	// Update internal state of the STrack after a kalman filter update
-	void updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id);
+	void updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len = false);
 };

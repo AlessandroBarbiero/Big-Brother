@@ -70,14 +70,29 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 }
 
 // TODO: implement
-void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id){
-	return;
+void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
+{
+	vector<float> tlbr = new_track.tlbr;
+
+	DETECTBOX2D xyabt_box;
+	xyabt_box[0] = (tlbr[0]+tlbr[2])/2.0;	// x
+	xyabt_box[1] = (tlbr[1]+tlbr[3])/2.0;	// y
+	xyabt_box[2] = (tlbr[2]-tlbr[0])/2.0;	// a
+	xyabt_box[3] = (tlbr[3]-tlbr[1])/2.0;	// b
+	xyabt_box[4] = 0;						// theta
+
+	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
+
+	auto current_time_ms = new_track.time_ms;
+	updateTrackState(mc, current_time_ms, new_track.prob, frame_id, true);
+
+	if (new_id)
+		this->track_id = next_id();
 }
 
 void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
-	auto current_time_ms = new_track.last_filter_update_ms;
 
 	DETECTBOX3D xyaah_box;
 	xyaah_box[0] = xyzaah[0];
@@ -86,23 +101,11 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	xyaah_box[3] = xyzaah[4];
 	xyaah_box[4] = xyzaah[5];
 
-
 	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xyaah_box);
-	last_filter_update_ms = current_time_ms;
-	this->mean = mc.first;
-	this->covariance = mc.second;
-	this->mean_predicted = this->mean;
-	this->covariance_predicted = this->covariance;
-	theta = mean[2];
 
-	static_minwdh();
-	static_minmax();
+	auto current_time_ms = new_track.last_filter_update_ms;
+	updateTrackState(mc, current_time_ms, new_track.score, frame_id, true);
 
-	this->tracklet_len = 0;
-	this->state = TrackState::Tracked;
-	this->is_activated = true;
-	this->frame_id = frame_id;
-	this->score = new_track.score;
 	if (new_id)
 		this->track_id = next_id();
 }
@@ -119,10 +122,14 @@ bool STrack::checkOldDetection(unsigned long detection_time_ms){
 	return false;
 }
 
-void STrack::updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id){
+void STrack::updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len){
 	
+	if(reset_tracklet_len)
+		this->tracklet_len = 0;
+	else
+		this->tracklet_len++;
 	this->frame_id = frame_id;
-	this->tracklet_len++;
+
 	last_filter_update_ms = detection_time_ms;
 	this->mean = updated_values.first;
 	this->covariance = updated_values.second;
@@ -292,7 +299,7 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
 		double dt = (static_cast<long>(current_time_ms) - static_cast<long>(stracks[i]->last_filter_update_ms))/MILLIS_IN_SECONDS;
-		// cout << dt << endl;
+		
 		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update
 		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
