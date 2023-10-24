@@ -188,6 +188,7 @@ namespace byte_kalman
 		std << _std_weight_position,
 			_std_weight_position,
 			_std_weight_position, 
+			_std_weight_position, 
 			_std_weight_position;
 		DETECTBOX2D tmp = std.array().square();
 		KAL_HCOVA2D measure_noise_var = tmp.asDiagonal();

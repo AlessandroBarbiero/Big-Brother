@@ -38,7 +38,7 @@ namespace byte_kalman
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
 		 * @return The projected output y(t|t-1) mean and covariance P_y(t) in 3 dimensions
 		*/
-		KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
+		virtual KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 		/**
 		 * Project the current state of the Kalman Filter into measurement space 2D.
 		 * Equations:
@@ -48,7 +48,7 @@ namespace byte_kalman
 		 * @param covariance The current covariance P_x(t) of the Kalman Filter state
 		 * @return The projected output y(t|t-1) mean and covariance P_y(t) in 2 dimensions
 		*/
-		KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
+		virtual KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 
 		// %%%%%%%%%%%%%%
 		// %%% UPDATE %%%

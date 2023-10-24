@@ -412,6 +412,8 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
       RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
   }
 
+  add_detection2D(detection_msg, camera_info);
+
   return;
 }
 
