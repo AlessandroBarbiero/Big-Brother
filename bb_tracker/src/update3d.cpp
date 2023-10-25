@@ -69,12 +69,13 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	}
 
 	//std::cout << "Step 2" << std::endl;
-	////////////////// Step 2: First association, with IoU //////////////////
+	////////////////// Step 2.1: Prediction ////////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
-	long unsigned int last_det_time_ms = objects.back().time_ms;
+	int64_t last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
+	////////////////// Step 2.2: First association, with IoU //////////////////
 	vector<vector<float> > dists;
 	int dist_size = 0, dist_size_size = 0;
 	dists = iou_distance(strack_pool, detections, dist_size, dist_size_size);
@@ -250,6 +251,8 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 			output_stracks.push_back(&this->tracked_stracks[i]);
 		}
 	}
+
+	predict_at_current_time(output_stracks, last_det_time_ms);
 	
 	return output_stracks;
 }

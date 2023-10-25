@@ -52,7 +52,7 @@ struct Object3D
     vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position and size
     int label;
     float prob;
-	long unsigned int time_ms;
+	int64_t time_ms;
 };
 
 struct Object2D
@@ -60,5 +60,5 @@ struct Object2D
     std::vector<float> tlbr; // float-based 2D bounding box with center and size 
     int label;
     float prob;
-	long unsigned int time_ms;
+	int64_t time_ms;
 };

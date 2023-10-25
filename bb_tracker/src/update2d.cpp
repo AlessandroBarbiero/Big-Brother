@@ -40,7 +40,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 				detections_low.push_back(objects[i]);
 		}
 	}
-
+ 
 	// Add newly detected tracklets to tracked_stracks
 	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
 	{
@@ -54,7 +54,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	////////////////// Step 2.1: Prediction and Projection ////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
-	long unsigned int last_det_time_ms = objects.back().time_ms;
+	int64_t last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	STrack::multi_project(strack_pool, strack_pool_out_image, P, V, width, height);
@@ -64,7 +64,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < strack_pool_out_image.size(); i++)
 	{
 		STrack *track = strack_pool_out_image[i];
-		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -79,7 +79,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < unconfirmed_out_image.size(); i++)
 	{
 		STrack *track = unconfirmed_out_image[i];
-		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -159,7 +159,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_track.size(); i++)
 	{
 		STrack *track = r_tracked_stracks[u_track[i]];
-		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -191,7 +191,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_unconfirmed.size(); i++)
 	{
 		STrack *track = unconfirmed[u_unconfirmed[i]];
-		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -266,6 +266,8 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 			output_stracks.push_back(&this->tracked_stracks[i]);
 		}
 	}
-	
+
+	predict_at_current_time(output_stracks, last_det_time_ms);
+
 	return output_stracks;
 }

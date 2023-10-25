@@ -82,7 +82,7 @@ class BBTracker : public rclcpp::Node
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
 
-    rclcpp::TimerBase::SharedPtr _timer;
+    // rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr _det_poses_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
@@ -100,7 +100,6 @@ class BBTracker : public rclcpp::Node
 
     // std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _test_projection;
 
-    // rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr _detection2d;
 
 
     BYTETracker _tracker;
@@ -110,5 +109,5 @@ class BBTracker : public rclcpp::Node
     // Total number of BYTETracker updates
     int _num_updates;
     // Microseconds passed computing the algorithm
-    long unsigned int _total_ms;
+    int64_t _total_ms;
 };

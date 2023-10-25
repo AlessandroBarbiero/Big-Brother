@@ -22,6 +22,8 @@ void BYTETracker::init(u_int time_to_lost, u_int unconfirmed_ttl, u_int lost_ttl
 	this->lost_ttl = lost_ttl;
 
 	frame_id = 0;
+	current_time_ms = 0;
+	last_update_time = chrono::system_clock::now();
 
 	std::cout << "Init ByteTrack!"<< std::endl;
 	std::cout << "Parameters: " 

@@ -17,11 +17,11 @@ enum TrackState { New = 0, Tracked, Lost, Removed };
 class STrack
 {
 public:
-	STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms);
+	STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms);
 	~STrack();
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
-	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms);
+	void static multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, int64_t current_time_ms);
 	void static multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_image, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height);
 	void static_minwdh();
 	void static_minwdh_predicted();
@@ -66,7 +66,7 @@ public:
 	
 	int frame_id;
 	// milliseconds
-	unsigned long int last_filter_update_ms;
+	int64_t last_filter_update_ms;
 	int tracklet_len;
 	int start_frame;
 	visualization_msgs::msg::Marker path_marker;
@@ -83,8 +83,8 @@ private:
 	byte_kalman::EKF kalman_filter;
 
 	// Return true if saved state is more updated than detection, in that case the projection is deleted
-	bool checkOldDetection(unsigned long detection_time_ms);
+	bool checkOldDetection(int64_t detection_time_ms);
 
 	// Update internal state of the STrack after a kalman filter update
-	void updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len = false);
+	void updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len = false);
 };

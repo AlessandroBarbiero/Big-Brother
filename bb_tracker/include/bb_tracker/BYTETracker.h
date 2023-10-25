@@ -114,6 +114,8 @@ private:
 	double lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol, 
 		bool extend_cost = false, float cost_limit = LONG_MAX, bool return_cost = true);
 
+	void predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms);
+
 private:
 
 	float track_thresh;
@@ -121,6 +123,10 @@ private:
 	float match_thresh;
 	int frame_id;
 	u_int time_to_lost, lost_ttl, unconfirmed_ttl;
+	// The current time is updated every time a detection come
+	// if a detection time is after the predicted current time, that become the current time
+	int64_t current_time_ms;
+	std::chrono::time_point<std::chrono::system_clock> last_update_time;
 
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;

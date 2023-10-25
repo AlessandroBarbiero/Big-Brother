@@ -100,18 +100,17 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 
   #ifdef DEBUG
-    std::cout << "Tracker updated showing " << output_stracks.size() <<
+    std::cout << "Tracker updated 3D showing " << output_stracks.size() <<
     (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
   #endif
 
-  // TODO: decomment this
   publish_stracks(output_stracks);
 
   // Show Progress
   #ifndef DEBUG
   #ifndef NO_PROGRESS
-  std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
-  std::cout.flush();
+    std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
+    std::cout.flush();
   #endif
   #endif
 
@@ -144,7 +143,7 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 
   #ifdef DEBUG
-    std::cout << "Tracker updated showing " << output_stracks.size() <<
+    std::cout << "Tracker updated 2D showing " << output_stracks.size() <<
     (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
   #endif
 
@@ -152,8 +151,10 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_
 
   // Show Progress
   #ifndef DEBUG
+  #ifndef NO_PROGRESS
   std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
   std::cout.flush();
+  #endif
   #endif
 
   #ifdef DEBUG
@@ -249,7 +250,7 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
     objects.push_back(obj);
   }
   #ifdef DEBUG
-    std::cout << "Number of objects: " << objects.size() << std::endl;
+    std::cout << "Number of objects 3D: " << objects.size() << std::endl;
   #endif
 }
 
@@ -275,7 +276,7 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
       objects.push_back(obj);
     }
     #ifdef DEBUG
-      std::cout << "Number of objects: " << objects.size() << std::endl;
+      std::cout << "Number of objects 2D: " << objects.size() << std::endl;
     #endif
 }
 
@@ -315,7 +316,7 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
 void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
   #ifdef DEBUG
-    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
+    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detection_msg->header.frame_id.c_str());
   #endif
   _num_detections++;
   if (_num_detections % 50 == 0)
@@ -358,7 +359,7 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
   for(size_t i=0; i<trackedObj.size(); i++){
     objPtr.push_back(&trackedObj[i]);
   }
-  unsigned long current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
+  int64_t current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
   // TODO: delete Fake points to test the draw
@@ -425,7 +426,7 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
     objPtr.push_back(&trackedObj[i]);
   }
   // Predict the position of the objects before drawing them
-  unsigned long current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
+  int64_t current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
@@ -573,15 +574,15 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     vector<float> minwdh = current_track->minwdh;
 
     #ifdef DEBUG
-      std::cout << "Seeing " << current_track.class_name << " number " << current_track.track_id << " -- Score: " << current_track.score << std::endl;
-      std::cout << "minwdh values: " 
-                << " x=" << minwdh[0] + minwdh[3]/2
-                << " y=" << minwdh[1] + minwdh[4]/2
-                << " z=" << minwdh[2] + minwdh[5]/2
-                << " w=" << minwdh[3]
-                << " d=" << minwdh[4]
-                << " h=" << minwdh[5]
-                << std::endl;
+      // std::cout << "Seeing " << current_track->class_name << " number " << current_track->track_id << " -- Score: " << current_track->score << std::endl;
+      // std::cout << "minwdh values: " 
+      //           << " x=" << minwdh[0] + minwdh[3]/2
+      //           << " y=" << minwdh[1] + minwdh[4]/2
+      //           << " z=" << minwdh[2] + minwdh[5]/2
+      //           << " w=" << minwdh[3]
+      //           << " d=" << minwdh[4]
+      //           << " h=" << minwdh[5]
+      //           << std::endl;
     #endif
 
     auto single_det = out_message.detections[i];

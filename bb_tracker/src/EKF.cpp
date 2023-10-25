@@ -66,8 +66,6 @@ namespace byte_kalman
 		cx 		= (*P)(0,2),
 		cy 		= (*P)(1,2);
 		_observation_mat2D = computeJacobianEllipse(x,y,theta,l_ratio,d_ratio,h,vr00,vr01,vr02,vr10,vr11,vr12,vr20,vr21,vr22,vtx,vty,vtz,fx,fy,cx,cy);
-		std::cout << _observation_mat2D << std::endl;
-		// TODO: check this and remove print
 
 	}
 

@@ -1,7 +1,7 @@
 #include <bb_tracker/STrack.h>
 #define MILLIS_IN_SECONDS 1000.0
 
-STrack::STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms)
+STrack::STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms)
 {
 	_minwdh.resize(6);
 	_minwdh.assign(minwdh_.begin(), minwdh_.end());
@@ -110,7 +110,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 		this->track_id = next_id();
 }
 
-bool STrack::checkOldDetection(unsigned long detection_time_ms){
+bool STrack::checkOldDetection(int64_t detection_time_ms){
 	if(this->last_filter_update_ms > detection_time_ms){
 		// Saved state is more updated than detection, just delete the projection
 		this->mean_predicted = this->mean;
@@ -122,7 +122,7 @@ bool STrack::checkOldDetection(unsigned long detection_time_ms){
 	return false;
 }
 
-void STrack::updateTrackState(KAL_DATA& updated_values, unsigned long detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len){
+void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len){
 	
 	if(reset_tracklet_len)
 		this->tracklet_len = 0;
@@ -294,11 +294,11 @@ int STrack::end_frame()
 	return this->frame_id;
 }
 
-void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms)
+void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, int64_t current_time_ms)
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		double dt = (static_cast<long>(current_time_ms) - static_cast<long>(stracks[i]->last_filter_update_ms))/MILLIS_IN_SECONDS;
+		double dt = (static_cast<long long>(current_time_ms) - static_cast<long long>(stracks[i]->last_filter_update_ms))/MILLIS_IN_SECONDS;
 		
 		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update

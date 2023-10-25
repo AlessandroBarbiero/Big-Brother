@@ -548,3 +548,14 @@ Scalar BYTETracker::get_color(int idx)
 	idx += 3;
 	return Scalar(37 * idx % 255, 17 * idx % 255, 29 * idx % 255);
 }
+
+void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms){
+	auto end_timer = chrono::system_clock::now();
+	auto ms_elapsed = chrono::duration_cast<chrono::milliseconds>(end_timer - last_update_time).count();
+	current_time_ms += ms_elapsed;
+	last_update_time = chrono::system_clock::now();
+	if(detection_time_ms > current_time_ms){
+		current_time_ms = detection_time_ms;
+	}
+	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
+}
