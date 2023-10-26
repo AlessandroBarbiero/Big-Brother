@@ -15,6 +15,7 @@ from geometry_msgs.msg import TransformStamped, Point
 # Python
 from typing import List
 import numpy as np
+import random
 
 from .utility import classes_to_detect
 
@@ -28,7 +29,11 @@ class FakeDetector(Node):
             parameters=[
                 ('lidar_list', ["/lidar_topic"]),
                 ('lidar_max_distances', [30]),
-                ("fixed_frame", "/map")
+                ("fixed_frame", "/map"),
+                ("percentage_miss", 0.15),
+                ("noise_position", 0.01),
+                ("noise_size", 0.01),
+                ("noise_orientation", 0.001)
             ]
         )
 
@@ -109,8 +114,21 @@ class FakeDetector(Node):
   
         all_objects = self.static_objects + self.moving_objects  
         seen_objects = self.filter_lidar(all_objects)
+
+        percentage_miss = self.get_parameter('percentage_miss').value
+        noise_position = self.get_parameter('noise_position').value
+        noise_size = self.get_parameter('noise_size').value
+        noise_orient = self.get_parameter('noise_orientation').value
+
         marker : Marker
         for marker in seen_objects:
+            rnd_miss = random.uniform(0,1)
+            if(rnd_miss<percentage_miss):
+                continue
+            rnd_pos =       [random.uniform(-noise_position, noise_position) for _ in range(0,3)]
+            rnd_size =      [random.uniform(-noise_size, noise_size) for _ in range(0,3)]
+            rnd_orient =    [random.uniform(-noise_orient, noise_orient) for _ in range(0,4)]
+
             detection_a = Detection3D()
             detection_a.header = detections_msg.header
             # create hypothesis
@@ -123,12 +141,23 @@ class FakeDetector(Node):
                     hypothesis.id = "car"
                 else:
                     hypothesis.id = "person"
-            hypothesis.score = 1.0
+            hypothesis.score = 0.9
 
             detection_a.results.append(hypothesis)
 
             detection_a.bbox.center = marker.pose
+            detection_a.bbox.center.position.x += rnd_pos[0]
+            detection_a.bbox.center.position.y += rnd_pos[1]
+            detection_a.bbox.center.position.z += rnd_pos[2]
+            detection_a.bbox.center.orientation.x += rnd_orient[0]
+            detection_a.bbox.center.orientation.y += rnd_orient[1]
+            detection_a.bbox.center.orientation.z += rnd_orient[2]
+            detection_a.bbox.center.orientation.w += rnd_orient[3]
+
             detection_a.bbox.size = marker.scale
+            detection_a.bbox.size.x += rnd_size[0]
+            detection_a.bbox.size.y += rnd_size[1]
+            detection_a.bbox.size.z += rnd_size[2]
 
             detections_msg.detections.append(detection_a)
 

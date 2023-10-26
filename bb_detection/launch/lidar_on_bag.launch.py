@@ -23,9 +23,13 @@ def generate_launch_description():
             # ("/detection_3d", "something"),
         ],
         parameters=[
-            {'lidar_list': ["sensors_home/static_lidar"]},
-            {'lidar_max_distances': [30]},
-            {"fixed_frame": "map"}
+            {'lidar_list'           : ["sensors_home/static_lidar"]},
+            {'lidar_max_distances'  : [30]},
+            {"fixed_frame"          : "map"},
+            {"percentage_miss"      : 0.1},
+            {"noise_position"       : 0.01},
+            {"noise_size"           : 0.01},
+            {"noise_orientation"    : 0}
         ],
         output='screen'
     )
