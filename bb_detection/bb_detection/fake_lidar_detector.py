@@ -30,13 +30,15 @@ class FakeDetector(Node):
                 ('lidar_list', ["/lidar_topic"]),
                 ('lidar_max_distances', [30]),
                 ("fixed_frame", "/map"),
+                ("random_seed", 42),
                 ("percentage_miss", 0.15),
                 ("noise_position", 0.01),
                 ("noise_size", 0.01),
                 ("noise_orientation", 0.001)
             ]
         )
-
+        random_seed = self.get_parameter('random_seed').value
+        random.seed(random_seed)
         self.lidar_list = self.get_parameter('lidar_list').value
         self.lidar_max_distances = self.get_parameter('lidar_max_distances').value
         self.fixed_frame = self.get_parameter('fixed_frame').value

@@ -77,6 +77,7 @@ def generate_launch_description():
             {'lidar_list'           : ["sensors_home/static_lidar"]},
             {'lidar_max_distances'  : [30]},
             {"fixed_frame"          : "map"},
+            {"random_seed"          : 42},
             {"percentage_miss"      : 0.15},
             {"noise_position"       : 0.01},
             {"noise_size"           : 0.01},
@@ -119,7 +120,7 @@ def generate_launch_description():
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
     # ld.add_action(thermal_node)
-    ld.add_action(yolo_node)
+    # ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
