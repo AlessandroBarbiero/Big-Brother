@@ -90,14 +90,8 @@ BBTracker::BBTracker()
 void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   _num_updates++;
 
-  // Update the tracker
-  auto start = chrono::system_clock::now();
-
   // Get the Tracks for the objects currently beeing tracked
   vector<STrack*> output_stracks = _tracker.update(new_objects);
-
-  auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 
   #ifdef DEBUG
     std::cout << "Tracker updated 3D showing " << output_stracks.size() <<
@@ -122,9 +116,6 @@ void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
 void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info){
   _num_updates++;
 
-  // Update the tracker
-  auto start = chrono::system_clock::now();
-
   // Get values for 2d update from camera info
   TRANSFORMATION V = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
   PROJ_MATRIX P;
@@ -138,9 +129,6 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_
 
   // Get the Tracks for the objects currently beeing tracked
   vector<STrack*> output_stracks = _tracker.update(new_objects, P, V, camera_info->width, camera_info->height);
-
-  auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
 
   #ifdef DEBUG
     std::cout << "Tracker updated 2D showing " << output_stracks.size() <<
@@ -284,6 +272,8 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
 
 void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
 {
+  auto start = chrono::system_clock::now();
+
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
   #endif
@@ -295,9 +285,6 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   if (detections_message->detections.empty())
     return;
 
-  // Decode detections
-  auto start = chrono::system_clock::now();
-
   // Move all the detections to a common fixed frame
   if(detections_message->header.frame_id != _fixed_frame){
     change_frame(detections_message, _fixed_frame);
@@ -306,15 +293,16 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   vector<Object3D> objects3D;
   // Put detection3d array inside the object structure
   decode_detections(detections_message, objects3D);
+  update_tracker(objects3D);
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
-
-  update_tracker(objects3D);
 }
 
 void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
+  auto start = chrono::system_clock::now();
+
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detection_msg->header.frame_id.c_str());
   #endif
@@ -326,17 +314,13 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
   if (detection_msg->detections.empty())
     return;
 
-  // Decode detections
-  auto start = chrono::system_clock::now();
-
   vector<Object2D> objects2D;
   // Put detection2d array inside the object structure
   decode_detections(detection_msg, objects2D);
+  update_tracker(objects2D, camera_info);
 
   auto end = chrono::system_clock::now();
   _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
-
-  update_tracker(objects2D, camera_info);
 }
 
 // TODO: delete

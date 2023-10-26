@@ -557,5 +557,10 @@ void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64
 	if(detection_time_ms > current_time_ms){
 		current_time_ms = detection_time_ms;
 	}
+	// if not real time use this
+	// for(auto track : output_stracks){
+	// 	if(current_time_ms<track->last_filter_update_ms)
+	// 		current_time_ms = track->last_filter_update_ms;
+	// }
 	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
 }
