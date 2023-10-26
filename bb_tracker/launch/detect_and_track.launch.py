@@ -79,8 +79,8 @@ def generate_launch_description():
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
             {"percentage_miss"      : 0.15},
-            {"noise_position"       : 0.01},
-            {"noise_size"           : 0.01},
+            {"noise_position"       : 0.30},
+            {"noise_size"           : 0.15},
             {"noise_orientation"    : 0.0}
         ]
     )
@@ -103,7 +103,7 @@ def generate_launch_description():
     )
 
     bag_process = ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', bag_folder + bag_name],
+            cmd=['ros2', 'bag', 'play', bag_folder + bag_name], #, '-r', '0.9'],
         )
     
     rviz2_node = Node(
@@ -120,7 +120,7 @@ def generate_launch_description():
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
     # ld.add_action(thermal_node)
-    # ld.add_action(yolo_node)
+    ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
