@@ -8,6 +8,7 @@
 #include "dataType.h"
 
 #include "ellipsoid_ellipse.hpp"
+#define MILLIS_IN_SECONDS 1000.0
 
 using namespace cv;
 using namespace std;

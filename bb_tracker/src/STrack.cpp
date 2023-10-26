@@ -1,5 +1,5 @@
 #include <bb_tracker/STrack.h>
-#define MILLIS_IN_SECONDS 1000.0
+
 
 STrack::STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms)
 {

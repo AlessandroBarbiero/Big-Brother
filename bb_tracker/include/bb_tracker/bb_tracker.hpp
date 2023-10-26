@@ -27,6 +27,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
+#define NANO_IN_MILLIS 1000000 //10^6
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;

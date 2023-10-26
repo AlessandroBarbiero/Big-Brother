@@ -52,6 +52,9 @@ public:
 	static std::unordered_map<int, std::string> int_to_class;
 
 	byte_kalman::EKF kalman_filter;
+	// The current time is updated every time a detection come
+	// if a detection time is after the predicted current time, that become the current time
+	int64_t current_time_ms;
 
 private:
 	/**
@@ -123,9 +126,7 @@ private:
 	float match_thresh;
 	int frame_id;
 	u_int time_to_lost, lost_ttl, unconfirmed_ttl;
-	// The current time is updated every time a detection come
-	// if a detection time is after the predicted current time, that become the current time
-	int64_t current_time_ms;
+
 	std::chrono::time_point<std::chrono::system_clock> last_update_time;
 
 	vector<STrack> tracked_stracks;

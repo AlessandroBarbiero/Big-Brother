@@ -604,7 +604,9 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
 }
 
 void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message){
-  out_message->header.stamp = get_clock()->now();
+  out_message->header.stamp.sec = _tracker.current_time_ms/MILLIS_IN_SECONDS;
+  out_message->header.stamp.nanosec = _tracker.current_time_ms*NANO_IN_MILLIS;
+  // out_message->header.stamp = get_clock()->now();
   out_message->header.frame_id = _fixed_frame;
   out_message->detections.reserve(in_stracks.size());
   for (unsigned int i = 0; i < in_stracks.size(); i++)
