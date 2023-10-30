@@ -2,7 +2,6 @@
 
 vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height)
 {
-	// TODO: implement this
 	////////////////// Step 1: Get detections //////////////////
 	this->frame_id++;
 
@@ -206,11 +205,12 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	// TODO: look if activate a track from 2d detection
 	// for (unsigned int i = 0; i < u_detection.size(); i++)
 	// {
-	// 	Object2D *track = &detections[u_detection[i]];
-	// 	if (track->score < this->high_thresh)
+	// 	Object2D *new_obj = &detections[u_detection[i]];
+	// 	if (new_obj->prob < this->high_thresh)
 	// 		continue;
-	// 	track->activate(this->kalman_filter, this->frame_id);
-	// 	activated_stracks.push_back(*track);
+	// 	STrack track(new_obj, BYTETracker::int_to_class[new_obj->label]);
+	// 	track.activate2D(this->kalman_filter, V, P, this->frame_id);
+	// 	activated_stracks.push_back(track);
 	// }
 
 	//std::cout << "Step 5" << std::endl;
