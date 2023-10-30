@@ -194,7 +194,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 		STrack *track = &detections[u_detection[i]];
 		if (track->score < this->high_thresh)
 			continue;
-		track->activate(this->kalman_filter, this->frame_id);
+		track->activate3D(this->kalman_filter, this->frame_id);
 		activated_stracks.push_back(*track);
 	}
 
