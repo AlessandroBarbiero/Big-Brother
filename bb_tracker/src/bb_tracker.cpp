@@ -70,6 +70,8 @@ BBTracker::BBTracker()
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
   _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
 
+  _tracks_publisher = this->create_publisher<bb_interfaces::msg::STrackArray>("bytetrack/active_tracks_explicit", 10);
+
   // ROS Timer [Old version with periodic updates]
   // std::chrono::milliseconds ms_to_call((1000/fps));
   // _timer = this->create_wall_timer(
@@ -542,16 +544,19 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   geometry_msgs::msg::PoseArray poses_message;
   visualization_msgs::msg::MarkerArray path_markers;
   visualization_msgs::msg::MarkerArray text_markers;
+  bb_interfaces::msg::STrackArray s_track_array_msg;
 
   convert_into_detections(output_stracks, &out_message);
 
   poses_message.header = out_message.header;
+  s_track_array_msg.header = out_message.header;
 
   path_markers.markers.clear();
   text_markers.markers.clear();
   path_markers.markers.reserve(output_stracks.size());
   text_markers.markers.reserve(output_stracks.size());
   poses_message.poses.reserve(output_stracks.size());
+  s_track_array_msg.tracks.reserve(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
     auto current_track = output_stracks[i];
@@ -571,6 +576,7 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
 
     auto single_det = out_message.detections[i];
 
+    s_track_array_msg.tracks.push_back(current_track->toMessage());
     // Publish a path for each track, with relative text
     visualization_msgs::msg::Marker text;
     visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
@@ -581,6 +587,7 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   }
 
   _det_publisher->publish(out_message);
+  _tracks_publisher->publish(s_track_array_msg);
   _det_poses_publisher->publish(poses_message);
   _path_publisher->publish(path_markers);
   _text_publisher->publish(text_markers);

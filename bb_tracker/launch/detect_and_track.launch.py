@@ -33,7 +33,7 @@ def generate_launch_description():
         ],
         parameters=[config],
         output='screen',
-        #prefix=["xterm -font 10x20 -e gdb -ex run --args"] # add gdb
+        # prefix=["xterm -font 10x20 -e gdb -ex run --args"] # add gdb
         prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
     )
 
@@ -78,9 +78,9 @@ def generate_launch_description():
             {'lidar_max_distances'  : [30]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
-            {"percentage_miss"      : 0.15},
-            {"noise_position"       : 0.30},
-            {"noise_size"           : 0.15},
+            {"percentage_miss"      : 0.0},
+            {"noise_position"       : 0.0},
+            {"noise_size"           : 0.0},
             {"noise_orientation"    : 0.0}
         ]
     )

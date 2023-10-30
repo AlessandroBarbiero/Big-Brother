@@ -44,7 +44,8 @@ def generate_launch_description():
 
     visualizer_node = Node(
         package="bb_utils",
-        executable="bb_visualizer"
+        executable="bb_visualizer",
+        # prefix=["xterm -font 10x20 -e gdb -ex run --args"] # add gdb
     )
 
 

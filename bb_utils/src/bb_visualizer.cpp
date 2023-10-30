@@ -13,7 +13,7 @@
 // #include "bb_interfaces/srv/change_message.hpp"
 
 #include "bb_interfaces/msg/stats.hpp"
-
+#include "bb_interfaces/msg/s_track_array.hpp"
 
 #include "imgui_framework.hpp"
 #include "imgui.h"
@@ -58,11 +58,6 @@ class BBVisualizer : public rclcpp::Node
     BBVisualizer()
     : Node("bb_visualizer")
     {
-      // publisher_ = this->create_publisher<bb_interfaces::msg::Message>("topic", 10);
-
-      // timer_ = this->create_wall_timer(
-      // 500ms, std::bind(&BBVisualizer::timer_callback, this));
-
       ImGUI_f::init(1280, 720, "bb_visualizer");
       ImGUI_f::uploadFonts();
 
@@ -72,8 +67,9 @@ class BBVisualizer : public rclcpp::Node
       // srv_ = this->create_service<bb_interfaces::srv::ChangeMessage>("change_message",  std::bind(&BBVisualizer::change_message, this, _1, _2)); 
       _stats_sub = this->create_subscription<bb_interfaces::msg::Stats>(
       "benchmark/stats", 10, std::bind(&BBVisualizer::update_stats, this, _1));
+      _strack_sub = this->create_subscription<bb_interfaces::msg::STrackArray>(
+      "bytetrack/active_tracks_explicit", 10, std::bind(&BBVisualizer::update_stracks, this, _1));
 
-      
     }
 
     // void change_message(const std::shared_ptr<bb_interfaces::srv::ChangeMessage::Request> request,
@@ -88,14 +84,19 @@ class BBVisualizer : public rclcpp::Node
     // }
 
   private:
-    // void timer_callback()
-    // {
-    //   auto message = bb_interfaces::msg::Message();
-    //   message.mess = message_ + std::to_string(count_++);
-    //   RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.mess.c_str());
-    //   publisher_->publish(message);
 
-    // }
+    // Make the UI compact because there are so many fields
+    static void PushStyleCompact()
+    {
+        ImGuiStyle& style = ImGui::GetStyle();
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, (float)(int)(style.FramePadding.y * 0.60f)));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(style.ItemSpacing.x, (float)(int)(style.ItemSpacing.y * 0.60f)));
+    }
+
+    static void PopStyleCompact()
+    {
+        ImGui::PopStyleVar(2);
+    }
 
     void update_stats(std::shared_ptr<bb_interfaces::msg::Stats> stats_message){
       _statistics_map = {
@@ -135,6 +136,10 @@ class BBVisualizer : public rclcpp::Node
 
     }
 
+    void update_stracks(std::shared_ptr<bb_interfaces::msg::STrackArray> strack_message){
+      _last_track_msg = *strack_message.get();
+    }
+
     void update_imgui(){
 
       glfwPollEvents();
@@ -157,9 +162,9 @@ class BBVisualizer : public rclcpp::Node
       window_flags |= ImGuiWindowFlags_NoDocking;
 
       visualizeStats();
+      visualizeTracks();
+
       ImGui::Begin("Framerate", NULL, window_flags);
-
-
       // ImGui::InputText("message to publish", message_, IM_ARRAYSIZE(message_));
 
       // if (spawnWord_ && spawnTimer_ < spawnDuration_) {
@@ -179,6 +184,88 @@ class BBVisualizer : public rclcpp::Node
 
       ImGUI_f::render();
 
+    }
+
+    void visualizeTracks(){
+      static float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
+      static float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
+
+      ImGuiWindowFlags window_flags = 0;
+      window_flags |= ImGuiWindowFlags_NoDocking;
+      ImGui::Begin("Tracks", NULL, window_flags);
+
+      static ImGuiTableFlags flags = ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | 
+      ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | 
+      ImGuiTableFlags_Hideable | ImGuiTableFlags_Sortable | ImGuiTableFlags_SortMulti;
+      static int freeze_cols = 1;
+      static int freeze_rows = 1;
+
+      PushStyleCompact();
+      ImGui::CheckboxFlags("ImGuiTableFlags_Resizable", &flags, ImGuiTableFlags_Resizable);
+      ImGui::CheckboxFlags("ImGuiTableFlags_ScrollX", &flags, ImGuiTableFlags_ScrollX);
+      ImGui::CheckboxFlags("ImGuiTableFlags_ScrollY", &flags, ImGuiTableFlags_ScrollY);
+      ImGui::CheckboxFlags("ImGuiTableFlags_SortMulti", &flags, ImGuiTableFlags_SortMulti);
+      ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
+      ImGui::DragInt("freeze_cols", &freeze_cols, 0.2f, 0, 9, NULL, ImGuiSliderFlags_NoInput);
+      ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
+      ImGui::DragInt("freeze_rows", &freeze_rows, 0.2f, 0, 9, NULL, ImGuiSliderFlags_NoInput);
+      PopStyleCompact();
+
+      ImGui::Spacing();
+
+      ImVec2 outer_size = ImVec2(0.0f, TEXT_BASE_HEIGHT * 8);
+      if (ImGui::BeginTable("tracks_table", 13, flags, outer_size))
+      {
+        ImGui::TableSetupScrollFreeze(freeze_cols, freeze_rows);
+        ImGui::TableSetupColumn("TrackID", ImGuiTableColumnFlags_NoHide); // Make the first column not hideable to match our use of TableSetupScrollFreeze()
+        ImGui::TableSetupColumn("IsActivated");
+        ImGui::TableSetupColumn("State");
+        ImGui::TableSetupColumn("Class");
+        ImGui::TableSetupColumn("Score");
+        ImGui::TableSetupColumn("X");
+        ImGui::TableSetupColumn("Y");
+        ImGui::TableSetupColumn("Theta");
+        ImGui::TableSetupColumn("Size x");
+        ImGui::TableSetupColumn("Size y");
+        ImGui::TableSetupColumn("Size z");
+        ImGui::TableSetupColumn("V");
+        ImGui::TableSetupColumn("W");
+        ImGui::TableHeadersRow();
+        for (size_t row = 0; row < this->_last_track_msg.tracks.size(); row++)
+        {
+          bb_interfaces::msg::STrack track = _last_track_msg.tracks[row];
+          ImGui::TableNextRow();
+          if (ImGui::TableSetColumnIndex(0))   // TrackID
+            ImGui::Text("%ld", track.track_id);
+          if (ImGui::TableSetColumnIndex(1))   // IsActivated
+            ImGui::Text("%s", track.is_activated ? "true" : "false");
+          if (ImGui::TableSetColumnIndex(2))   // State
+            ImGui::Text("%s", track.state.c_str());
+          if (ImGui::TableSetColumnIndex(3))   // Class
+            ImGui::Text("%s", track.class_name.c_str());
+          if (ImGui::TableSetColumnIndex(4))   // Score
+            ImGui::Text("%.2f", track.score);
+          if (ImGui::TableSetColumnIndex(5))   // X
+            ImGui::Text("%.2f", track.mean[0]);
+          if (ImGui::TableSetColumnIndex(6))   // Y
+            ImGui::Text("%.2f", track.mean[1]);
+          if (ImGui::TableSetColumnIndex(7))   // Theta
+            ImGui::Text("%.2f", track.mean[2]);
+          if (ImGui::TableSetColumnIndex(8))   // Size x
+            ImGui::Text("%.2f", track.mean[3]);
+          if (ImGui::TableSetColumnIndex(9))   // Size y
+            ImGui::Text("%.2f", track.mean[4]);
+          if (ImGui::TableSetColumnIndex(10))   // Size z
+            ImGui::Text("%.2f", track.mean[5]);
+          if (ImGui::TableSetColumnIndex(11))   // V
+            ImGui::Text("%.2f", track.mean[6]);
+          if (ImGui::TableSetColumnIndex(12))   // W
+            ImGui::Text("%.2f", track.mean[7]);
+        }
+        ImGui::EndTable();
+      }
+
+      ImGui::End();
     }
 
     void visualizeStats(){
@@ -291,9 +378,9 @@ class BBVisualizer : public rclcpp::Node
           {
               ImGui::TableNextRow();
               ImGui::TableSetColumnIndex(0);
-              ImGui::Text(pair.first.c_str());
+              ImGui::Text("%s", pair.first.c_str());
               ImGui::TableSetColumnIndex(1);
-              ImGui::Text(pair.second.c_str());
+              ImGui::Text("%s", pair.second.c_str());
           }
           ImGui::EndTable();
       }
@@ -374,6 +461,8 @@ class BBVisualizer : public rclcpp::Node
     // rclcpp::Publisher<bb_interfaces::msg::Message>::SharedPtr publisher_;
     // rclcpp::Service<bb_interfaces::srv::ChangeMessage>::SharedPtr srv_;
 
+    // %%%%%%%%% STrack
+    bb_interfaces::msg::STrackArray _last_track_msg;
 
     // %%%%%%%%% Stats
     int _tot_false_positive, _tot_true_positive, _tot_missed, _tot_objects_to_detect;
@@ -383,8 +472,8 @@ class BBVisualizer : public rclcpp::Node
 
     rclcpp::TimerBase::SharedPtr imgui_timer_;
 
-
     rclcpp::Subscription<bb_interfaces::msg::Stats>::SharedPtr _stats_sub;
+    rclcpp::Subscription<bb_interfaces::msg::STrackArray>::SharedPtr _strack_sub;
 };
 
 

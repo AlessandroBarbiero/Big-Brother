@@ -18,6 +18,7 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <bb_interfaces/msg/s_track_array.hpp>
 // extra
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -89,6 +90,7 @@ class BBTracker : public rclcpp::Node
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr _det_poses_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _text_publisher;
+    rclcpp::Publisher<bb_interfaces::msg::STrackArray>::SharedPtr _tracks_publisher;
 
     // Detection 3D
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection3d;

@@ -1,5 +1,11 @@
 #include <bb_tracker/STrack.h>
 
+std::unordered_map<int, std::string> STrack::trackStateToString{
+	{0,"New"},
+	{1,"Tracked"},
+	{2,"Lost"},
+	{3,"Removed"}
+};
 
 STrack::STrack(Object2D *obj, std::string class_name)
 {
@@ -96,6 +102,11 @@ void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ
 	xyabt_box[2] = (vis2D_tlbr[2] - vis2D_tlbr[0])/2.0;
 	xyabt_box[3] = (vis2D_tlbr[3] - vis2D_tlbr[1])/2.0;
 	xyabt_box[4] = 0;
+	if(xyabt_box[2]<xyabt_box[3]){
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
+
 	auto mc = this->kalman_filter.initiate2D(xyabt_box, V, P);
 	this->mean = mc.first;
 	this->covariance = mc.second;
@@ -128,6 +139,10 @@ void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
 	xyabt_box[2] = (tlbr[2]-tlbr[0])/2.0;	// a
 	xyabt_box[3] = (tlbr[3]-tlbr[1])/2.0;	// b
 	xyabt_box[4] = 0;						// theta
+	if(xyabt_box[2]<xyabt_box[3]){
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
 
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
@@ -213,6 +228,10 @@ void STrack::update(Object2D &new_track, int frame_id)
 	xyabt_box[2] = (tlbr[2]-tlbr[0])/2.0;	// a
 	xyabt_box[3] = (tlbr[3]-tlbr[1])/2.0;	// b
 	xyabt_box[4] = 0;						// theta
+	if(xyabt_box[2]<xyabt_box[3]){
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
 
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
@@ -400,4 +419,16 @@ void STrack::multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_im
 void STrack::setViewProjection(std::shared_ptr<TRANSFORMATION> V, std::shared_ptr<PROJ_MATRIX> P){
 	kalman_filter.P = P;
 	kalman_filter.V = V;
+}
+
+bb_interfaces::msg::STrack STrack::toMessage(){
+	bb_interfaces::msg::STrack message;
+	message.is_activated = 	is_activated;
+	message.track_id =		track_id;
+	message.state =			trackStateToString[state];
+	message.mean = 			vector<float>(mean.data(), mean.data() + mean.rows() * mean.cols());
+	message.covariance = 	vector<float>(covariance.data(), covariance.data() + covariance.rows() * covariance.cols());
+	message.class_name = 	class_name;
+	message.score = 		score;
+	return message;
 }

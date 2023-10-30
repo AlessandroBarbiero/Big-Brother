@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <memory>
+#include <map>
 #include <opencv2/opencv.hpp>
 #include "EKF.hpp"
 #include <visualization_msgs/msg/marker.hpp>
+#include <bb_interfaces/msg/s_track.hpp>
 #include "dataType.h"
 
 #include "ellipsoid_ellipse.hpp"
@@ -45,11 +47,13 @@ public:
 	void update(STrack &new_track, int frame_id);
 	void update(Object2D &new_track, int frame_id);
 	void setViewProjection(std::shared_ptr<TRANSFORMATION> V, std::shared_ptr<PROJ_MATRIX> P);
+	bb_interfaces::msg::STrack toMessage();
 
 public:
 	bool is_activated;
 	int track_id;
 	int state;
+	static std::unordered_map<int, std::string> trackStateToString;
 
 	// Used during the creation phase
 	vector<float> _minwdh;
