@@ -34,7 +34,8 @@ class FakeDetector(Node):
                 ("percentage_miss", 0.15),
                 ("noise_position", 0.01),
                 ("noise_size", 0.01),
-                ("noise_orientation", 0.001)
+                ("noise_orientation", 0.001),
+                ("active", True)
             ]
         )
         random_seed = self.get_parameter('random_seed').value
@@ -110,6 +111,9 @@ class FakeDetector(Node):
         return filtered
 
     def publish_detections(self, stamp):
+        active = self.get_parameter('active').value
+        if(not active):
+            return
         detections_msg = Detection3DArray()
         detections_msg.header.stamp = stamp
         detections_msg.header.frame_id = self.fixed_frame

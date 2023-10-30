@@ -85,17 +85,17 @@ namespace byte_kalman
 	}
 
 	
-	KAL_DATA KalmanFilter::initiate2D(const DETECTBOX2D &measurement)
+	KAL_DATA KalmanFilter::initiate2D(const DETECTBOX2D &measurement, TRANSFORMATION &V, PROJ_MATRIX &P)
 	{
-		KAL_MEAN mean;
-		mean(0) = measurement(0); 	// x
-		mean(1) = measurement(1); 	// y
-		mean(2) = 0;				// theta
-		mean(3) = measurement(2); 	// l_ratio
-		mean(4) = 0.5;				// d_ratio
-		mean(5) = measurement(3);	// h
-		mean(6) = 0;				// v
-		mean(7) = 0;				// w
+		KAL_MEAN mean = ellipsoidFromEllipse(measurement, V, P);
+		// mean(0) = measurement(0); 	// x
+		// mean(1) = measurement(1); 	// y
+		// mean(2) = 0;					// theta
+		// mean(3) = measurement(2); 	// l_ratio
+		// mean(4) = 0.5;				// d_ratio
+		// mean(5) = 1.6;				// h
+		// mean(6) = 0;					// v
+		// mean(7) = 0;					// w
 
 		// TODO: Refine P0, starting variance -> accuracy of the estimate
 		KAL_MEAN std;

@@ -19,6 +19,7 @@ class STrack
 {
 public:
 	STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms);
+	STrack(Object2D *obj, std::string class_name);
 	~STrack();
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
@@ -37,7 +38,8 @@ public:
 	int next_id();
 	int end_frame();
 	
-	void activate(byte_kalman::EKF &kalman_filter, int frame_id);
+	void activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ_MATRIX &P, int frame_id);
+	void activate3D(byte_kalman::EKF &kalman_filter, int frame_id);
 	void re_activate(STrack &new_track, int frame_id, bool new_id = false);
 	void re_activate(Object2D &new_track, int frame_id, bool new_id = false);
 	void update(STrack &new_track, int frame_id);

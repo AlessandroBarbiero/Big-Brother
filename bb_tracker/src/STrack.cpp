@@ -1,6 +1,22 @@
 #include <bb_tracker/STrack.h>
 
 
+STrack::STrack(Object2D *obj, std::string class_name)
+{
+	this->vis2D_tlbr = obj->tlbr;
+
+	is_activated = false;
+	track_id = 0;
+	state = TrackState::New;
+	
+	frame_id = 0;
+	tracklet_len = 0;
+	this->score = obj->prob;
+	this->class_name = class_name;
+	start_frame = 0;
+	last_filter_update_ms = obj->time_ms;
+}
+
 STrack::STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms)
 {
 	_minwdh.resize(6);
@@ -28,7 +44,7 @@ STrack::~STrack()
 	// std::cout<<"track deleted, id: "<< track_id << " size: " << path_marker.points.size() << std::endl;
 }
 
-void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
+void STrack::activate3D(byte_kalman::EKF &kalman_filter, int frame_id)
 {
 	this->kalman_filter = kalman_filter;
 	this->track_id = this->next_id();
@@ -69,7 +85,39 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	this->start_frame = frame_id;
 }
 
-// TODO: implement
+void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ_MATRIX &P, int frame_id)
+{
+	this->kalman_filter = kalman_filter;
+	this->track_id = this->next_id();
+
+	DETECTBOX2D xyabt_box;
+	xyabt_box[0] = (vis2D_tlbr[0] + vis2D_tlbr[2])/2.0;
+	xyabt_box[1] = (vis2D_tlbr[1] + vis2D_tlbr[3])/2.0;
+	xyabt_box[2] = (vis2D_tlbr[2] - vis2D_tlbr[0])/2.0;
+	xyabt_box[3] = (vis2D_tlbr[3] - vis2D_tlbr[1])/2.0;
+	xyabt_box[4] = 0;
+	auto mc = this->kalman_filter.initiate2D(xyabt_box, V, P);
+	this->mean = mc.first;
+	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
+	theta = mean[2];
+
+	// The state has to be updated before the static minwdh in 2D
+	this->state = TrackState::Tracked;
+	static_minwdh();
+	static_minmax();
+
+	this->tracklet_len = 0;
+	if (frame_id == 1)
+	{
+		this->is_activated = true;
+	}
+	//this->is_activated = true;
+	this->frame_id = frame_id;
+	this->start_frame = frame_id;
+}
+
 void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
 {
 	vector<float> tlbr = new_track.tlbr;
@@ -148,13 +196,13 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 	this->score = (this->score*2 + new_score)/3;
 }
 
-// TODO: implement
 void STrack::update(Object2D &new_track, int frame_id)
 {
 	auto current_time_ms = new_track.time_ms;
 
-	if(checkOldDetection(current_time_ms))
-		return; // Saved state is more updated than detection, do not update
+	// TODO: removed old update
+	// if(checkOldDetection(current_time_ms))
+	// 	return; // Saved state is more updated than detection, do not update
 
 	// Handle detection and update
 	vector<float> tlbr = new_track.tlbr;
@@ -169,15 +217,18 @@ void STrack::update(Object2D &new_track, int frame_id)
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
 	auto new_score = new_track.prob;
-	updateTrackState(mc, current_time_ms, new_score, frame_id);
+	// TODO: removed time update
+	// updateTrackState(mc, current_time_ms, new_score, frame_id);
+	updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
 }
 
 void STrack::update(STrack &new_track, int frame_id)
 {
 	auto current_time_ms = new_track.last_filter_update_ms;
 
-	if(checkOldDetection(current_time_ms))
-		return; // Saved state is more updated than detection, do not update
+	// TODO: removed old detection
+	// if(checkOldDetection(current_time_ms))
+	// 	return; // Saved state is more updated than detection, do not update
 
 	// Handle detection and update
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
@@ -298,7 +349,7 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		double dt = (static_cast<long long>(current_time_ms) - static_cast<long long>(stracks[i]->last_filter_update_ms))/MILLIS_IN_SECONDS;
+		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
 		
 		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update

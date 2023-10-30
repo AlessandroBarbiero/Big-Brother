@@ -243,6 +243,15 @@ inline ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TR
   return result;
 }
 
+inline KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, TRANSFORMATION &vMat, PROJ_MATRIX &P){
+  KAL_MEAN result;
+  // Eigen::Vector3f point2d;
+  // point2d << state(0), state(1);
+  // Eigen::Vector4f point3d = (P * vMat).inverse()*point2d;
+  // point3d = point3d / point3d(3);
+  // result << point3d(0), point3d(1), 0.0, 1.0, 1.0, 1.6, 0.0, 0.0;
+  return result;
+}
 
 inline bool ellipseInImage(float ecx, float ecy, float ea, float eb, int width, int height){
   return (ea > 0 && eb > 0 && ecx-ea > 0 && ecx+ea < width && ecy-eb > 0 && ecy+eb < height);

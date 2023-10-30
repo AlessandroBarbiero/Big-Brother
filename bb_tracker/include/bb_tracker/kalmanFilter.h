@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dataType.h"
+#include <bb_tracker/ellipsoid_ellipse.hpp>
 //TODO: add when finished to speed up
 // #define DEIGEN_NO_DEBUG
 
@@ -12,7 +13,7 @@ namespace byte_kalman
 		static const double chi2inv95[10];
 		KalmanFilter();
 		KAL_DATA initiate3D(const DETECTBOX3D& measurement);
-		KAL_DATA initiate2D(const DETECTBOX2D& measurement);
+		KAL_DATA initiate2D(const DETECTBOX2D& measurement, TRANSFORMATION &V, PROJ_MATRIX &P);
 
 		/**
 		 * Predicts the Kalman filter state and covariance at the next step and returns them throught the input parameters
