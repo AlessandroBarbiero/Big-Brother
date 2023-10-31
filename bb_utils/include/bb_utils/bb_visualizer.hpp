@@ -67,6 +67,7 @@ class BBVisualizer : public rclcpp::Node
     //   spawnWord_ = true;
     //   spawnTimer_ = 0.0f;
     // }
+    static const ImGuiTableSortSpecs* s_current_sort_specs;
 
   private:
 

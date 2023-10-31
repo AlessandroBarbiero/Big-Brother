@@ -1,7 +1,8 @@
 #include <bb_utils/bb_visualizer.hpp>
 
-// Compare function to be used by qsort()
-static int CompareWithSortSpecs(const void* lhs, const void* rhs);
+const ImGuiTableSortSpecs* BBVisualizer::s_current_sort_specs = NULL;
+// Compare function to be used by sort()
+bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfaces::msg::STrack& b);
 
 BBVisualizer::BBVisualizer()
 : Node("bb_visualizer")
@@ -138,9 +139,6 @@ void BBVisualizer::visualizeTracks(){
 
   PushStyleCompact();
   ImGui::CheckboxFlags("ImGuiTableFlags_Resizable", &flags, ImGuiTableFlags_Resizable);
-  // ImGui::CheckboxFlags("ImGuiTableFlags_ScrollX", &flags, ImGuiTableFlags_ScrollX);
-  // ImGui::CheckboxFlags("ImGuiTableFlags_ScrollY", &flags, ImGuiTableFlags_ScrollY);
-  // ImGui::CheckboxFlags("ImGuiTableFlags_SortMulti", &flags, ImGuiTableFlags_SortMulti);
   ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
   ImGui::DragInt("freeze_cols", &freeze_cols, 0.2f, 0, 9, NULL, ImGuiSliderFlags_NoInput);
   ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
@@ -150,7 +148,6 @@ void BBVisualizer::visualizeTracks(){
   ImGui::Spacing();
 
   static ImVector<int64_t> selection;
-  static bool items_need_sort = false;
 
   ImVec2 outer_size = ImVec2(0.0f, TEXT_BASE_HEIGHT * 8);
   if (ImGui::BeginTable("tracks_table", 13, flags, outer_size))
@@ -170,28 +167,25 @@ void BBVisualizer::visualizeTracks(){
     ImGui::TableSetupColumn("V");
     ImGui::TableSetupColumn("W");
 
-    // Sort our data if sort specs have been changed!
+    // Sort our data
     ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs();
-    if (sorts_specs && sorts_specs->SpecsDirty)
-        items_need_sort = true;
-    if (sorts_specs && items_need_sort && _last_track_msg.tracks.size() > 1)
+    if (sorts_specs && _last_track_msg.tracks.size() > 1)
     {
-        //s_current_sort_specs = sorts_specs; // Store in variable accessible by the sort function.
-        qsort(&_last_track_msg.tracks[0], (size_t)_last_track_msg.tracks.size(), sizeof(_last_track_msg.tracks[0]), CompareWithSortSpecs);
-        //s_current_sort_specs = NULL;
-        sorts_specs->SpecsDirty = false;
+        s_current_sort_specs = sorts_specs; // Store in variable accessible by the sort function.
+        std::sort(_last_track_msg.tracks.begin(), _last_track_msg.tracks.end(), CompareWithSortSpecs);
     }
-    items_need_sort = false;
 
 
     ImGui::TableHeadersRow();
+
     for (size_t row = 0; row < this->_last_track_msg.tracks.size(); row++)
     {
-      
       bb_interfaces::msg::STrack track = _last_track_msg.tracks[row];
+
       const bool item_is_selected = selection.contains(track.track_id);
       ImGui::PushID(track.track_id);
       ImGui::TableNextRow();
+
 
       ImGui::TableSetColumnIndex(0);   // TrackID
       char label[32];
@@ -418,40 +412,37 @@ void BBVisualizer::plotPieGraphs(int dim){
 }
 
 
-int CompareWithSortSpecs(const void* lhs, const void* rhs)
+bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfaces::msg::STrack& b)
   {
-    const bb_interfaces::msg::STrack* a = (const bb_interfaces::msg::STrack*)lhs;
-    const bb_interfaces::msg::STrack* b = (const bb_interfaces::msg::STrack*)rhs;
-    // for (int n = 0; n < BBVisualizer::s_current_sort_specs->SpecsCount; n++)
-    // {
-    //     const ImGuiTableColumnSortSpecs* sort_spec = &BBVisualizer::s_current_sort_specs->Specs[n];
-    //     int delta = 0;
-    //     switch (sort_spec->ColumnUserID)
-    //     {
-    //     case 0:    delta = (a->track_id - b->track_id);                              break;
-    //     case 1:    delta = (a->is_activated ? 1 : -1);                               break;
-    //     case 2:    delta = (strcmp(a->state.c_str(), b->state.c_str()));             break;
-    //     case 3:    delta = (strcmp(a->class_name.c_str(), b->class_name.c_str()));   break;
-    //     case 4:    delta = (a->score - b->score);                                    break;
-    //     case 5:    delta = (a->mean[0] - b->mean[0]);                                break;
-    //     case 6:    delta = (a->mean[1] - b->mean[1]);                                break;
-    //     case 7:    delta = (a->mean[2] - b->mean[2]);                                break;
-    //     case 8:    delta = (a->mean[3] - b->mean[3]);                                break;
-    //     case 9:    delta = (a->mean[4] - b->mean[4]);                                break;
-    //     case 10:   delta = (a->mean[5] - b->mean[5]);                                break;
-    //     case 11:   delta = (a->mean[6] - b->mean[6]);                                break;
-    //     case 12:   delta = (a->mean[7] - b->mean[7]);                                break;
-    //     default: IM_ASSERT(0); break;
-    //     }
-    //     if (delta > 0)
-    //         return (sort_spec->SortDirection == ImGuiSortDirection_Ascending) ? +1 : -1;
-    //     if (delta < 0)
-    //         return (sort_spec->SortDirection == ImGuiSortDirection_Ascending) ? -1 : +1;
-    //   }
+    for (int n = 0; n < BBVisualizer::s_current_sort_specs->SpecsCount; n++)
+    {
+        const ImGuiTableColumnSortSpecs* sort_spec = &BBVisualizer::s_current_sort_specs->Specs[n];
+        int delta = 0;
+        switch (sort_spec->ColumnUserID)
+        {
+        case 0:    delta = (a.track_id - b.track_id);                              break;
+        case 1:    delta = (a.is_activated ? 1 : -1);                               break;
+        case 2:    delta = (strcmp(a.state.c_str(), b.state.c_str()));             break;
+        case 3:    delta = (strcmp(a.class_name.c_str(), b.class_name.c_str()));   break;
+        case 4:    delta = (a.score - b.score);                                    break;
+        case 5:    delta = (a.mean[0] - b.mean[0]);                                break;
+        case 6:    delta = (a.mean[1] - b.mean[1]);                                break;
+        case 7:    delta = (a.mean[2] - b.mean[2]);                                break;
+        case 8:    delta = (a.mean[3] - b.mean[3]);                                break;
+        case 9:    delta = (a.mean[4] - b.mean[4]);                                break;
+        case 10:   delta = (a.mean[5] - b.mean[5]);                                break;
+        case 11:   delta = (a.mean[6] - b.mean[6]);                                break;
+        case 12:   delta = (a.mean[7] - b.mean[7]);                                break;
+        default: IM_ASSERT(0); break;
+        }
+        if (delta > 0)
+            return (sort_spec->SortDirection == ImGuiSortDirection_Ascending);
+        if (delta < 0)
+            return (sort_spec->SortDirection != ImGuiSortDirection_Ascending);
+      }
 
-      // qsort() is instable so always return a way to differenciate items.
-      // Your own compare function may want to avoid fallback on implicit sort specs e.g. a Name compare if it wasn't already part of the sort specs.
-      return (a->track_id - b->track_id);
+      // Always return a way to differenciate items.
+      return (a.track_id - b.track_id)>0;
   }
 
 
