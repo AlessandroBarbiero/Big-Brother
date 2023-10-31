@@ -148,6 +148,8 @@ void BBVisualizer::visualizeTracks(){
   ImGui::Spacing();
 
   static ImVector<int64_t> selection;
+  static ImGuiTextFilter filter;
+  filter.Draw("Filter by TrackID");
 
   ImVec2 outer_size = ImVec2(0.0f, TEXT_BASE_HEIGHT * 8);
   if (ImGui::BeginTable("tracks_table", 13, flags, outer_size))
@@ -181,6 +183,8 @@ void BBVisualizer::visualizeTracks(){
     for (size_t row = 0; row < this->_last_track_msg.tracks.size(); row++)
     {
       bb_interfaces::msg::STrack track = _last_track_msg.tracks[row];
+      if (!filter.PassFilter(std::to_string(track.track_id).c_str()))
+        continue;
 
       const bool item_is_selected = selection.contains(track.track_id);
       ImGui::PushID(track.track_id);
