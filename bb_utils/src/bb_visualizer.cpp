@@ -159,15 +159,15 @@ void BBVisualizer::visualizeTracks(){
     ImGui::TableSetupColumn("IsActivated");
     ImGui::TableSetupColumn("State");
     ImGui::TableSetupColumn("Class");
-    ImGui::TableSetupColumn("Score");
-    ImGui::TableSetupColumn("X");
-    ImGui::TableSetupColumn("Y");
-    ImGui::TableSetupColumn("Theta");
-    ImGui::TableSetupColumn("Size x");
-    ImGui::TableSetupColumn("Size y");
-    ImGui::TableSetupColumn("Size z");
-    ImGui::TableSetupColumn("V");
-    ImGui::TableSetupColumn("W");
+    ImGui::TableSetupColumn("Score (%)");
+    ImGui::TableSetupColumn("X (m)");
+    ImGui::TableSetupColumn("Y (m)");
+    ImGui::TableSetupColumn("Theta (rad)");
+    ImGui::TableSetupColumn("Size x (m)");
+    ImGui::TableSetupColumn("Size y (m)");
+    ImGui::TableSetupColumn("Size z (m)");
+    ImGui::TableSetupColumn("V (m/s)");
+    ImGui::TableSetupColumn("W (rad/s)");
 
     // Sort our data
     ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs();
@@ -226,9 +226,9 @@ void BBVisualizer::visualizeTracks(){
       if (ImGui::TableSetColumnIndex(7))   // Theta
         ImGui::Text("%.2f", track.mean[2]);
       if (ImGui::TableSetColumnIndex(8))   // Size x
-        ImGui::Text("%.2f", track.mean[3]);
+        ImGui::Text("%.2f", track.mean[3]*track.mean[5]);
       if (ImGui::TableSetColumnIndex(9))   // Size y
-        ImGui::Text("%.2f", track.mean[4]);
+        ImGui::Text("%.2f", track.mean[4]*track.mean[5]);
       if (ImGui::TableSetColumnIndex(10))   // Size z
         ImGui::Text("%.2f", track.mean[5]);
       if (ImGui::TableSetColumnIndex(11))   // V
