@@ -124,8 +124,18 @@ namespace byte_kalman
 		Eigen::Matrix<float, 8, 8, Eigen::RowMajor> _motion_mat;			// F
 		Eigen::Matrix<float, 6, 8, Eigen::RowMajor> _observation_mat3D; 	// H_3D
 		Eigen::Matrix<float, 5, 8, Eigen::RowMajor> _observation_mat2D; 	// H_2D
+
+		//Noise
+		KAL_COVA _var_P0_3D, _var_P0_2D;
+		KAL_COVA _process_noise_cov;
+		KAL_HCOVA3D _measure_noise3D_var;
+		KAL_HCOVA2D _measure_noise2D_var;
+
 		float _std_weight_position;
+		float _std_weight_size;
+		float _std_weight_angle;
 		float _std_weight_velocity;
+		float _std_weight_pixel;
 		int detection3D_dim = 6;
 		int detection2D_dim = 5;
 		int state_dim = 8;
