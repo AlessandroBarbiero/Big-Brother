@@ -21,7 +21,7 @@ namespace byte_kalman
 
 	protected: 
 		// Call this before the update, the update will use the updated jacobians
-        void computeJacobianMotion(const KAL_MEAN &mean);
+        void computeJacobianMotion(const KAL_MEAN &mean, double dt);
 		void computeJacobianObservation2D(const KAL_MEAN &mean);
 		// void computeJacobianObservation3D(const KAL_MEAN &mean);
 		KAL_MEAN predictState(KAL_MEAN &mean, double dt);

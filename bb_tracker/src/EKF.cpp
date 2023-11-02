@@ -25,14 +25,13 @@ namespace byte_kalman
 		return ellipseFromEllipsoidv2(mean, *V, *P);
 	}
 
-	void EKF::computeJacobianMotion(const KAL_MEAN &mean){
+	void EKF::computeJacobianMotion(const KAL_MEAN &mean, double dt){
       	_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
-		_motion_mat(0,6) = cos(mean(2));
-		_motion_mat(0,2) = - mean(6)*sin(mean(2));
-		_motion_mat(1,6) = sin(mean(2));
-		_motion_mat(1,2) = mean(6)*cos(mean(2));
-		_motion_mat(2,7) = 1.0;
-		
+		_motion_mat(0,6) = cos(mean(2))*dt;
+		_motion_mat(0,2) = - mean(6)*sin(mean(2))*dt;
+		_motion_mat(1,6) = sin(mean(2))*dt;
+		_motion_mat(1,2) = mean(6)*cos(mean(2))*dt;
+		_motion_mat(2,7) = 1.0*dt;
   	}
 
 	#include "computeJacobianEllipse.cpp"
@@ -70,7 +69,7 @@ namespace byte_kalman
 	}
 
 	void EKF::predict(KAL_MEAN& mean, KAL_COVA& covariance, double dt){
-		computeJacobianMotion(mean);
+		computeJacobianMotion(mean, dt);
 		KalmanFilter::predict(mean, covariance, dt);
 	}
 
