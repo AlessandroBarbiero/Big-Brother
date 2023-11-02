@@ -64,13 +64,14 @@ void STrack::activate3D(byte_kalman::EKF &kalman_filter, int frame_id)
 	_minwdh_tmp[5] = this->_minwdh[5];
 	vector<float> xyzaah = minwdh_to_xyzaah(_minwdh_tmp);
 
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];
-	xyaah_box[1] = xyzaah[1];
-	xyaah_box[2] = xyzaah[3];
-	xyaah_box[3] = xyzaah[4];
-	xyaah_box[4] = xyzaah[5];
-	auto mc = this->kalman_filter.initiate3D(xyaah_box);
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = this->theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
+	auto mc = this->kalman_filter.initiate3D(xy_yaw_aah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
 	this->mean_predicted = this->mean;
@@ -157,14 +158,15 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];
-	xyaah_box[1] = xyzaah[1];
-	xyaah_box[2] = xyzaah[3];
-	xyaah_box[3] = xyzaah[4];
-	xyaah_box[4] = xyzaah[5];
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = new_track.theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
 
-	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xyaah_box);
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
 
 	auto current_time_ms = new_track.last_filter_update_ms;
 	updateTrackState(mc, current_time_ms, new_track.score, frame_id, true);
@@ -252,14 +254,15 @@ void STrack::update(STrack &new_track, int frame_id)
 	// Handle detection and update
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
 
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];	// x
-	xyaah_box[1] = xyzaah[1];	// y
-	xyaah_box[2] = xyzaah[3];	// w/h
-	xyaah_box[3] = xyzaah[4];	// d/h
-	xyaah_box[4] = xyzaah[5];	// h
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = new_track.theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
 
-	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xyaah_box);
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
 
 	auto new_score = new_track.score;
 	updateTrackState(mc, current_time_ms, new_score, frame_id);

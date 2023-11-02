@@ -4,6 +4,11 @@
 
 namespace byte_kalman
 {
+
+	inline void normalizeAngle(float& angle){
+		angle = fmod(angle + M_PI, 2*M_PI) - M_PI;
+	}
+
 	const double KalmanFilter::chi2inv95[10] = {
 	0,
 	3.8415,
@@ -25,16 +30,11 @@ namespace byte_kalman
 		// [ x y t l d h v w ]
 		// [ 1 0 0 0 0 0 0 0 ]
 		// [ 0 1 0 0 0 0 0 0 ]
+		// [ 0 0 1 0 0 0 0 0 ]
 		// [ 0 0 0 1 0 0 0 0 ]
 		// [ 0 0 0 0 1 0 0 0 ]
 		// [ 0 0 0 0 0 1 0 0 ]
 		_observation_mat3D = Eigen::MatrixXf::Identity(detection3D_dim, state_dim);
-		_observation_mat3D(2,2)=0;
-		_observation_mat3D(2,3)=1;
-		_observation_mat3D(3,3)=0;
-		_observation_mat3D(4,4)=0;
-		_observation_mat3D(3,4)=1;
-		_observation_mat3D(4,5)=1;
 
 		// The `_observation_mat2D` matrix has the following form:
 		// [ x y t l d h v w ]
@@ -48,7 +48,7 @@ namespace byte_kalman
 		_observation_mat2D(3,3)=0;
 		_observation_mat2D(3,5)=1;
 
-		this->_std_weight_position = 1. / 20;
+		this->_std_weight_position = 1. / 2;
 		this->_std_weight_velocity = 1. / 30; // Changed from 1/120 to 1/30 -> it can now follow most motorbikes
 	}
 
@@ -61,10 +61,10 @@ namespace byte_kalman
 		KAL_MEAN mean;
 		mean(0) = measurement(0); 	// x
 		mean(1) = measurement(1); 	// y
-		mean(2) = 0;				// theta
-		mean(3) = measurement(2); 	// l_ratio
-		mean(4) = measurement(3);	// d_ratio
-		mean(5) = measurement(4);	// h
+		mean(2) = measurement(2);	// theta
+		mean(3) = measurement(3); 	// l_ratio
+		mean(4) = measurement(4);	// d_ratio
+		mean(5) = measurement(5);	// h
 		mean(6) = 0;				// v
 		mean(7) = 0;				// w
 
@@ -160,6 +160,7 @@ namespace byte_kalman
 			_std_weight_position,
 			_std_weight_position, 
 			_std_weight_position, 
+			_std_weight_position, 
 			_std_weight_position;
 		DETECTBOX3D tmp = std.array().square();
 		KAL_HCOVA3D measure_noise_var = tmp.asDiagonal();
@@ -172,6 +173,7 @@ namespace byte_kalman
 		KAL_HCOVA3D covariance1 = _observation_mat3D * covariance * (_observation_mat3D.transpose());
 		
 		covariance1 += measure_noise_var;
+		normalizeAngle(mean1(2));
 
 		return std::make_pair(mean1, covariance1);
 	}
@@ -201,6 +203,7 @@ namespace byte_kalman
 		KAL_HCOVA2D covariance1 = _observation_mat2D * covariance * (_observation_mat2D.transpose());
 		
 		covariance1 += measure_noise_var;
+		normalizeAngle(mean1(4));
 
 		return std::make_pair(mean1, covariance1);
 	}
@@ -227,16 +230,17 @@ namespace byte_kalman
 		// (H*P(t)*H^T + V2) * K = P(t)*H^T
 		// In other words:
 		// K = (P(t)*H^T)(H*P(t)*H^T + V2)^-1
-		Eigen::Matrix<float, 5, 8> B = (covariance * (_observation_mat3D.transpose())).transpose();
+		Eigen::Matrix<float, 6, 8> B = (covariance * (_observation_mat3D.transpose())).transpose();
 		// Computes the Cholesky decomposition and performs a triangular solve to find the Kalman gain.
 		// The Cholesky decomposition is a method to factorize a symmetric positive-definite matrix into 
 		// the product of a lower triangular matrix and its transpose. 
 		// The resulting lower triangular matrix is used to solve a linear system efficiently.
-		Eigen::Matrix<float, 8, 5> kalman_gain = (projected_cov.llt().solve(B)).transpose();
+		Eigen::Matrix<float, 8, 6> kalman_gain = (projected_cov.llt().solve(B)).transpose();
 
 		// Calculate the Innovation or measurement ERROR
 		// e(t) = y(t) - y~(t|t-1)
-		Eigen::Matrix<float, 1, 5> innovation = measurement - projected_mean;
+		Eigen::Matrix<float, 1, 6> innovation = measurement - projected_mean;
+		normalizeAngle(innovation(2));
 
 		// Compute new STATE estimate
 		// x(t|t) = x(t+1|t) + K(t) * e(t)
@@ -249,16 +253,14 @@ namespace byte_kalman
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
 		// Keep speed > 0, move only forward
-		if(new_mean(6)<0){
-			new_mean(6)*=-1;
-			new_mean(2)+= M_PI;
-		}
+		// if(new_mean(6)<0){
+		// 	new_mean(6)*=-1;
+		// 	new_mean(2)+= M_PI;
+		// }
 
-		// Keep theta within [0 , 2*PI]
-		if(new_mean(2) > 2*M_PI)
-			new_mean(2) -= 2*M_PI;
-		else if (new_mean(2) < 0)
-			new_mean(2) += 2*M_PI;
+		// Keep theta within [-PI , PI]
+		normalizeAngle(new_mean(2));
+
 
 		return std::make_pair(new_mean, new_covariance);
 	}
@@ -272,6 +274,7 @@ namespace byte_kalman
 		KAL_HDATA2D pa = project2D(mean, covariance);
 		KAL_HMEAN2D projected_mean = pa.first;
 		KAL_HCOVA2D projected_cov = pa.second;
+		normalizeAngle(projected_mean(4));
 
 		// K = (P(t)*H^T)(H*P(t)*H^T + V2)^-1
 		Eigen::Matrix<float, 5, 8> B = (covariance * (_observation_mat2D.transpose())).transpose();
@@ -281,6 +284,8 @@ namespace byte_kalman
 		// Calculate the Innovation or measurement ERROR
 		// e(t) = y(t) - y~(t|t-1)
 		Eigen::Matrix<float, 1, 5> innovation = measurement - projected_mean;
+		// Normalize
+		normalizeAngle(innovation(4));
 
 		// Compute new STATE estimate
 		// x(t|t) = x(t+1|t) + K(t) * e(t)
@@ -293,16 +298,13 @@ namespace byte_kalman
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
 		// Keep speed > 0, move only forward
-		if(new_mean(6)<0){
-			new_mean(6)*=-1;
-			new_mean(2)+= M_PI;
-		}
+		// if(new_mean(6)<0){
+		// 	new_mean(6)*=-1;
+		// 	new_mean(2)+= M_PI;
+		// }
 
-		// Keep theta within [0 , 2*PI]
-		if(new_mean(2) > 2*M_PI)
-			new_mean(2) -= 2*M_PI;
-		else if (new_mean(2) < 0)
-			new_mean(2) += 2*M_PI;
+		// Keep theta within [-PI , PI]
+		normalizeAngle(new_mean(2));
 
 		return std::make_pair(new_mean, new_covariance);
 	}

@@ -1,5 +1,28 @@
 #include <bb_tracker/BYTETracker.h>
 
+inline void normalizeAngle(float& angle){
+	angle = fmod(angle + M_PI, 2*M_PI) - M_PI;
+}
+
+float getYawFromQuat(geometry_msgs::msg::Quaternion& quat){
+	tf2::Quaternion q(
+        quat.x,
+        quat.y,
+        quat.z,
+        quat.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw_d;
+    m.getRPY(roll, pitch, yaw_d, 2);
+	float yaw = yaw_d;
+	// Keep yaw within [-PI , PI]
+	normalizeAngle(yaw);
+	return yaw;
+}
+
+inline float toDegree(float rad){
+	return rad * 180.0 / M_PI;
+}
+
 vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 {
 
@@ -47,6 +70,8 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 			int time_ms = object.time_ms;
 
 			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name, time_ms);
+			strack.theta = getYawFromQuat(object.box.center.orientation);
+			// cout << "Theta: " << strack.theta << endl;
 			if (score >= track_thresh)
 			{
 				detections.push_back(strack);

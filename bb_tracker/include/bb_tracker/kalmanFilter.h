@@ -122,11 +122,11 @@ namespace byte_kalman
 
 	protected:
 		Eigen::Matrix<float, 8, 8, Eigen::RowMajor> _motion_mat;			// F
-		Eigen::Matrix<float, 5, 8, Eigen::RowMajor> _observation_mat3D; 	// H_3D
+		Eigen::Matrix<float, 6, 8, Eigen::RowMajor> _observation_mat3D; 	// H_3D
 		Eigen::Matrix<float, 5, 8, Eigen::RowMajor> _observation_mat2D; 	// H_2D
 		float _std_weight_position;
 		float _std_weight_velocity;
-		int detection3D_dim = 5;
+		int detection3D_dim = 6;
 		int detection2D_dim = 5;
 		int state_dim = 8;
 	};
