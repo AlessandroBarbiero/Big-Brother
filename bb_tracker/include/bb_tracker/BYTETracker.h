@@ -31,7 +31,7 @@ public:
 	 * @param fixed_frame_desc The fixed frame the BYTETracker has to use; all the detections have to give a transform
 	 *                          for this frame.
 	 */
-	void init(u_int time_to_lost = 300, u_int unconfirmed_ttl = 300, u_int lost_ttl = 1000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
+	void init(int time_to_lost = 300, int unconfirmed_ttl = 300, int lost_ttl = 1000, int max_dt_past = 2000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
 
 	vector<STrack*> update(const vector<Object3D>& objects);
 
@@ -119,6 +119,7 @@ private:
 		bool extend_cost = false, float cost_limit = LONG_MAX, bool return_cost = true);
 
 	void predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms);
+	void get_predicted_output(vector<STrack*>& output_stracks, int64_t detection_time_ms);
 
 private:
 
@@ -126,7 +127,7 @@ private:
 	float high_thresh;
 	float match_thresh;
 	int frame_id;
-	u_int time_to_lost, lost_ttl, unconfirmed_ttl;
+	int time_to_lost, lost_ttl, unconfirmed_ttl, max_dt_past;
 
 	std::chrono::time_point<std::chrono::system_clock> last_update_time;
 

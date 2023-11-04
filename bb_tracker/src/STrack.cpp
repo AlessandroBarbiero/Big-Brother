@@ -239,8 +239,8 @@ void STrack::update(Object2D &new_track, int frame_id)
 
 	auto new_score = new_track.prob;
 	// TODO: removed time update
-	// updateTrackState(mc, current_time_ms, new_score, frame_id);
-	updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
+	updateTrackState(mc, current_time_ms, new_score, frame_id);
+	//updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
 }
 
 void STrack::update(STrack &new_track, int frame_id)

@@ -2,6 +2,13 @@
 
 vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height)
 {
+	vector<STrack*> output_stracks;
+	int64_t last_det_time_ms = objects.back().time_ms;
+	if(this->current_time_ms - last_det_time_ms > this->max_dt_past){
+		get_predicted_output(output_stracks, last_det_time_ms);
+		return output_stracks;
+	}
+
 	////////////////// Step 1: Get detections //////////////////
 	this->frame_id++;
 
@@ -25,8 +32,6 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	vector<STrack*> tracked_stracks;
 	vector<STrack*> strack_pool;
 	vector<STrack*> strack_pool_out_image;
-
-	vector<STrack*> output_stracks;
 
 
 	if (objects.size() > 0)
@@ -53,7 +58,6 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	////////////////// Step 2.1: Prediction and Projection ////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
-	int64_t last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	STrack::multi_project(strack_pool, strack_pool_out_image, P, V, width, height);
@@ -257,17 +261,9 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	this->lost_stracks.clear();
 	this->lost_stracks.assign(resb.begin(), resb.end());
 
-	//std::cout << "End step 5" << std::endl;
+	//%%%%%%%% OUTPUT %%%%%%%%%%
 	
-	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
-	{
-		if (this->tracked_stracks[i].is_activated)
-		{
-			output_stracks.push_back(&this->tracked_stracks[i]);
-		}
-	}
-
-	predict_at_current_time(output_stracks, last_det_time_ms);
+	get_predicted_output(output_stracks, last_det_time_ms);
 
 	return output_stracks;
 }

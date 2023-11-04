@@ -1,5 +1,6 @@
 #include <bb_tracker/BYTETracker.h>
 
+// Keep angle within [-PI , PI]
 inline void normalizeAngle(float& angle){
 	angle = fmod(angle + M_PI, 2*M_PI) - M_PI;
 }
@@ -25,6 +26,12 @@ inline float toDegree(float rad){
 
 vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 {
+	vector<STrack*> output_stracks;
+	int64_t last_det_time_ms = objects.back().time_ms;
+	if(this->current_time_ms - last_det_time_ms > this->max_dt_past){
+		get_predicted_output(output_stracks, last_det_time_ms);
+		return output_stracks;
+	}
 
 	////////////////// Step 1: Get detections //////////////////
 	this->frame_id++;
@@ -48,8 +55,6 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	vector<STrack*> tracked_stracks;
 	vector<STrack*> strack_pool;
 
-    vector<STrack*> output_stracks;
-
 
 	if (objects.size() > 0)
 	{
@@ -71,7 +76,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 
 			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name, time_ms);
 			strack.theta = getYawFromQuat(object.box.center.orientation);
-			// cout << "Theta: " << strack.theta << endl;
+
 			if (score >= track_thresh)
 			{
 				detections.push_back(strack);
@@ -93,11 +98,9 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 			tracked_stracks.push_back(&this->tracked_stracks[i]);
 	}
 
-	//std::cout << "Step 2" << std::endl;
 	////////////////// Step 2.1: Prediction ////////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
-	int64_t last_det_time_ms = objects.back().time_ms;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	////////////////// Step 2.2: First association, with IoU //////////////////
@@ -125,7 +128,6 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 		}
 	}
 
-	//std::cout << "Step 3" << std::endl;
 	////////////////// Step 3: Second association, using low score dets //////////////////
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
@@ -212,7 +214,6 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 		}
 	}
 
-	//std::cout << "Step 4" << std::endl;
 	////////////////// Step 4: Init new stracks //////////////////
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
@@ -223,7 +224,6 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 		activated_stracks.push_back(*track);
 	}
 
-	//std::cout << "Step 5" << std::endl;
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
@@ -267,17 +267,9 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	this->lost_stracks.clear();
 	this->lost_stracks.assign(resb.begin(), resb.end());
 
-	//std::cout << "End step 5" << std::endl;
+	//%%%%%%%%%%%% OUTPUT %%%%%%%%%%%%
 	
-	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
-	{
-		if (this->tracked_stracks[i].is_activated)
-		{
-			output_stracks.push_back(&this->tracked_stracks[i]);
-		}
-	}
-
-	predict_at_current_time(output_stracks, last_det_time_ms);
+	get_predicted_output(output_stracks, last_det_time_ms);
 	
 	return output_stracks;
 }

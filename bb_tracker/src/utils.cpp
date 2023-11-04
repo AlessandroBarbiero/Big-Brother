@@ -564,3 +564,15 @@ void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64
 	// }
 	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
 }
+
+void BYTETracker::get_predicted_output(vector<STrack*>& output_stracks, int64_t detection_time_ms){
+	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
+	{
+		if (this->tracked_stracks[i].is_activated)
+		{
+			output_stracks.push_back(&this->tracked_stracks[i]);
+		}
+	}
+
+	predict_at_current_time(output_stracks, detection_time_ms);
+}

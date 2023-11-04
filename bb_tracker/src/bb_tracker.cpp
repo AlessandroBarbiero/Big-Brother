@@ -10,6 +10,8 @@ BBTracker::BBTracker()
   // ROS Parameters
   auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
   show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
+  auto max_dt_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  max_dt_desc.description = "Max interval (current time - new detection time) in milliseconds, older detections are discarded";
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
   auto unconfirmed_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -24,6 +26,7 @@ BBTracker::BBTracker()
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
   auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+  this->declare_parameter("max_dt_past", 2000, max_dt_desc);
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
   this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
@@ -34,6 +37,7 @@ BBTracker::BBTracker()
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
   _show_img_projection=   get_parameter("show_img_projection").as_bool();
+  int max_dt_past =      get_parameter("max_dt_past").as_int();
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
   int lost_ttl        =   get_parameter("lost_ttl").as_int();
@@ -61,10 +65,6 @@ BBTracker::BBTracker()
     _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
   }
 
-  // Test synch to show projections without new det2d
-  // _test_projection = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(_camera_info, _camera_image, 100);
-  // _test_projection->registerCallback(std::bind(&BBTracker::test_ellipse_project, this, std::placeholders::_1, std::placeholders::_2));
-
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
   _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
@@ -81,7 +81,7 @@ BBTracker::BBTracker()
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
 
   // Init BYTETracker object
-  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, t_thresh, h_thresh, m_thresh);
+  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh);
   _num_detections = 0;
   _num_updates = 0;
   _total_ms = 0;
@@ -174,18 +174,6 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
   );
   tf2::Transform transform(q, p);
 
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox BEFORE transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
-
   for(auto& detect : old_message->detections){
 
     tf2::Vector3 v(detect.bbox.center.position.x, detect.bbox.center.position.y, detect.bbox.center.position.z);
@@ -209,18 +197,6 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
     detect.bbox.size.y = s.y();
     detect.bbox.size.z = s.z();
   }
-
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox AFTER transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
 
   old_message->header.frame_id = new_frame;
   return;
