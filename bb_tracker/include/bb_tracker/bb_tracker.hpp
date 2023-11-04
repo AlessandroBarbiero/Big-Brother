@@ -102,9 +102,6 @@ class BBTracker : public rclcpp::Node
     std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _sync_det_camera;
     std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>> _sync_det2d;
 
-    // std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _test_projection;
-
-
 
     BYTETracker _tracker;
     vector<Object3D> _objects_buffer;

@@ -57,6 +57,7 @@ file(GLOB BYTE_traker_files
     src/STrack.cpp 
     src/utils.cpp
     src/EKF.cpp
+    src/ellipsoid_ellipse.cpp
 )
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
