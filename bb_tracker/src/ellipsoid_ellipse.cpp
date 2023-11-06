@@ -1,5 +1,6 @@
 #include <bb_tracker/ellipsoid_ellipse.hpp>
 
+
 // Utility functions to convert from an ellipsoid 3D to an ellipse 2D
 
 std::tuple<Eigen::Vector2f, Eigen::Vector2f, Eigen::Matrix2f> dualEllipseToParameters(Eigen::Matrix3f &C) {
@@ -166,13 +167,94 @@ ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORM
   return result;
 }
 
-KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, TRANSFORMATION &vMat, PROJ_MATRIX &P){
+Eigen::Vector3f find_3d_point_on_line(const Eigen::Vector3f& normalized_vector, float z_value) {
+    // Calculate proportions
+    float a = z_value / normalized_vector[2];
+
+    // Calculate the final coordinates (x, y, z)
+    float x = a * normalized_vector[0];
+    float y = a * normalized_vector[1];
+
+    return Eigen::Vector3f(x, y, z_value);
+}
+
+
+KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P){
+  // PRIOR 3D Average Dimensions in meters for the class labels
+  static constexpr float car_dim_prior[] = {4.5, 1.8, 1.65};
+  static constexpr float person_dim_prior[] = {0.5, 0.5, 1.7};
+  static constexpr float bike_dim_prior[] = {2.0, 1.0, 1.7};
+  static constexpr float general_dim_prior[] = {1.0, 1.0, 1.7};
+
   KAL_MEAN result;
-  // Eigen::Vector3f point2d;
-  // point2d << state(0), state(1);
-  // Eigen::Vector4f point3d = (P * vMat).inverse()*point2d;
-  // point3d = point3d / point3d(3);
-  // result << point3d(0), point3d(1), 0.0, 1.0, 1.0, 1.6, 0.0, 0.0;
+  float 
+    x = state(0),
+    y = state(1) + (state(4)>0 ? state(3) : state(2)), // I want the bottom-center of the box
+    // a = state(2),
+    // b = state(3),
+    // theta = state(4),
+    tx = 0,
+    ty = 0,
+    // Projection
+    fx = P(0,0),
+    fy = P(1,1),
+    cx = P(0,2),
+    cy = P(1,2);
+  Eigen::Vector3f ray;
+  ray <<  (x-cx-tx)/fx, 
+          (y-cy-ty)/fy,
+          1.0;
+  ray.normalize();
+
+  Eigen::Vector3f z_vector_world(0.0,0.0,1.0), ground_normal, point_on_ground;
+  Eigen::Matrix3f rotMat;
+  rotMat = vMat.block<3, 3>(0, 0);
+  ground_normal = rotMat * z_vector_world;
+  ground_normal.normalize();
+  point_on_ground = vMat.block<3,1>(0,3);
+  float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2)) /
+            (ray(0)*ground_normal(0) + ray(1)*ground_normal(1) + ray(2)*ground_normal(2));
+
+
+  Eigen::Vector4f point_camera_frame, point_world_frame;
+  point_camera_frame << ray * t, 1.0;
+  point_world_frame = vMat.inverse() * point_camera_frame;
+  point_world_frame /= point_world_frame(3);
+
+
+  float l_ratio, d_ratio, h;
+  switch(class_label){
+    case ClassLabel::Pedestrian:
+      l_ratio = person_dim_prior[0]/person_dim_prior[2];  // l_ratio
+      d_ratio = person_dim_prior[1]/person_dim_prior[2];  // d_ratio
+      h =       person_dim_prior[2];                      // h
+      break;
+    case ClassLabel::Bicycle:
+    case ClassLabel::Motorcycle:
+      l_ratio = bike_dim_prior[0]/bike_dim_prior[2]; 
+      d_ratio = bike_dim_prior[1]/bike_dim_prior[2]; 
+      h =       bike_dim_prior[2];
+      break;
+    case ClassLabel::Car:
+      l_ratio = car_dim_prior[0]/car_dim_prior[2]; 
+      d_ratio = car_dim_prior[1]/car_dim_prior[2]; 
+      h =       car_dim_prior[2];
+      break;
+    case ClassLabel::Unknown:
+      l_ratio = general_dim_prior[0]/general_dim_prior[2]; 
+      d_ratio = general_dim_prior[1]/general_dim_prior[2]; 
+      h =       general_dim_prior[2];
+      break;
+  }
+
+  result << point_world_frame(0), // x
+            point_world_frame(1), // y
+            0,               // yaw
+            l_ratio,
+            d_ratio,
+            h,
+            0.0,    // v
+            0.0;    // w
   return result;
 }
 

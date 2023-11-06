@@ -117,7 +117,6 @@ void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ
 	auto sh_V = std::make_shared<TRANSFORMATION>(V);
 	setViewProjection(sh_V, sh_P);
 
-	// TODO: add prior based on class
 	auto mc = this->kalman_filter.initiate2D(xyabt_box, class_label, V, P);
 	this->mean = mc.first;
 	this->covariance = mc.second;

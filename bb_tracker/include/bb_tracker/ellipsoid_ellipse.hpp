@@ -89,7 +89,7 @@ ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORM
  */
 ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION &vMat, PROJ_MATRIX &P);
 
-KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, TRANSFORMATION &vMat, PROJ_MATRIX &P);
+KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P);
 
 inline bool ellipseInImage(float ecx, float ecy, float ea, float eb, int width, int height){
   return (ea > 0 && eb > 0 && ecx-ea > 0 && ecx+ea < width && ecy-eb > 0 && ecy+eb < height);

@@ -26,6 +26,19 @@ BBTracker::BBTracker()
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
   auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+  auto mul_p03d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_p03d_desc.description = "List of multiplicators for the varaince P0 in 3D detection to use within the Kalman Filter";
+  auto mul_p02d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_p02d_desc.description = "List of multiplicators for the varaince P0 in 2D detection to use within the Kalman Filter";
+  auto mul_process_noise_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_process_noise_desc.description = "List of multiplicators for the varaince of the Process Noise to use within the Kalman Filter";
+  auto mul_mn3d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_mn3d_desc.description = "List of multiplicators for the varaince of the Measurement Noise in 3D detections to use within the Kalman Filter";
+  auto mul_mn2d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_mn2d_desc.description = "List of multiplicators for the varaince of the Measurement Noise in 2D detections to use within the Kalman Filter";
+
+  vector<double> mul_p03d(8,1.0), mul_p02d(8,1.0), mul_process_noise(8,1.0), mul_mn3d(6,1.0), mul_mn2d(5,1.0);
+
   this->declare_parameter("max_dt_past", 2000, max_dt_desc);
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
@@ -35,9 +48,14 @@ BBTracker::BBTracker()
   this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
+  this->declare_parameter("mul_p03d", mul_p03d, mul_p03d_desc);
+  this->declare_parameter("mul_p02d", mul_p02d, mul_p02d_desc);
+  this->declare_parameter("mul_process_noise", mul_process_noise, mul_process_noise_desc);
+  this->declare_parameter("mul_mn3d", mul_mn3d, mul_mn3d_desc);
+  this->declare_parameter("mul_mn2d", mul_mn2d, mul_mn2d_desc);
 
   _show_img_projection=   get_parameter("show_img_projection").as_bool();
-  int max_dt_past =      get_parameter("max_dt_past").as_int();
+  int max_dt_past =       get_parameter("max_dt_past").as_int();
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
   int lost_ttl        =   get_parameter("lost_ttl").as_int();
@@ -45,6 +63,11 @@ BBTracker::BBTracker()
   float t_thresh =        get_parameter("track_thresh").as_double();
   float m_thresh =        get_parameter("match_thresh").as_double();
   _fixed_frame =          get_parameter("fixed_frame").as_string();
+  mul_p03d =              get_parameter("mul_p03d").as_double_array();
+  mul_p02d =              get_parameter("mul_p02d").as_double_array();
+  mul_process_noise =     get_parameter("mul_process_noise").as_double_array();
+  mul_mn3d =              get_parameter("mul_mn3d").as_double_array();
+  mul_mn2d =              get_parameter("mul_mn2d").as_double_array();
 
   // ROS Subscriber and Publisher
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
@@ -82,6 +105,7 @@ BBTracker::BBTracker()
 
   // Init BYTETracker object
   _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh);
+  _tracker.initVariance(mul_p03d, mul_p02d, mul_process_noise, mul_mn3d, mul_mn2d);
   _num_detections = 0;
   _num_updates = 0;
   _total_ms = 0;

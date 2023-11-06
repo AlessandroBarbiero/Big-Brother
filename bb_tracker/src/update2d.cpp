@@ -117,7 +117,6 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 		}
 	}
 
-	//std::cout << "Step 3" << std::endl;
 	////////////////// Step 3: Second association, using low score dets //////////////////
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
@@ -204,20 +203,20 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 		}
 	}
 
-	//std::cout << "Step 4" << std::endl;
+
 	////////////////// Step 4: Init new stracks //////////////////
 	// TODO: look if activate a track from 2d detection
-	// for (unsigned int i = 0; i < u_detection.size(); i++)
-	// {
-	// 	Object2D *new_obj = &detections[u_detection[i]];
-	// 	if (new_obj->prob < this->high_thresh)
-	// 		continue;
-	// 	STrack track(new_obj, BYTETracker::int_to_class[new_obj->label]);
-	// 	track.activate2D(this->kalman_filter, V, P, this->frame_id);
-	// 	activated_stracks.push_back(track);
-	// }
+	for (unsigned int i = 0; i < u_detection.size(); i++)
+	{
+		Object2D *new_obj = &detections[u_detection[i]];
+		if (new_obj->prob < this->high_thresh)
+			continue;
+		STrack track(new_obj, new_obj->label);
+		track.activate2D(this->kalman_filter, V, P, this->frame_id);
+		activated_stracks.push_back(track);
+	}
 
-	//std::cout << "Step 5" << std::endl;
+
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
