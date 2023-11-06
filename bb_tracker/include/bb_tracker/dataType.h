@@ -44,13 +44,23 @@ typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
 typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> ELLIPSE_STATE; // [X_center, Y_center, semi_axis_A, semi_axis_B, theta (in radians)]
 
 
+enum class ClassLabel{
+    Unknown = 0,
+    Pedestrian, 
+    Bicycle,
+    Motorcycle, 
+    Car
+    };
+static const std::string classLabelString[] = {"Unknown", "Person", "Cyclist", "Motorcycle", "Car"};
+
+
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <vision_msgs/msg/bounding_box2_d.hpp>
 
 struct Object3D
 {
     vision_msgs::msg::BoundingBox3D box; // float-based 3D bounding box with center.position, center.orientation and size
-    int label;
+    ClassLabel label;
     float prob;
 	int64_t time_ms;
 };
@@ -58,7 +68,7 @@ struct Object3D
 struct Object2D
 {
     std::vector<float> tlbr; // float-based 2D bounding box with center and size 
-    int label;
+    ClassLabel label;
     float prob;
 	int64_t time_ms;
 };

@@ -71,10 +71,9 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 			minmax_[5] = object.box.center.position.z + object.box.size.z/2;
 
 			float score = object.prob;
-			std::string class_name = int_to_class[object.label];
 			int time_ms = object.time_ms;
 
-			STrack strack(STrack::minmax_to_minwdh(minmax_), score, class_name, time_ms);
+			STrack strack(STrack::minmax_to_minwdh(minmax_), score, object.label, time_ms);
 			strack.theta = getYawFromQuat(object.box.center.orientation);
 
 			if (score >= track_thresh)

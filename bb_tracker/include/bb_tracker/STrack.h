@@ -20,8 +20,8 @@ enum TrackState { New = 0, Tracked, Lost, Removed };
 class STrack
 {
 public:
-	STrack(vector<float> minwdh_, float score, std::string class_name, int64_t time_ms);
-	STrack(Object2D *obj, std::string class_name);
+	STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64_t time_ms);
+	STrack(Object2D *obj, ClassLabel class_label);
 	~STrack();
 
 	vector<float> static minmax_to_minwdh(vector<float> &minmax);
@@ -84,7 +84,7 @@ public:
 	KAL_MEAN mean;
 	KAL_COVA covariance;
 	float score;
-	std::string class_name;
+	ClassLabel class_label;
 
 private:
 	byte_kalman::EKF kalman_filter;

@@ -49,8 +49,7 @@ public:
 	Scalar get_color(int idx);
 	vector<STrack> getTrackedObj();
 
-	static std::unordered_map<std::string, int> class_to_int;
-	static std::unordered_map<int, std::string> int_to_class;
+	static std::unordered_map<std::string, ClassLabel> class_to_label;
 
 	byte_kalman::EKF kalman_filter;
 	// The current time is updated every time a detection come

@@ -209,7 +209,7 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
     // Decode
     Object3D obj;
     obj.box = detection.bbox;
-    obj.label = BYTETracker::class_to_int[detection.results[0].id];
+    obj.label = BYTETracker::class_to_label[detection.results[0].id];
     obj.prob = detection.results[0].score;
     obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
@@ -235,7 +235,7 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
         static_cast<float>(detection.bbox.center.x+detection.bbox.size_x/2),
         static_cast<float>(detection.bbox.center.y+detection.bbox.size_y/2),
          };
-      obj.label = BYTETracker::class_to_int[detection.results[0].id];
+      obj.label = BYTETracker::class_to_label[detection.results[0].id];
       obj.prob = detection.results[0].score;
       obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
@@ -599,7 +599,7 @@ void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs
     single_det.bbox.size.z =            minwdh[5];
 
     auto hypothesis = vision_msgs::msg::ObjectHypothesisWithPose();
-    hypothesis.id = current_track->class_name;
+    hypothesis.id = classLabelString[(int)current_track->class_label];
     hypothesis.score = current_track->score;
     single_det.results.push_back(hypothesis);
 
@@ -654,7 +654,7 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
     Scalar s_color = _tracker.get_color(track->track_id);
     initPathMarker(track->path_marker, s_color);
     initTextMarker(track->text_marker, s_color);
-    track->text_marker.text = track->class_name;
+    track->text_marker.text = classLabelString[(int)track->class_label];
     track->text_marker.text.append("-").append(::to_string(track->track_id));
   }
   track->path_marker.points.push_back(last_point);

@@ -38,19 +38,16 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	<< std::endl;
 }
 
-std::unordered_map<std::string, int> BYTETracker::class_to_int{
-	{"person", 0},
-	{"pedestrian", 0},
-	{"vehicle", 1},
-	{"car", 1},
-	{"truck", 1},
-	{"motorcycle", 3},
-	{"bicycle", 2}
-};
-
-std::unordered_map<int, std::string> BYTETracker::int_to_class{
-	{0, "Person"},
-	{1, "Car"},
-	{2, "Cyclist"},
-	{3, "Motorcycle"}
+std::unordered_map<std::string, ClassLabel> BYTETracker::class_to_label{
+	{"", ClassLabel::Unknown},
+	{"unknown", ClassLabel::Unknown},
+	{"other", ClassLabel::Unknown},
+	{"person", ClassLabel::Pedestrian},
+	{"pedestrian", ClassLabel::Pedestrian},
+	{"bicycle", ClassLabel::Bicycle},
+	{"cyclist", ClassLabel::Bicycle},
+	{"motorcycle", ClassLabel::Motorcycle},
+	{"vehicle", ClassLabel::Car},
+	{"car", ClassLabel::Car},
+	{"truck", ClassLabel::Car}
 };
