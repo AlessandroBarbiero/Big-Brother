@@ -12,8 +12,11 @@ namespace byte_kalman
 	public:
 		static const double chi2inv95[10];
 		KalmanFilter();
+
+		void initVariance(KAL_MEAN& mul_p03d, KAL_MEAN& mul_p02d, KAL_MEAN& mul_process_noise, DETECTBOX3D& mul_mn3d, DETECTBOX2D& mul_mn2d);
+
 		KAL_DATA initiate3D(const DETECTBOX3D& measurement);
-		KAL_DATA initiate2D(const DETECTBOX2D& measurement, TRANSFORMATION &V, PROJ_MATRIX &P);
+		KAL_DATA initiate2D(const DETECTBOX2D& measurement, ClassLabel class_label, TRANSFORMATION &V, PROJ_MATRIX &P);
 
 		/**
 		 * Predicts the Kalman filter state and covariance at the next step and returns them throught the input parameters

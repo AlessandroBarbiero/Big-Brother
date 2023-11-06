@@ -38,6 +38,43 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	<< std::endl;
 }
 
+inline void copy_from_double_array(KAL_MEAN& eigen_v, std::vector<double>& c_vector){
+	for(long int i = 0; i<eigen_v.size(); i++){
+		eigen_v[i] = static_cast<float>(c_vector[i]);
+	}
+}
+inline void copy_from_double_array(DETECTBOX3D& eigen_v, std::vector<double>& c_vector){
+	for(long int i = 0; i<eigen_v.size(); i++){
+		eigen_v[i] = static_cast<float>(c_vector[i]);
+	}
+}
+inline void copy_from_double_array(DETECTBOX2D& eigen_v, std::vector<double>& c_vector){
+	for(long int i = 0; i<eigen_v.size(); i++){
+		eigen_v[i] = static_cast<float>(c_vector[i]);
+	}
+}
+
+void BYTETracker::initVariance(std::vector<double>& v_mul_p03d, std::vector<double>& v_mul_p02d, std::vector<double>& v_mul_process_noise, std::vector<double>& v_mul_mn3d, std::vector<double>& v_mul_mn2d){
+	KAL_MEAN mul_p03d, mul_p02d, mul_process_noise;
+	DETECTBOX3D mul_mn3d;
+	DETECTBOX2D mul_mn2d;
+	copy_from_double_array(mul_p03d, v_mul_p03d);
+	copy_from_double_array(mul_p02d, v_mul_p02d);
+	copy_from_double_array(mul_process_noise, v_mul_process_noise);
+	copy_from_double_array(mul_mn3d, v_mul_mn3d);
+	copy_from_double_array(mul_mn2d, v_mul_mn2d);
+	kalman_filter.initVariance(mul_p03d, mul_p02d, mul_process_noise, mul_mn3d, mul_mn2d);
+
+	std::cout << "Variance Values: " 
+	<< "\n\tP0 3D = " << mul_p03d
+	<< "\n\tP0 2D = " << mul_p02d
+	<< "\n\tProcess Noise = " << mul_process_noise
+	<< "\n\tMeasurement Noise 3D = " << mul_mn3d
+	<< "\n\tMeasurement Noise 2D = " << mul_mn2d
+	<< std::endl;
+
+}
+
 std::unordered_map<std::string, ClassLabel> BYTETracker::class_to_label{
 	{"", ClassLabel::Unknown},
 	{"unknown", ClassLabel::Unknown},

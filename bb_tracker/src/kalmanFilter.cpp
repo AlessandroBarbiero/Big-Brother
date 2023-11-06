@@ -55,7 +55,7 @@ namespace byte_kalman
 		this->_std_weight_pixel = 10.0;
 
 
-		// TODO: Refine P0_3D, starting variance -> accuracy of the estimate
+		// Starting variance -> accuracy of the estimate
 		KAL_MEAN std_p03d;
 		std_p03d << 
 			2 * 	_std_weight_position, 	// x
@@ -70,24 +70,24 @@ namespace byte_kalman
 		KAL_MEAN tmp_p03d = std_p03d.array().square();
 		this->_var_P0_3D = tmp_p03d.asDiagonal();
 
-		// TODO: Refine P0_2D, starting variance -> accuracy of the estimate
+		// Starting variance -> accuracy of the estimate
 		KAL_MEAN std_p02d;
 		std_p02d << 
-			2 * 	_std_weight_position, 	// x
-			2 * 	_std_weight_position,	// y
-			10 * 	_std_weight_angle, 		// theta
+			10 * 	_std_weight_position, 	// x
+			10 * 	_std_weight_position,	// y
+			90 * 	_std_weight_angle, 		// theta
 					_std_weight_size,		// l_ratio
-			10 * 	_std_weight_size,		// d_ratio
-			2 * 	_std_weight_size,		// h
+				 	_std_weight_size,		// d_ratio
+			 		_std_weight_size,		// h
 			10 * 	_std_weight_velocity,	// v
 			10 * 	_std_weight_velocity;	// w
 
 		KAL_MEAN tmp_p02d = std_p02d.array().square();
 		this->_var_P0_2D = tmp_p02d.asDiagonal();
 		 
-		// TODO: Refine process noise
-		KAL_MEAN std_process;
-		std_process << 
+		// V1, Accuracy of the prediction
+		KAL_MEAN std_process_noise;
+		std_process_noise << 
 			_std_weight_position, 	// x
 			_std_weight_position,	// y
 			_std_weight_angle, 		// theta
@@ -97,12 +97,12 @@ namespace byte_kalman
 			_std_weight_velocity,	// v
 			_std_weight_velocity;	// w
 
-		KAL_MEAN tmp_process = std_process.array().square();
+		KAL_MEAN tmp_process = std_process_noise.array().square();
 		// This is V1
 		this->_process_noise_cov = tmp_process.asDiagonal();
 
-		// TODO: Refine measurement noise
-		// Compute V2
+
+		// V2, Accuracy of the measurement
 		DETECTBOX3D std_mn3d;
 		std_mn3d << 
 			_std_weight_position,
@@ -114,8 +114,8 @@ namespace byte_kalman
 		DETECTBOX3D tmp_mn3d = std_mn3d.array().square();
 		this->_measure_noise3D_var = tmp_mn3d.asDiagonal();
 
-		// TODO: Refine measurement noise
-		// Compute V2
+
+		// V2, Accuracy of the measurement
 		DETECTBOX2D std_mn2d;
 		std_mn2d << 
 			_std_weight_pixel,
@@ -126,6 +126,77 @@ namespace byte_kalman
 		DETECTBOX2D tmp_mn2d = std_mn2d.array().square();
 		this->_measure_noise2D_var = tmp_mn2d.asDiagonal();
 
+	}
+
+	void KalmanFilter::initVariance(KAL_MEAN& mul_p03d, KAL_MEAN& mul_p02d, KAL_MEAN& mul_process_noise, DETECTBOX3D& mul_mn3d, DETECTBOX2D& mul_mn2d){
+		
+		KAL_MEAN std_p03d;
+		std_p03d << 
+			_std_weight_position, 	// x
+			_std_weight_position,	// y
+			_std_weight_angle, 		// theta
+			_std_weight_size,		// l_ratio
+			_std_weight_size,		// d_ratio
+			_std_weight_size,		// h
+			_std_weight_velocity,	// v
+			_std_weight_velocity;	// w
+		std_p03d.array() *= mul_p03d.array();
+		KAL_MEAN tmp_p03d = std_p03d.array().square();
+		this->_var_P0_3D = tmp_p03d.asDiagonal();
+
+		KAL_MEAN std_p02d;
+		std_p02d << 
+			_std_weight_position, 	// x
+			_std_weight_position,	// y
+			_std_weight_angle, 		// theta
+			_std_weight_size,		// l_ratio
+			_std_weight_size,		// d_ratio
+			_std_weight_size,		// h
+			_std_weight_velocity,	// v
+			_std_weight_velocity;	// w
+		std_p02d.array() *= mul_p02d.array();
+		KAL_MEAN tmp_p02d = std_p02d.array().square();
+		this->_var_P0_2D = tmp_p02d.asDiagonal();
+		 
+		KAL_MEAN std_process_noise;
+		std_process_noise << 
+			_std_weight_position, 	// x
+			_std_weight_position,	// y
+			_std_weight_angle, 		// theta
+			_std_weight_size,		// l_ratio
+			_std_weight_size,		// d_ratio
+			_std_weight_size,		// h
+			_std_weight_velocity,	// v
+			_std_weight_velocity;	// w
+		std_process_noise.array() *= mul_process_noise.array();
+		KAL_MEAN tmp_process = std_process_noise.array().square();
+		// This is V1
+		this->_process_noise_cov = tmp_process.asDiagonal();
+
+		// Compute V2
+		DETECTBOX3D std_mn3d;
+		std_mn3d << 
+			_std_weight_position,
+			_std_weight_position,
+			_std_weight_angle, 
+			_std_weight_size, 
+			_std_weight_size, 
+			_std_weight_size;
+		std_mn3d.array() *= mul_mn3d.array();
+		DETECTBOX3D tmp_mn3d = std_mn3d.array().square();
+		this->_measure_noise3D_var = tmp_mn3d.asDiagonal();
+
+		// Compute V2
+		DETECTBOX2D std_mn2d;
+		std_mn2d << 
+			_std_weight_pixel,
+			_std_weight_pixel,
+			_std_weight_pixel, 
+			_std_weight_pixel, 
+			_std_weight_angle;
+		std_mn2d.array() *= mul_mn2d.array();
+		DETECTBOX2D tmp_mn2d = std_mn2d.array().square();
+		this->_measure_noise2D_var = tmp_mn2d.asDiagonal();
 	}
 
 	// %%%%%%%%%%%%%%%%
@@ -148,19 +219,14 @@ namespace byte_kalman
 	}
 
 	
-	KAL_DATA KalmanFilter::initiate2D(const DETECTBOX2D &measurement, TRANSFORMATION &V, PROJ_MATRIX &P)
+	KAL_DATA KalmanFilter::initiate2D(const DETECTBOX2D &measurement, ClassLabel class_label, TRANSFORMATION &V, PROJ_MATRIX &P)
 	{
-		KAL_MEAN mean = ellipsoidFromEllipse(measurement, V, P);
-		// mean(0) = measurement(0); 	// x
-		// mean(1) = measurement(1); 	// y
-		// mean(2) = 0;					// theta
-		// mean(3) = measurement(2); 	// l_ratio
-		// mean(4) = 0.5;				// d_ratio
-		// mean(5) = 1.6;				// h
-		// mean(6) = 0;					// v
-		// mean(7) = 0;					// w
+		KAL_MEAN mean = ellipsoidFromEllipse(measurement, class_label, V, P);
+
 		KAL_COVA P0 = _var_P0_2D;
-		return std::make_pair(mean, P0);
+		
+		return update2D(mean, P0, measurement);
+		// return std::make_pair(mean, P0);
 	}
 
 	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance, double dt)

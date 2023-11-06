@@ -90,6 +90,7 @@ class BBTracker : public rclcpp::Node
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr _det_poses_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _text_publisher;
+    // Debug publisher for tracks visualization
     rclcpp::Publisher<bb_interfaces::msg::STrackArray>::SharedPtr _tracks_publisher;
 
     // Detection 3D

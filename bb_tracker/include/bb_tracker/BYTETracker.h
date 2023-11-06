@@ -15,6 +15,8 @@ class BYTETracker
 public:
 	BYTETracker();
 	~BYTETracker();
+	void initVariance(std::vector<double>& v_mul_p03d, std::vector<double>& v_mul_p02d, 
+			std::vector<double>& v_mul_process_noise, std::vector<double>& v_mul_mn3d, std::vector<double>& v_mul_mn2d);
 
 	/**
 	 * Initializes the BYTETracker with specified parameters.
