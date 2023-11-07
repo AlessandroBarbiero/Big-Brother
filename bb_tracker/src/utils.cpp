@@ -1,5 +1,6 @@
 #include <bb_tracker/lapjv.h>
 #include "BYTETracker.cpp"
+#define BYTE_REAL_TIME
 
 vector<STrack*> BYTETracker::joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb)
 {
@@ -550,6 +551,7 @@ Scalar BYTETracker::get_color(int idx)
 }
 
 void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms){
+	#ifdef BYTE_REAL_TIME
 	auto end_timer = chrono::system_clock::now();
 	auto ms_elapsed = chrono::duration_cast<chrono::milliseconds>(end_timer - last_update_time).count();
 	current_time_ms += ms_elapsed;
@@ -557,11 +559,13 @@ void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64
 	if(detection_time_ms > current_time_ms){
 		current_time_ms = detection_time_ms;
 	}
-	// if not real time use this
-	// for(auto track : output_stracks){
-	// 	if(current_time_ms<track->last_filter_update_ms)
-	// 		current_time_ms = track->last_filter_update_ms;
-	// }
+	#else
+	// if not real time use the time of the messages to update the time
+	for(auto track : output_stracks){
+		if(current_time_ms<track->last_filter_update_ms)
+			current_time_ms = track->last_filter_update_ms;
+	}
+	#endif
 	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
 }
 
