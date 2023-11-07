@@ -74,7 +74,11 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 			int time_ms = object.time_ms;
 
 			STrack strack(STrack::minmax_to_minwdh(minmax_), score, object.label, time_ms);
-			strack.theta = getYawFromQuat(object.box.center.orientation);
+
+			if(this->left_handed_system)
+				strack.theta = getYawFromQuat(object.box.center.orientation) + M_PI;
+			else
+				strack.theta = getYawFromQuat(object.box.center.orientation);
 
 			if (score >= track_thresh)
 			{

@@ -9,6 +9,7 @@ bb_tracker:
       match_thresh: 0.8
       fixed_frame: sensors_home
       show_img_projection: true
+      left_handed_system: true
       # P0 3D
       mul_p03d: [
          2.,2.,      # position
@@ -38,7 +39,7 @@ bb_tracker:
          ]
       # V2 2D
       mul_mn2d: [
-         100.,100.,    # position
-         100.,100.,    # semi-axes
-         50.          # theta
+         10.,10.,    # position
+         10.,10.,    # semi-axes
+         60.          # theta
          ]

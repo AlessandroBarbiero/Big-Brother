@@ -13,7 +13,7 @@ vector<STrack> BYTETracker::getTrackedObj(){
 	return this->tracked_stracks;
 }
 
-void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int max_dt_past, float track_thresh, float high_thresh, float match_thresh){
+void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int max_dt_past, float track_thresh, float high_thresh, float match_thresh, bool left_handed_system){
 	this->track_thresh = track_thresh; //0.5;
 	this->high_thresh  = high_thresh;  //0.6;
 	this->match_thresh = match_thresh; //0.8;
@@ -21,6 +21,7 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	this->unconfirmed_ttl = unconfirmed_ttl;
 	this->lost_ttl = lost_ttl;
 	this->max_dt_past = max_dt_past;
+	this->left_handed_system = left_handed_system;
 
 	frame_id = 0;
 	current_time_ms = 0;
@@ -35,6 +36,7 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	<< "\n\ttrack_thresh = " << track_thresh
 	<< "\n\thigh_thresh = " << high_thresh
 	<< "\n\tmatch_thresh = " << match_thresh
+	<< "\n\tleft_handed_system = " << (left_handed_system?"true":"false")
 	<< std::endl;
 }
 

@@ -10,6 +10,8 @@ BBTracker::BBTracker()
   // ROS Parameters
   auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
   show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
+  auto left_handed_system_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  left_handed_system_desc.description = "Set to true to if the Detections 3D come from a left handed system like Unreal Engine (yaw angle is rotated 180 degrees)";
   auto max_dt_desc = rcl_interfaces::msg::ParameterDescriptor{};
   max_dt_desc.description = "Max interval (current time - new detection time) in milliseconds, older detections are discarded";
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -48,6 +50,7 @@ BBTracker::BBTracker()
   this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
+  this->declare_parameter("left_handed_system", false, left_handed_system_desc);
   this->declare_parameter("mul_p03d", mul_p03d, mul_p03d_desc);
   this->declare_parameter("mul_p02d", mul_p02d, mul_p02d_desc);
   this->declare_parameter("mul_process_noise", mul_process_noise, mul_process_noise_desc);
@@ -63,6 +66,7 @@ BBTracker::BBTracker()
   float t_thresh =        get_parameter("track_thresh").as_double();
   float m_thresh =        get_parameter("match_thresh").as_double();
   _fixed_frame =          get_parameter("fixed_frame").as_string();
+  bool lh_system =        get_parameter("left_handed_system").as_bool();
   mul_p03d =              get_parameter("mul_p03d").as_double_array();
   mul_p02d =              get_parameter("mul_p02d").as_double_array();
   mul_process_noise =     get_parameter("mul_process_noise").as_double_array();
@@ -104,7 +108,7 @@ BBTracker::BBTracker()
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
 
   // Init BYTETracker object
-  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh);
+  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh, lh_system);
   _tracker.initVariance(mul_p03d, mul_p02d, mul_process_noise, mul_mn3d, mul_mn2d);
   _num_detections = 0;
   _num_updates = 0;
