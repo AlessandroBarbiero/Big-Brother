@@ -90,7 +90,7 @@ void STrack::activate3D(byte_kalman::EKF &kalman_filter, int frame_id)
 	{
 		this->is_activated = true;
 	}
-	//this->is_activated = true;
+
 	this->frame_id = frame_id;
 	this->start_frame = frame_id;
 }
@@ -134,7 +134,6 @@ void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ
 	{
 		this->is_activated = true;
 	}
-	//this->is_activated = true;
 	this->frame_id = frame_id;
 	this->start_frame = frame_id;
 }
@@ -157,7 +156,7 @@ void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
 	auto current_time_ms = new_track.time_ms;
-	updateTrackState(mc, current_time_ms, new_track.prob, frame_id, true);
+	updateTrackState(mc, current_time_ms, new_track.prob, new_track.label, frame_id, true);
 
 	if (new_id)
 		this->track_id = next_id();
@@ -178,7 +177,7 @@ void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
 
 	auto current_time_ms = new_track.last_filter_update_ms;
-	updateTrackState(mc, current_time_ms, new_track.score, frame_id, true);
+	updateTrackState(mc, current_time_ms, new_track.score, new_track.class_label, frame_id, true);
 
 	if (new_id)
 		this->track_id = next_id();
@@ -196,8 +195,40 @@ bool STrack::checkOldDetection(int64_t detection_time_ms){
 	return false;
 }
 
-void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len){
-	
+void STrack::updateClassLabel(ClassLabel new_label, float new_score){
+	// this is the maximum value in meters that the dimensions can differ from prior
+	static float margin = 1.0; 
+
+	if(this->class_label == new_label){
+		// The new score is the average between the old*2 and new
+		this->score = (this->score*2 + new_score)/3;
+		auto priorDim = priorDimensions.at(this->class_label);
+		// Respect the priors
+		if(		this->mean(5) > (priorDim[2]+margin)  ||
+				this->mean(3) > (priorDim[0]+margin)/priorDim[2]  ||
+				this->mean(4) > (priorDim[1]+margin)/priorDim[2])
+		{
+			this->mean(5) = priorDim[2];
+			this->mean(3) = priorDim[0]/priorDim[2];
+			this->mean(4) = priorDim[1]/priorDim[2];
+		}
+	}
+	else{
+		// The score is decreased and new priors are applied if object change class
+		this->score = (this->score*2 - new_score)/3;
+		if(this->score < 0.5){
+			this->class_label = new_label;
+			// Apply new priors
+			auto priorDim = priorDimensions.at(this->class_label);
+			this->mean(3) = priorDim[0]/priorDim[2]; //l_ratio
+			this->mean(4) = priorDim[1]/priorDim[2]; //d_ratio
+			this->mean(5) = priorDim[2];			 //h
+		}
+	}
+}
+
+void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, ClassLabel new_label, int frame_id, bool reset_tracklet_len){
+
 	if(reset_tracklet_len)
 		this->tracklet_len = 0;
 	else
@@ -206,6 +237,7 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 
 	last_filter_update_ms = detection_time_ms;
 	this->mean = updated_values.first;
+	updateClassLabel(new_label, new_score);
 	this->covariance = updated_values.second;
 	this->mean_predicted = this->mean;
 	this->covariance_predicted = this->covariance;
@@ -216,10 +248,6 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 
 	this->state = TrackState::Tracked;
 	this->is_activated = true;
-
-	// The new score is the average between the old*2 and new
-	// TODO: this can be improved
-	this->score = (this->score*2 + new_score)/3;
 }
 
 void STrack::update(Object2D &new_track, int frame_id)
@@ -248,7 +276,7 @@ void STrack::update(Object2D &new_track, int frame_id)
 
 	auto new_score = new_track.prob;
 	// TODO: removed time update
-	updateTrackState(mc, current_time_ms, new_score, frame_id);
+	updateTrackState(mc, current_time_ms, new_score, new_track.label, frame_id);
 	//updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
 }
 
@@ -274,7 +302,7 @@ void STrack::update(STrack &new_track, int frame_id)
 	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
 
 	auto new_score = new_track.score;
-	updateTrackState(mc, current_time_ms, new_score, frame_id);
+	updateTrackState(mc, current_time_ms, new_score, new_track.class_label, frame_id);
 }
 
 void STrack::static_minwdh()

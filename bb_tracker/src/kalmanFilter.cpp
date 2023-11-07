@@ -273,7 +273,6 @@ namespace byte_kalman
 
 	KAL_HDATA2D KalmanFilter::project2D(const KAL_MEAN &mean, const KAL_COVA &covariance)
 	{
-
 		// Perform state projection in the measurement space
 		// y~(t|t-1) = H * x(t|t-1)
 		KAL_HMEAN2D mean1 = projectState2D(mean);
@@ -331,12 +330,6 @@ namespace byte_kalman
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
 
-		// Keep speed > 0, move only forward
-		// if(new_mean(6)<0){
-		// 	new_mean(6)*=-1;
-		// 	new_mean(2)+= M_PI;
-		// }
-
 		// Keep theta within [-PI , PI]
 		normalizeAngle(new_mean(2));
 
@@ -375,12 +368,6 @@ namespace byte_kalman
 		// if we consider the old covariance as state covariance (F*P*F^T + V1) we obtain 
 		// P(t+1|t) = (F*P*F^T + V1) - (F*P*H^T)*(H*P*H^T + V2)^-1 *(F*P*H^T)^T
 		KAL_COVA new_covariance = covariance - kalman_gain * projected_cov*(kalman_gain.transpose());
-
-		// Keep speed > 0, move only forward
-		// if(new_mean(6)<0){
-		// 	new_mean(6)*=-1;
-		// 	new_mean(2)+= M_PI;
-		// }
 
 		// Keep theta within [-PI , PI]
 		normalizeAngle(new_mean(2));

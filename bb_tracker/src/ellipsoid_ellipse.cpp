@@ -180,12 +180,6 @@ Eigen::Vector3f find_3d_point_on_line(const Eigen::Vector3f& normalized_vector, 
 
 
 KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P){
-  // PRIOR 3D Average Dimensions in meters for the class labels
-  static constexpr float car_dim_prior[] = {4.5, 1.8, 1.65};
-  static constexpr float person_dim_prior[] = {0.5, 0.5, 1.7};
-  static constexpr float bike_dim_prior[] = {2.0, 1.0, 1.7};
-  static constexpr float general_dim_prior[] = {1.0, 1.0, 1.7};
-
   KAL_MEAN result;
   float 
     x = state(0),
@@ -215,37 +209,16 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
   float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2)) /
             (ray(0)*ground_normal(0) + ray(1)*ground_normal(1) + ray(2)*ground_normal(2));
 
-
   Eigen::Vector4f point_camera_frame, point_world_frame;
   point_camera_frame << ray * t, 1.0;
   point_world_frame = vMat.inverse() * point_camera_frame;
   point_world_frame /= point_world_frame(3);
 
-
   float l_ratio, d_ratio, h;
-  switch(class_label){
-    case ClassLabel::Pedestrian:
-      l_ratio = person_dim_prior[0]/person_dim_prior[2];  // l_ratio
-      d_ratio = person_dim_prior[1]/person_dim_prior[2];  // d_ratio
-      h =       person_dim_prior[2];                      // h
-      break;
-    case ClassLabel::Bicycle:
-    case ClassLabel::Motorcycle:
-      l_ratio = bike_dim_prior[0]/bike_dim_prior[2]; 
-      d_ratio = bike_dim_prior[1]/bike_dim_prior[2]; 
-      h =       bike_dim_prior[2];
-      break;
-    case ClassLabel::Car:
-      l_ratio = car_dim_prior[0]/car_dim_prior[2]; 
-      d_ratio = car_dim_prior[1]/car_dim_prior[2]; 
-      h =       car_dim_prior[2];
-      break;
-    case ClassLabel::Unknown:
-      l_ratio = general_dim_prior[0]/general_dim_prior[2]; 
-      d_ratio = general_dim_prior[1]/general_dim_prior[2]; 
-      h =       general_dim_prior[2];
-      break;
-  }
+  Eigen::Vector3f dim = priorDimensions.at(class_label);
+  l_ratio = dim(0)/dim(2);
+  d_ratio = dim(1)/dim(2);
+  h = dim(2);
 
   result << point_world_frame(0), // x
             point_world_frame(1), // y

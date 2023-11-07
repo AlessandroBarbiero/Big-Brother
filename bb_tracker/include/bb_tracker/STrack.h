@@ -93,5 +93,8 @@ private:
 	bool checkOldDetection(int64_t detection_time_ms);
 
 	// Update internal state of the STrack after a kalman filter update
-	void updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, int frame_id, bool reset_tracklet_len = false);
+	void updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, ClassLabel new_label, int frame_id, bool reset_tracklet_len = false);
+
+	// Update the confidence of the current class label and apply prior information on dimensions to refine mean
+	void updateClassLabel(ClassLabel new_label, float new_score);
 };

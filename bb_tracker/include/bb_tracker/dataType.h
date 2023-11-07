@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <unordered_map>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -51,8 +52,16 @@ enum class ClassLabel{
     Motorcycle, 
     Car
     };
-static const std::string classLabelString[] = {"Unknown", "Person", "Cyclist", "Motorcycle", "Car"};
 
+static const std::string classLabelString[] = {"Unknown", "Person", "Cyclist", "Motorcycle", "Car"};
+// PRIOR 3D Average Dimensions in meters for the class labels
+static const std::unordered_map<ClassLabel, Eigen::Vector3f> priorDimensions = {
+    {ClassLabel::Unknown, {1.0, 1.0, 1.7}},
+    {ClassLabel::Pedestrian, {0.5, 0.5, 1.7}},
+    {ClassLabel::Bicycle, {1.8, 0.7, 1.6}},
+    {ClassLabel::Motorcycle, {2.2, 0.8, 1.7}},
+    {ClassLabel::Car, {4.5, 1.8, 1.65}}
+};
 
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <vision_msgs/msg/bounding_box2_d.hpp>
