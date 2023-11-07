@@ -41,5 +41,5 @@ bb_tracker:
       mul_mn2d: [
          10.,10.,    # position
          10.,10.,    # semi-axes
-         60.          # theta
+         45.         # theta
          ]
