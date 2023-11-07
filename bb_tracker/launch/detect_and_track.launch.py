@@ -28,8 +28,12 @@ def generate_launch_description():
         remappings=[
             # ("/bytetrack/detections", "/something"),
             # ("/bytetrack/active_tracks", "/something")
-            ("/bytetrack/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
-            ("/bytetrack/camera_image", "/carla/sensors_home/static_rgb_camera/image")
+
+            ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
+            ("/bytetrack/camera_image", "/carla/sensors_home/static_termic_camera/image")
+
+            # ("/bytetrack/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
+            # ("/bytetrack/camera_image", "/carla/sensors_home/static_rgb_camera/image")
         ],
         parameters=[config],
         output='screen',
@@ -43,7 +47,8 @@ def generate_launch_description():
         remappings=[
             ("/to_detect", "/carla/sensors_home/static_termic_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
-            ("/detection_3d", "/bytetrack/detections3d")
+            # ("/detection_3d", "/bytetrack/detections3d"),
+            ("/detection_2d", "/bytetrack/detections2d")
         ],
         parameters=[
             {"show_debug": False}
@@ -119,8 +124,8 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
-    # ld.add_action(thermal_node)
-    ld.add_action(yolo_node)
+    ld.add_action(thermal_node)
+    #ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
