@@ -165,6 +165,13 @@ class FakeDetector(Node):
             detection_a.bbox.size.y += rnd_size[1]
             detection_a.bbox.size.z += rnd_size[2]
 
+            if detection_a.bbox.size.x < 0.30:
+                detection_a.bbox.size.x = 0.30
+            if detection_a.bbox.size.y < 0.30:
+                detection_a.bbox.size.y = 0.30
+            if detection_a.bbox.size.z < 0.30:
+                detection_a.bbox.size.z = 0.30
+
             detections_msg.detections.append(detection_a)
 
         self._pub_detections.publish(detections_msg)
