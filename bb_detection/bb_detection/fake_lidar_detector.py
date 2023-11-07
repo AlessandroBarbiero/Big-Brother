@@ -16,6 +16,7 @@ from geometry_msgs.msg import TransformStamped, Point
 from typing import List
 import numpy as np
 import random
+from copy import deepcopy
 
 from .utility import classes_to_detect
 
@@ -142,16 +143,17 @@ class FakeDetector(Node):
 
             if marker.ns.lower() in classes_to_detect:
                 hypothesis.id = marker.ns.lower()
+                hypothesis.score = 0.9
             else:
                 if marker.scale.x>1.0 or marker.scale.y>1.0:
                     hypothesis.id = "car"
                 else:
                     hypothesis.id = "person"
-            hypothesis.score = 0.9
+                hypothesis.score = 0.8
 
             detection_a.results.append(hypothesis)
 
-            detection_a.bbox.center = marker.pose
+            detection_a.bbox.center = deepcopy(marker.pose)
             detection_a.bbox.center.position.x += rnd_pos[0]
             detection_a.bbox.center.position.y += rnd_pos[1]
             detection_a.bbox.center.position.z += rnd_pos[2]
@@ -160,7 +162,7 @@ class FakeDetector(Node):
             detection_a.bbox.center.orientation.z += rnd_orient[2]
             detection_a.bbox.center.orientation.w += rnd_orient[3]
 
-            detection_a.bbox.size = marker.scale
+            detection_a.bbox.size = deepcopy(marker.scale)
             detection_a.bbox.size.x += rnd_size[0]
             detection_a.bbox.size.y += rnd_size[1]
             detection_a.bbox.size.z += rnd_size[2]
