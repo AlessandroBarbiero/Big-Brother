@@ -222,7 +222,7 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
 
   result << point_world_frame(0), // x
             point_world_frame(1), // y
-            0,               // yaw
+            state(4),               // yaw
             l_ratio,
             d_ratio,
             h,
