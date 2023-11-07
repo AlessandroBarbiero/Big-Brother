@@ -10,14 +10,15 @@ from tf2_ros.buffer import Buffer
 # ROS messages
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
-from vision_msgs.msg import Detection3D
+from vision_msgs.msg import Detection3D, Detection2D
 from vision_msgs.msg import ObjectHypothesisWithPose
-from vision_msgs.msg import Detection3DArray
+from vision_msgs.msg import Detection3DArray, Detection2DArray
 from geometry_msgs.msg import TransformStamped
 # Other
 from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import numpy as np
+from copy import deepcopy
 # My files
 from .utility import *
 from .bev.Bev import Bev
@@ -63,9 +64,10 @@ class ThermalDetector(Node):
         sub1 = Subscriber(self, Image, "to_detect")
         sub2 = Subscriber(self, CameraInfo, "camera_info")
         self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
-        self._tss.registerCallback(self.detect_3d)
+        self._tss.registerCallback(self.detect)
 
-        self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+        self._pub3d = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+        self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -87,10 +89,10 @@ class ThermalDetector(Node):
         return SetParametersResult(successful=True)
     
     
-    def detect_3d(self, data: Image, camera_info: CameraInfo):
+    def detect(self, data: Image, camera_info: CameraInfo):
         """
         Callback function, it is called everytime an image is published on the given topic. It transform the semantic segmentation into 
-        bounding boxes and publishes the 3D bounding boxes,
+        bounding boxes and publishes the 2D and approximated 3D bounding boxes,
         It can also show the debug image if the parameter is set
         """
         
@@ -148,8 +150,11 @@ class ThermalDetector(Node):
 
         # Create detections msg
         detections_msg = Detection3DArray()
-        detections_msg.header = data.header
+        detections_msg.header = deepcopy(data.header)
         detections_msg.header.frame_id = DEFAULT_FRAME
+
+        detections2d_msg = Detection2DArray()
+        detections2d_msg.header = deepcopy(data.header)
 
         # Create the bbox starting from semseg
         for class_name, target_color in self.colors.items():
@@ -168,8 +173,16 @@ class ThermalDetector(Node):
                 left_base_pt = (x, y)
                 right_base_pt = (x+w, y)
 
+                detection2d = Detection2D()
+                detection2d.header = detections2d_msg.header
                 detection = Detection3D()
                 detection.header = detections_msg.header
+
+                # Fill detection2D
+                detection2d.bbox.center.x = float(x+w/2.0)
+                detection2d.bbox.center.y = float(y+h/2.0)
+                detection2d.bbox.size_x = float(w)
+                detection2d.bbox.size_y = float(h)
 
                 # Project base points into Bird Eye View Projection
                 points = np.array([left_base_pt, right_base_pt])
@@ -192,9 +205,11 @@ class ThermalDetector(Node):
                 hypothesis.id = class_name
                 hypothesis.score = 1.0
                 detection.results.append(hypothesis)
+                detection2d.results.append(hypothesis)
 
                 # Append msg
                 detections_msg.detections.append(detection)
+                detections2d_msg.detections.append(detection2d)
 
                 # Draw rectangles in debug image
                 if(self.get_parameter('show_debug').value):
@@ -207,7 +222,8 @@ class ThermalDetector(Node):
                                 1, bounding_box_color, 1, cv2.LINE_AA)
 
         # Publish detections
-        self._pub.publish(detections_msg)
+        self._pub3d.publish(detections_msg)
+        self._pub2d.publish(detections2d_msg)
 
         if(self.get_parameter('show_debug').value):
             # Display image
