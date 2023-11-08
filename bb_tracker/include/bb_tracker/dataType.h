@@ -44,6 +44,7 @@ typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> TRANSFORMATION;
 typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
 typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> ELLIPSE_STATE; // [X_center, Y_center, semi_axis_A, semi_axis_B, theta (in radians)]
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 enum class ClassLabel{
     Unknown = 0,
@@ -63,6 +64,9 @@ static const std::unordered_map<ClassLabel, Eigen::Vector3f> priorDimensions = {
     {ClassLabel::Car, {4.5, 1.8, 1.65}}
 };
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 #include <vision_msgs/msg/bounding_box3_d.hpp>
 #include <vision_msgs/msg/bounding_box2_d.hpp>
 
@@ -80,4 +84,36 @@ struct Object2D
     ClassLabel label;
     float prob;
 	int64_t time_ms;
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+template <typename T>
+class CircularBuffer {
+public:
+    CircularBuffer() : capacity_(10){}
+
+    CircularBuffer(size_t capacity) : capacity_(capacity){
+        buffer_.reserve(capacity_);
+    }
+
+    // Push an element to the back of the circular buffer
+    void push_back(const T& value) {
+        if (size_ < capacity_) {
+            // If there's space available, add the element at the tail.
+            buffer_.push_back(value);
+            size_++;
+        } else {
+            // If the buffer is full, overwrite the oldest element.
+            buffer_[head_] = value;
+            head_ = (head_ + 1) % capacity_;
+        }
+    }
+
+    std::vector<T> buffer_;
+private:
+    
+    size_t capacity_;
+    size_t head_ = 0;  // Start with head at position 0
+    size_t size_ = 0;
 };

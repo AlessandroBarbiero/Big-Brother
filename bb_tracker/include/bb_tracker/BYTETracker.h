@@ -136,6 +136,6 @@ private:
 
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;
-	vector<STrack> removed_stracks;
+	CircularBuffer<STrack> removed_stracks;
 
 };

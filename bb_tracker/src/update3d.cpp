@@ -257,7 +257,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 		this->lost_stracks.push_back(lost_stracks[i]);
 	}
 
-	this->lost_stracks = sub_stracks(this->lost_stracks, this->removed_stracks);
+	this->lost_stracks = sub_stracks(this->lost_stracks, this->removed_stracks.buffer_);
 	for (unsigned int i = 0; i < removed_stracks.size(); i++)
 	{
 		this->removed_stracks.push_back(removed_stracks[i]);

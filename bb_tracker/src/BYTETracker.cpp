@@ -22,6 +22,8 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	this->lost_ttl = lost_ttl;
 	this->max_dt_past = max_dt_past;
 	this->left_handed_system = left_handed_system;
+	CircularBuffer<STrack> buff(300);
+	this->removed_stracks = buff;
 
 	frame_id = 0;
 	current_time_ms = 0;
