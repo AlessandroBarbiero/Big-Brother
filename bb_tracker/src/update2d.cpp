@@ -67,7 +67,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < strack_pool_out_image.size(); i++)
 	{
 		STrack *track = strack_pool_out_image[i];
-		if (last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -82,7 +82,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < unconfirmed_out_image.size(); i++)
 	{
 		STrack *track = unconfirmed_out_image[i];
-		if(last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
