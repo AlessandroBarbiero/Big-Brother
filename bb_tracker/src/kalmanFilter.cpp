@@ -346,7 +346,6 @@ namespace byte_kalman
 		KAL_HDATA2D pa = project2D(mean, covariance);
 		KAL_HMEAN2D projected_mean = pa.first;
 		KAL_HCOVA2D projected_cov = pa.second;
-		normalizeAngle(projected_mean(4));
 
 		// K = (P(t)*H^T)(H*P(t)*H^T + V2)^-1
 		Eigen::Matrix<float, 5, 8> B = (covariance * (_observation_mat2D.transpose())).transpose();
