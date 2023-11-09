@@ -23,8 +23,7 @@ void BYTETracker::init(int time_to_lost, int unconfirmed_ttl, int lost_ttl, int 
 	this->max_dt_past = max_dt_past;
 	this->left_handed_system = left_handed_system;
 	constexpr size_t removed_to_keep = 1000;
-	CircularBuffer<STrack> buff(removed_to_keep);
-	this->removed_stracks = buff;
+	this->removed_stracks.set_capacity(removed_to_keep);
 
 	frame_id = 0;
 	current_time_ms = 0;
