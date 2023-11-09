@@ -123,7 +123,7 @@ void BBVisualizer::update_imgui(){
 }
 
 void BBVisualizer::visualizeTracks(){
-  static float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
+  // static float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
   static float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
 
   ImGuiWindowFlags window_flags = 0;
@@ -138,7 +138,6 @@ void BBVisualizer::visualizeTracks(){
   static int freeze_rows = 1;
 
   PushStyleCompact();
-  ImGui::CheckboxFlags("ImGuiTableFlags_Resizable", &flags, ImGuiTableFlags_Resizable);
   ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
   ImGui::DragInt("freeze_cols", &freeze_cols, 0.2f, 0, 9, NULL, ImGuiSliderFlags_NoInput);
   ImGui::SetNextItemWidth(ImGui::GetFrameHeight());
@@ -422,7 +421,7 @@ bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfac
     {
         const ImGuiTableColumnSortSpecs* sort_spec = &BBVisualizer::s_current_sort_specs->Specs[n];
         int delta = 0;
-        switch (sort_spec->ColumnUserID)
+        switch (sort_spec->ColumnIndex)
         {
         case 0:    delta = (a.track_id - b.track_id);                              break;
         case 1:    delta = (a.is_activated ? 1 : -1);                               break;
