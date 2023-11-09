@@ -76,6 +76,8 @@ public:
 	int64_t last_filter_update_ms;
 	int tracklet_len;
 	int start_frame;
+
+	CircularBuffer<geometry_msgs::msg::Point> last_points; //TODO: Think about using a different type of buffer, maybe with continuous elements to avoid the weird effet of the trajectories
 	visualization_msgs::msg::Marker path_marker;
 	visualization_msgs::msg::Marker text_marker;
 

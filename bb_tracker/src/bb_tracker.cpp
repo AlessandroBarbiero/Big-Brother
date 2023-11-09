@@ -1,7 +1,7 @@
 #include <bb_tracker/bb_tracker.hpp>
 
 // #define DEBUG
-//#define NO_PROGRESS // Avoid printing the fps and number of tracks
+#define NO_PROGRESS // Avoid printing the fps and number of tracks
 #define OBJECT_BUFFER_SIZE 500
 
 BBTracker::BBTracker()
@@ -670,8 +670,8 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
     track->text_marker.text = classLabelString[(int)track->class_label];
     track->text_marker.text.append("-").append(::to_string(track->track_id));
   }
-  track->path_marker.points.push_back(last_point);
-  // path_marker.colors.push_back(s_color);
+  track->last_points.push_back(last_point);
+  track->path_marker.points = track->last_points.buffer_;
   track->text_marker.pose.position = last_point;
   text = track->text_marker;
   return track->path_marker;

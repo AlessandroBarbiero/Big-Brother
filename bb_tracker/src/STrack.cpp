@@ -24,6 +24,8 @@ STrack::STrack(Object2D *obj, ClassLabel class_label)
 	this->class_label = class_label;
 	start_frame = 0;
 	last_filter_update_ms = obj->time_ms;
+
+	this->last_points.set_capacity(100);
 }
 
 STrack::STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64_t time_ms)
@@ -46,6 +48,8 @@ STrack::STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64
 	this->class_label = class_label;
 	start_frame = 0;
 	last_filter_update_ms = time_ms;
+
+	this->last_points.set_capacity(100);
 }
 
 STrack::~STrack()
