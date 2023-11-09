@@ -1,7 +1,7 @@
 #include <bb_tracker/bb_tracker.hpp>
 
 // #define DEBUG
-#define NO_PROGRESS // Avoid printing the fps and number of detections
+//#define NO_PROGRESS // Avoid printing the fps and number of tracks
 #define OBJECT_BUFFER_SIZE 500
 
 BBTracker::BBTracker()
@@ -110,43 +110,23 @@ BBTracker::BBTracker()
   // Init BYTETracker object
   _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh, lh_system);
   _tracker.initVariance(mul_p03d, mul_p02d, mul_process_noise, mul_mn3d, mul_mn2d);
-  _num_detections = 0;
   _num_updates = 0;
   _total_ms = 0;
 
   RCLCPP_INFO(this->get_logger(), "Ready to track");
 }
 
-void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
+vector<STrack*> BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   _num_updates++;
 
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack*> output_stracks = _tracker.update(new_objects);
-
-  #ifdef DEBUG
-    std::cout << "Tracker updated 3D showing " << output_stracks.size() <<
-    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
-  #endif
-
-  publish_stracks(output_stracks);
-
-  // Show Progress
-  #ifndef DEBUG
-  #ifndef NO_PROGRESS
-    std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
-    std::cout.flush();
-  #endif
-  #endif
-
-  #ifdef DEBUG
-  std::cout<< "Tracks published" << std::endl;
-  #endif
+  return _tracker.update(new_objects);
 }
 
-void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info){
+vector<STrack*> BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info){
   _num_updates++;
 
-  // Get values for 2d update from camera info
+  // Get values for 2D update from camera info
   TRANSFORMATION V = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
   PROJ_MATRIX P;
   int p_index = 0;
@@ -158,26 +138,7 @@ void BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_
   }
 
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack*> output_stracks = _tracker.update(new_objects, P, V, camera_info->width, camera_info->height);
-
-  #ifdef DEBUG
-    std::cout << "Tracker updated 2D showing " << output_stracks.size() <<
-    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
-  #endif
-
-  publish_stracks(output_stracks);
-
-  // Show Progress
-  #ifndef DEBUG
-  #ifndef NO_PROGRESS
-  std::cout << format("update: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
-  std::cout.flush();
-  #endif
-  #endif
-
-  #ifdef DEBUG
-  std::cout<< "Tracks published" << std::endl;
-  #endif
+  return _tracker.update(new_objects, P, V, camera_info->width, camera_info->height);
 }
 
 void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, const std::string& new_frame){
@@ -278,18 +239,16 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
 
 void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
 {
-  auto start = chrono::system_clock::now();
-
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
   #endif
-  _num_detections++;
-  if (_num_detections % 50 == 0)
-  {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, (Ideally %lu fps)", _num_detections, _num_updates * 1000000 / _total_ms);
-  }
+
   if (detections_message->detections.empty())
     return;
+
+  auto start = chrono::system_clock::now();
+
+// -----------------------
 
   // Move all the detections to a common fixed frame
   if(detections_message->header.frame_id != _fixed_frame){
@@ -299,34 +258,60 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   vector<Object3D> objects3D;
   // Put detection3d array inside the object structure
   decode_detections(detections_message, objects3D);
-  update_tracker(objects3D);
+  vector<STrack*> output_stracks = update_tracker(objects3D);
+  publish_stracks(output_stracks);
+
+// ----------------------
 
   auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+  auto duration = chrono::duration_cast<chrono::microseconds>(end - start).count();
+  _total_ms = _total_ms + duration;
+
+  #ifndef NO_PROGRESS
+    std::cout << format("(3D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+    std::cout.flush();
+  #endif
+
+  if (_num_updates % 50 == 0)
+  {
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+  }
 }
 
 void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
-  auto start = chrono::system_clock::now();
-
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detection_msg->header.frame_id.c_str());
   #endif
-  _num_detections++;
-  if (_num_detections % 50 == 0)
-  {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, (Ideally %lu fps)", _num_detections, _num_updates * 1000000 / _total_ms);
-  }
+
   if (detection_msg->detections.empty())
     return;
+
+  auto start = chrono::system_clock::now();
+
+  // ------------------------
 
   vector<Object2D> objects2D;
   // Put detection2d array inside the object structure
   decode_detections(detection_msg, objects2D);
-  update_tracker(objects2D, camera_info);
+  vector<STrack*> output_stracks = update_tracker(objects2D, camera_info);
+  publish_stracks(output_stracks);
+
+  // ------------------------
 
   auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+  auto duration = chrono::duration_cast<chrono::microseconds>(end - start).count();
+  _total_ms = _total_ms + duration;
+
+  #ifndef NO_PROGRESS
+   std::cout << format("(2D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+   std::cout.flush();
+  #endif
+
+  if (_num_updates % 50 == 0)
+  {
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+  }
 }
 
 // TODO: delete

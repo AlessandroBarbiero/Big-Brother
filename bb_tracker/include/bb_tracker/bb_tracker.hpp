@@ -29,6 +29,7 @@
 #include <Eigen/Dense>
 
 #define NANO_IN_MILLIS 1000000 //10^6
+#define MICRO_IN_SECOND 1000000 //10^6
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -56,8 +57,8 @@ class BBTracker : public rclcpp::Node
     void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
-    void update_tracker(std::vector<Object3D>& new_objects);
-    void update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
+    vector<STrack*> update_tracker(std::vector<Object3D>& new_objects);
+    vector<STrack*> update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void publish_stracks(vector<STrack*>& output_stracks);
     void convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message);
     visualization_msgs::msg::Marker createPathMarker(STrack* track, std_msgs::msg::Header& header, geometry_msgs::msg::Point& last_point, visualization_msgs::msg::Marker& text);
@@ -106,8 +107,6 @@ class BBTracker : public rclcpp::Node
 
     BYTETracker _tracker;
     vector<Object3D> _objects_buffer;
-    // Total number of detections received
-    int _num_detections;
     // Total number of BYTETracker updates
     int _num_updates;
     // Microseconds passed computing the algorithm
