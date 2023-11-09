@@ -37,7 +37,8 @@ def generate_launch_description():
         ],
         parameters=[config],
         output='screen',
-        #prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"] # add gdb
+        # prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"] # add gdb
+        # prefix=["xterm -font 10x20 -g 100x25 -e gdbserver localhost:3100"] # add gdb-server to use with vsCode
         prefix=["xterm -font 10x20 -g 100x25 -e"] # open in a new terminal with big font
     )
 
@@ -80,7 +81,7 @@ def generate_launch_description():
         ],
         parameters=[
             {'lidar_list'           : ["sensors_home/static_lidar"]},
-            {'lidar_max_distances'  : [30]},
+            {'lidar_max_distances'  : [100]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
             {"percentage_miss"      : 0.15},
@@ -124,7 +125,7 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
-    ld.add_action(thermal_node)
+    # ld.add_action(thermal_node)
     #ld.add_action(yolo_node)
     ld.add_action(lidar_node)
     ld.add_action(static_tf)
