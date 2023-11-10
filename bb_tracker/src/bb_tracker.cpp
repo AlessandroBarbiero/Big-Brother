@@ -7,29 +7,36 @@
 BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
-  // ROS Parameters
+  // %%%%%%%%%% ROS Parameters %%%%%%%%%%%%%%
+  // Visualization
   auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
   show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
+  auto points_track_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  points_track_desc.description = "Number of points to show per each track.";
+  // Detection
   auto left_handed_system_desc = rcl_interfaces::msg::ParameterDescriptor{};
   left_handed_system_desc.description = "Set to true to if the Detections 3D come from a left handed system like Unreal Engine (yaw angle is rotated 180 degrees)";
   auto max_dt_desc = rcl_interfaces::msg::ParameterDescriptor{};
   max_dt_desc.description = "Max interval (current time - new detection time) in milliseconds, older detections are discarded";
+  auto camera_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  camera_list_desc.description = "List of the CameraInfo topics";
+  auto image_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  image_list_desc.description = "List of the Images retreived from cameras topics, it should have the same order and size as camera_list if show_image_projection is set";
+  // Tracker Time
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
   auto unconfirmed_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
   unconfirmed_ttl_desc.description = "Milliseconds an unconfirmed object is not seen before removing it.";
   auto lost_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
   lost_ttl_desc.description = "Number of milliseconds a track is kept if it is not seen in the scene.";
-  auto points_track_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  points_track_desc.description = "Number of points to show per each track.";
+  // Tracker Thresholds
   auto t_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   t_thresh_desc.description = "This threshold is used to divide initially the detections into high and low score, high score detections are considered first for matching";
   auto h_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   h_thresh_desc.description = "This threshold is used to determine whether a high score detected object should be considered as a new object if it does not match with previously considered tracklets";
   auto m_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
-  auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
-  fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+  // Kalman Filter
   auto mul_p03d_desc = rcl_interfaces::msg::ParameterDescriptor{};
   mul_p03d_desc.description = "List of multiplicators for the varaince P0 in 3D detection to use within the Kalman Filter";
   auto mul_p02d_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -41,47 +48,88 @@ BBTracker::BBTracker()
   auto mul_mn2d_desc = rcl_interfaces::msg::ParameterDescriptor{};
   mul_mn2d_desc.description = "List of multiplicators for the varaince of the Measurement Noise in 2D detections to use within the Kalman Filter";
 
-  vector<double> mul_p03d(8,1.0), mul_p02d(8,1.0), mul_process_noise(8,1.0), mul_mn3d(6,1.0), mul_mn2d(5,1.0);
+  auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
 
-  this->declare_parameter("max_dt_past", 2000, max_dt_desc);
+  vector<double> mul_p03d(8,1.0), mul_p02d(8,1.0), mul_process_noise(8,1.0), mul_mn3d(6,1.0), mul_mn2d(5,1.0);
+  vector<std::string> camera_info_topics = {"/camera/info1"};
+  vector<std::string> image_topics = {"/camera/image1"};
+
+  // Visualization
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
   this->declare_parameter("points_per_track", 100, points_track_desc);
+  // Detection
+  this->declare_parameter("left_handed_system", false, left_handed_system_desc);
+  this->declare_parameter("max_dt_past", 2000, max_dt_desc);
+  this->declare_parameter("camera_list", camera_info_topics, camera_list_desc);
+  this->declare_parameter("image_list", image_topics, image_list_desc);
+
+  // Tracker Time
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
   this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
   this->declare_parameter("lost_ttl", 1000, lost_ttl_desc);
+  // Tracker Thresholds
   this->declare_parameter("track_thresh", 0.5, t_thresh_desc);
   this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
-  this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
-  this->declare_parameter("left_handed_system", false, left_handed_system_desc);
+  // Kalman Filter
   this->declare_parameter("mul_p03d", mul_p03d, mul_p03d_desc);
   this->declare_parameter("mul_p02d", mul_p02d, mul_p02d_desc);
   this->declare_parameter("mul_process_noise", mul_process_noise, mul_process_noise_desc);
   this->declare_parameter("mul_mn3d", mul_mn3d, mul_mn3d_desc);
   this->declare_parameter("mul_mn2d", mul_mn2d, mul_mn2d_desc);
 
+  this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
+
+  // Visualization
   _show_img_projection=   get_parameter("show_img_projection").as_bool();
   int points_per_track=   get_parameter("points_per_track").as_int();
+  // Detection
+  bool lh_system =        get_parameter("left_handed_system").as_bool();
   int max_dt_past =       get_parameter("max_dt_past").as_int();
+  camera_info_topics =    get_parameter("camera_list").as_string_array();
+  image_topics =          get_parameter("image_list").as_string_array();
+
+  // Tracker Time
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
   int lost_ttl        =   get_parameter("lost_ttl").as_int();
+  // Tracker Thresholds
   float h_thresh =        get_parameter("high_thresh").as_double();
   float t_thresh =        get_parameter("track_thresh").as_double();
   float m_thresh =        get_parameter("match_thresh").as_double();
-  _fixed_frame =          get_parameter("fixed_frame").as_string();
-  bool lh_system =        get_parameter("left_handed_system").as_bool();
+  // Kalman Filter
   mul_p03d =              get_parameter("mul_p03d").as_double_array();
   mul_p02d =              get_parameter("mul_p02d").as_double_array();
   mul_process_noise =     get_parameter("mul_process_noise").as_double_array();
   mul_mn3d =              get_parameter("mul_mn3d").as_double_array();
   mul_mn2d =              get_parameter("mul_mn2d").as_double_array();
+  
+  _fixed_frame =          get_parameter("fixed_frame").as_string();
 
-  // ROS Subscriber and Publisher
+
+  // %%%%%%%%% ROS Subscriber and Publisher %%%%%%%%%%
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
           "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
 
   _detection2d.subscribe(this, "bytetrack/detections2d");
+
+
+  // TODO: Add a subscriber for each camera info topic, something like this used in benchmark
+  // int id = 0;
+  // for (auto camera_topic : _cameras){
+  //   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_sub;
+  //   std::function<void(std::shared_ptr<sensor_msgs::msg::CameraInfo>)> callback_fun = std::bind(
+  //     &BBBenchmark::camera_info_callback, this, _1, id, _cameras_max_dist[id]);
+    
+  //   cam_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(camera_topic, rclcpp::QoS(rclcpp::KeepLast(1)), callback_fun);
+  //   _cameras_sub.push_back(cam_sub);
+  //   _last_transform_camera.push_back(geometry_msgs::msg::Transform());
+  //   _tf2_transform_camera.push_back(tf2::Transform());
+  //   _camera_models.push_back(image_geometry::PinholeCameraModel());
+  //   id++;
+  // }
+
   _camera_info.subscribe(this, "bytetrack/camera_info");
 
   if(_show_img_projection){
@@ -103,10 +151,7 @@ BBTracker::BBTracker()
 
   _tracks_publisher = this->create_publisher<bb_interfaces::msg::STrackArray>("bytetrack/active_tracks_explicit", 10);
 
-  // ROS Timer [Old version with periodic updates]
-  // std::chrono::milliseconds ms_to_call((1000/fps));
-  // _timer = this->create_wall_timer(
-  //     ms_to_call, std::bind(&BBTracker::update_tracker, this));
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   // Reserve space trying to avoid frequent dynamical reallocation
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
@@ -366,7 +411,7 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
   try
   {
-    cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
+    // cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
     cv_ptr_track = cv_bridge::toCvCopy(image, image->encoding);
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
@@ -376,15 +421,15 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
     // Draw ellipses for incoming detections
     for(auto det : detection_msg->detections)
-      cv::ellipse(cv_ptr_detect->image, Point(det.bbox.center.x, det.bbox.center.y),
+      cv::ellipse(cv_ptr_track->image, Point(det.bbox.center.x, det.bbox.center.y),
               Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
               360, CV_RGB(255, 0, 0),
               1, LINE_AA);
 
-    std::string window_name1 = "Tracked Objects";
+    std::string window_name1 = "Tracked (Blue) and Detected (Red) Objects";
     cv::imshow(window_name1, cv_ptr_track->image);
-    std::string window_name2 = "Detected Objects";
-    cv::imshow(window_name2, cv_ptr_detect->image);
+    // std::string window_name2 = "Detected Objects";
+    // cv::imshow(window_name2, cv_ptr_detect->image);
     // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
@@ -521,7 +566,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
     vector<float> tlbr_ellipse = tlbrFromEllipse(ecx,ecy,ea,eb,theta);
     min_pt = {static_cast<int>(tlbr_ellipse[0]), static_cast<int>(tlbr_ellipse[1])};
     max_pt = {static_cast<int>(tlbr_ellipse[2]), static_cast<int>(tlbr_ellipse[3])};
-    cv::rectangle(image_ptr->image, cv::Rect(min_pt, max_pt), CV_RGB(255,0,0), 1, LINE_AA);
+    cv::rectangle(image_ptr->image, cv::Rect(min_pt, max_pt), CV_RGB(0,0,255), 1, LINE_AA);
 
     // Draw the ellipse
     theta = theta * 180/M_PI; // Convert in degrees

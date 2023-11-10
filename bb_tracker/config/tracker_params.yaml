@@ -1,16 +1,30 @@
 bb_tracker:
    ros__parameters:
+      fixed_frame: sensors_home
+      # Visualization
+      show_img_projection: true
+      points_per_track: 100
+      # Detection
+      left_handed_system: true
       max_dt_past: 2000
+      camera_list: [
+         "/carla/sensors_home/static_rgb_camera/camera_info", 
+         "/carla/sensors_home/static_termic_camera/camera_info"
+         ]
+      image_list: [
+         "/carla/sensors_home/static_rgb_camera/image", 
+         "/carla/sensors_home/static_termic_camera/image"
+         ]
+      # Tracker Time
       time_to_lost: 1500
       unconfirmed_ttl: 1000
       lost_ttl: 2000
+      # Tracker Thresh
       track_thresh: 0.5
       high_thresh: 0.6
       match_thresh: 0.8
-      fixed_frame: sensors_home
-      show_img_projection: true
-      points_per_track: 100
-      left_handed_system: true
+
+      # Kalman Filter
       # P0 3D
       mul_p03d: [
          2.,2.,      # position
