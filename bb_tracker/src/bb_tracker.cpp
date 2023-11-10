@@ -375,6 +375,28 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
 //   }
 // }
 
+// Add a color legend on the right showing colors and relative label on the image
+void addColorLegend(cv::Mat& image, const std::vector<cv::Scalar>& colors, const std::vector<std::string>& labels) {
+    int legendWidth = 150;  // Width of the legend box
+    int legendHeight = 5 + 20 * colors.size();  // Height of the legend box, with a little space between each color
+    int startX = image.cols - legendWidth;  // X-coordinate to start drawing the legend box
+    int startY = 10;  // Y-coordinate to start drawing the legend box at the top
+
+    // Create a white background for the legend
+    cv::Rect legendRect(startX, startY, legendWidth, legendHeight);
+    cv::rectangle(image, legendRect, cv::Scalar(255, 255, 255), -1);
+
+    // Draw rectangles with colors and corresponding labels in the legend
+    int rectWidth = 15;  // Width of the color square
+    int rectHeight = 15;  // Height of the color square
+    for (size_t i = 0; i < colors.size(); ++i) {
+        cv::Rect rect(startX + 5, startY + 5 + i * (rectHeight + 5), rectWidth, rectHeight);
+        cv::rectangle(image, rect, colors[i], -1);
+        cv::putText(image, labels[i], cv::Point(startX + rectWidth + 15, startY + 5 + i * (rectHeight + 5) + rectHeight - 3),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 1);
+    }
+}
+
 void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
   cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
 
@@ -425,6 +447,8 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
               Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
               360, CV_RGB(255, 0, 0),
               1, LINE_AA);
+
+    addColorLegend(cv_ptr_track->image, {CV_RGB(0, 0, 255), CV_RGB(255, 0, 0)}, {"Tracked Objects", "Detected Objects"});
 
     std::string window_name1 = "Tracked (Blue) and Detected (Red) Objects";
     cv::imshow(window_name1, cv_ptr_track->image);
