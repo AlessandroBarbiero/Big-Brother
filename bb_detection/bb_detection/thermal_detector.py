@@ -45,7 +45,9 @@ class ThermalDetector(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('show_debug', True)
+                ('show_debug', True),
+                ('publish_3d', True),
+                ('publish_2d', True)
             ]
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
@@ -95,66 +97,69 @@ class ThermalDetector(Node):
         bounding boxes and publishes the 2D and approximated 3D bounding boxes,
         It can also show the debug image if the parameter is set
         """
-        
-        # Compute the transformation from the Default frame to the sensor frame to compute the bev projection
-        from_frame_rel = SENSORS_FRAME
-        to_frame_rel = DEFAULT_FRAME
-
-        try:
-            tf : TransformStamped = self.tf_buffer.lookup_transform(
-                to_frame_rel,
-                from_frame_rel,
-                rclpy.time.Time())
-        except TransformException as ex:
-            self.get_logger().info(
-                f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
-            return
-        
-        roll, pitch, yaw = euler_from_quaternion(tf.transform.rotation)
+        publish_3d = self.get_parameter('publish_3d').value
+        publish_2d = self.get_parameter('publish_2d').value
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
             self.get_logger().info("Started detecting images")
             self.no_image_detected_yet = False
-    
+
+        if(publish_3d):
+            # Compute the transformation from the Default frame to the sensor frame to compute the bev projection
+            from_frame_rel = SENSORS_FRAME
+            to_frame_rel = DEFAULT_FRAME
+
+            try:
+                tf : TransformStamped = self.tf_buffer.lookup_transform(
+                    to_frame_rel,
+                    from_frame_rel,
+                    rclpy.time.Time())
+            except TransformException as ex:
+                self.get_logger().info(
+                    f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+                return
+            
+            roll, pitch, yaw = euler_from_quaternion(tf.transform.rotation)
+
+            # Prepare Bird Eye View projection
+            camera_model = PinholeCameraModel()
+            camera_model.fromCameraInfo(camera_info)
+            cameraData = {
+                'intrinsic': {
+                    'fx': camera_model.fx(),
+                    'fy': camera_model.fy(),
+                    'u0': camera_model.cx(),
+                    'v0': camera_model.cy()
+                },
+                'extrinsic': {
+                    'x': tf.transform.translation.x,
+                    'y': tf.transform.translation.y,
+                    'z': tf.transform.translation.z,
+                    'yaw': yaw,
+                    'pitch': pitch,
+                    'roll': roll
+                }
+            }
+            camera = Camera(cameraData)
+            bev_out_view = [0, 10, -20, 20]
+            bev_out_image_width = 1000
+            bev_out_image_size = [np.nan, bev_out_image_width] 
+            bev_obj = Bev(camera, bev_out_view, bev_out_image_size)
+
+            # Create detections msg
+            detections_msg = Detection3DArray()
+            detections_msg.header = deepcopy(data.header)
+            detections_msg.header.frame_id = DEFAULT_FRAME
+
+
         # Convert ROS Image message to OpenCV image
         cv_image = self.br.imgmsg_to_cv2(data)
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
 
-
-        # Prepare Bird Eye View projection
-        camera_model = PinholeCameraModel()
-        camera_model.fromCameraInfo(camera_info)
-        cameraData = {
-            'intrinsic': {
-                'fx': camera_model.fx(),
-                'fy': camera_model.fy(),
-                'u0': camera_model.cx(),
-                'v0': camera_model.cy()
-            },
-            'extrinsic': {
-                'x': tf.transform.translation.x,
-                'y': tf.transform.translation.y,
-                'z': tf.transform.translation.z,
-                'yaw': yaw,
-                'pitch': pitch,
-                'roll': roll
-            }
-        }
-        camera = Camera(cameraData)
-        bev_out_view = [0, 10, -20, 20]
-        bev_out_image_width = 1000
-        bev_out_image_size = [np.nan, bev_out_image_width] 
-        bev_obj = Bev(camera, bev_out_view, bev_out_image_size)
-
-
-        # Create detections msg
-        detections_msg = Detection3DArray()
-        detections_msg.header = deepcopy(data.header)
-        detections_msg.header.frame_id = DEFAULT_FRAME
-
-        detections2d_msg = Detection2DArray()
-        detections2d_msg.header = deepcopy(data.header)
+        if(publish_2d):
+            detections2d_msg = Detection2DArray()
+            detections2d_msg.header = deepcopy(data.header)
 
         # Create the bbox starting from semseg
         for class_name, target_color in self.colors.items():
@@ -173,43 +178,46 @@ class ThermalDetector(Node):
                 left_base_pt = (x, y)
                 right_base_pt = (x+w, y)
 
-                detection2d = Detection2D()
-                detection2d.header = detections2d_msg.header
-                detection = Detection3D()
-                detection.header = detections_msg.header
-
-                # Fill detection2D
-                detection2d.bbox.center.x = float(x+w/2.0)
-                detection2d.bbox.center.y = float(y+h/2.0)
-                detection2d.bbox.size_x = float(w)
-                detection2d.bbox.size_y = float(h)
-
-                # Project base points into Bird Eye View Projection
-                points = np.array([left_base_pt, right_base_pt])
-                bev_points = bev_obj.projectImagePointsToBevPoints(points)
-                real_points = bev_obj.projectBevPointsToWorldGroundPlane(bev_points)
-                real_left = (real_points[0][0], real_points[0][1])
-                real_right = (real_points[1][0], real_points[1][1])
-    
-                detection.bbox.center.position.x = real_left[0] + (real_right[0]-real_left[0])/2
-                detection.bbox.center.position.y = real_left[1] + (real_right[1]-real_left[1])/2
-                detection.bbox.center.position.z = self.class_to_height[class_name]/2
-
-                # Compute the size of the bounding box based on the class
-                detection.bbox.size.x = self.class_to_depth[class_name]
-                detection.bbox.size.y = float(real_right[1]-real_left[1])
-                detection.bbox.size.z = self.class_to_height[class_name]
-
                 # Create hypothesis
                 hypothesis = ObjectHypothesisWithPose()
                 hypothesis.id = class_name
                 hypothesis.score = 1.0
-                detection.results.append(hypothesis)
-                detection2d.results.append(hypothesis)
 
-                # Append msg
-                detections_msg.detections.append(detection)
-                detections2d_msg.detections.append(detection2d)
+                if(publish_2d):
+                    detection2d = Detection2D()
+                    detection2d.header = detections2d_msg.header
+                    # Fill detection2D
+                    detection2d.bbox.center.x = float(x+w/2.0)
+                    detection2d.bbox.center.y = float(y+h/2.0)
+                    detection2d.bbox.size_x = float(w)
+                    detection2d.bbox.size_y = float(h)
+                    detection2d.results.append(hypothesis)
+                    detections2d_msg.detections.append(detection2d)
+
+                if(publish_3d):
+                    detection = Detection3D()
+                    detection.header = detections_msg.header
+
+                    # Project base points into Bird Eye View Projection
+                    points = np.array([left_base_pt, right_base_pt])
+                    bev_points = bev_obj.projectImagePointsToBevPoints(points)
+                    real_points = bev_obj.projectBevPointsToWorldGroundPlane(bev_points)
+                    real_left = (real_points[0][0], real_points[0][1])
+                    real_right = (real_points[1][0], real_points[1][1])
+        
+                    detection.bbox.center.position.x = real_left[0] + (real_right[0]-real_left[0])/2
+                    detection.bbox.center.position.y = real_left[1] + (real_right[1]-real_left[1])/2
+                    detection.bbox.center.position.z = self.class_to_height[class_name]/2
+
+                    # Compute the size of the bounding box based on the class
+                    detection.bbox.size.x = self.class_to_depth[class_name]
+                    detection.bbox.size.y = float(real_right[1]-real_left[1])
+                    detection.bbox.size.z = self.class_to_height[class_name]
+
+                    detection.results.append(hypothesis)
+
+                    # Append msg
+                    detections_msg.detections.append(detection)
 
                 # Draw rectangles in debug image
                 if(self.get_parameter('show_debug').value):
@@ -222,8 +230,10 @@ class ThermalDetector(Node):
                                 1, bounding_box_color, 1, cv2.LINE_AA)
 
         # Publish detections
-        self._pub3d.publish(detections_msg)
-        self._pub2d.publish(detections2d_msg)
+        if(publish_3d):
+            self._pub3d.publish(detections_msg)
+        if(publish_2d):
+            self._pub2d.publish(detections2d_msg)
 
         if(self.get_parameter('show_debug').value):
             # Display image
