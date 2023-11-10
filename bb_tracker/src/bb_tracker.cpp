@@ -20,6 +20,8 @@ BBTracker::BBTracker()
   unconfirmed_ttl_desc.description = "Milliseconds an unconfirmed object is not seen before removing it.";
   auto lost_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
   lost_ttl_desc.description = "Number of milliseconds a track is kept if it is not seen in the scene.";
+  auto points_track_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  points_track_desc.description = "Number of points to show per each track.";
   auto t_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   t_thresh_desc.description = "This threshold is used to divide initially the detections into high and low score, high score detections are considered first for matching";
   auto h_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -43,6 +45,7 @@ BBTracker::BBTracker()
 
   this->declare_parameter("max_dt_past", 2000, max_dt_desc);
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
+  this->declare_parameter("points_per_track", 100, points_track_desc);
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
   this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
   this->declare_parameter("lost_ttl", 1000, lost_ttl_desc);
@@ -58,6 +61,7 @@ BBTracker::BBTracker()
   this->declare_parameter("mul_mn2d", mul_mn2d, mul_mn2d_desc);
 
   _show_img_projection=   get_parameter("show_img_projection").as_bool();
+  int points_per_track=   get_parameter("points_per_track").as_int();
   int max_dt_past =       get_parameter("max_dt_past").as_int();
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
@@ -106,6 +110,8 @@ BBTracker::BBTracker()
 
   // Reserve space trying to avoid frequent dynamical reallocation
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
+
+  STrack::last_points_capacity = points_per_track;
 
   // Init BYTETracker object
   _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh, lh_system);

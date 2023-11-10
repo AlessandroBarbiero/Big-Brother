@@ -8,6 +8,7 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <bb_interfaces/msg/s_track.hpp>
 #include "dataType.h"
+#include "LinearBuffer.hpp"
 
 #include "ellipsoid_ellipse.hpp"
 #define MILLIS_IN_SECONDS 1000.0
@@ -50,6 +51,8 @@ public:
 	bb_interfaces::msg::STrack toMessage();
 
 public:
+
+	static size_t last_points_capacity;
 	bool is_activated;
 	int track_id;
 	int state;
@@ -77,7 +80,7 @@ public:
 	int tracklet_len;
 	int start_frame;
 
-	CircularBuffer<geometry_msgs::msg::Point> last_points; //TODO: Think about using a different type of buffer, maybe with continuous elements to avoid the weird effet of the trajectories
+	LinearBuffer<geometry_msgs::msg::Point> last_points;
 	visualization_msgs::msg::Marker path_marker;
 	visualization_msgs::msg::Marker text_marker;
 

@@ -9,6 +9,7 @@ bb_tracker:
       match_thresh: 0.8
       fixed_frame: sensors_home
       show_img_projection: true
+      points_per_track: 100
       left_handed_system: true
       # P0 3D
       mul_p03d: [

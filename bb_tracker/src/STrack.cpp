@@ -1,5 +1,7 @@
 #include <bb_tracker/STrack.h>
 
+size_t STrack::last_points_capacity = 10;
+
 std::unordered_map<int, std::string> STrack::trackStateToString{
 	{0,"New"},
 	{1,"Tracked"},
@@ -25,7 +27,7 @@ STrack::STrack(Object2D *obj, ClassLabel class_label)
 	start_frame = 0;
 	last_filter_update_ms = obj->time_ms;
 
-	this->last_points.set_capacity(100);
+	this->last_points.set_capacity(STrack::last_points_capacity);
 }
 
 STrack::STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64_t time_ms)
@@ -49,7 +51,7 @@ STrack::STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64
 	start_frame = 0;
 	last_filter_update_ms = time_ms;
 
-	this->last_points.set_capacity(100);
+	this->last_points.set_capacity(STrack::last_points_capacity);
 }
 
 STrack::~STrack()
