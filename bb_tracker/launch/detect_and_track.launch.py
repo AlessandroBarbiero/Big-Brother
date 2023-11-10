@@ -26,9 +26,6 @@ def generate_launch_description():
         package="bb_tracker",
         executable="bb_tracker",
         remappings=[
-            # ("/bytetrack/detections", "/something"),
-            # ("/bytetrack/active_tracks", "/something")
-
             # ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
             # ("/bytetrack/camera_image", "/carla/sensors_home/static_termic_camera/image")
 
@@ -65,7 +62,7 @@ def generate_launch_description():
             ("/to_detect", "/carla/sensors_home/static_rgb_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
             ("/depth", "/carla/sensors_home/static_depth_camera/image"),
-            ("/detection_3d", "/bytetrack/detections3d"),
+            # ("/detection_3d", "/bytetrack/detections3d"),
             ("/detection_2d", "/bytetrack/detections2d")
         ],
         parameters=[
@@ -85,7 +82,7 @@ def generate_launch_description():
         ],
         parameters=[
             {'lidar_list'           : ["sensors_home/static_lidar"]},
-            {'lidar_max_distances'  : [100]},
+            {'lidar_max_distances'  : [30]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
             {"percentage_miss"      : 0.15},
@@ -131,7 +128,7 @@ def generate_launch_description():
     ld.add_action(bag_name_arg)
     #ld.add_action(thermal_node)
     ld.add_action(yolo_node)
-    #ld.add_action(lidar_node)
+    ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
     ld.add_action(bag_process)
