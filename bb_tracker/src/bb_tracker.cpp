@@ -141,10 +141,11 @@ BBTracker::BBTracker()
       sync_det_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
       _sync_det_images.push_back(sync_det_image);
-      cout << "sync number " << id << 
-        "\ncamera_info topic: " << camera_topic << 
-        "\nimage topic: " << image_topics[id] <<
-        "\nDetection topic: " << det2d_topics[id] 
+
+      cout << "Listening Detection 2D (" << id << ") using"
+        "\n\tCameraInfo topic:\t" << camera_topic << 
+        "\n\tImage topic:\t\t" << image_topics[id] <<
+        "\n\tDetection topic:\t" << det2d_topics[id] 
         << endl;
 
       id++;
@@ -178,9 +179,10 @@ BBTracker::BBTracker()
       sync_det_no_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2));
 
       _sync_det_no_images.push_back(sync_det_no_image);
-      cout << "sync number " << id << 
-        "\ncamera_info topic: " << camera_topic << 
-        "\nDetection topic: " << det2d_topics[id] 
+
+      cout << "Listening Detection 2D (" << id << ") using"
+        "\n\tCameraInfo topic:\t" << camera_topic << 
+        "\n\tDetection topic:\t\t" << det2d_topics[id] 
         << endl;
 
       id++;
@@ -488,7 +490,8 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
     {
-      draw_ellipse(cv_ptr_track, obj, P, vMat);
+      if(obj.is_activated)
+        draw_ellipse(cv_ptr_track, obj, P, vMat);
     }
 
     // Draw ellipses for incoming detections
