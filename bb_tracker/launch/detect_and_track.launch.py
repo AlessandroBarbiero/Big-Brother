@@ -26,17 +26,14 @@ def generate_launch_description():
         package="bb_tracker",
         executable="bb_tracker",
         remappings=[
-            # ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
-            # ("/bytetrack/camera_image", "/carla/sensors_home/static_termic_camera/image")
+            # ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info")
 
-            ("/bytetrack/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
-            ("/bytetrack/camera_image", "/carla/sensors_home/static_rgb_camera/image")
         ],
         parameters=[config],
         output='screen',
-        # prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"] # add gdb
-        # prefix=["xterm -font 10x20 -g 100x25 -e gdbserver localhost:3100"] # add gdb-server to use with vsCode
-        prefix=["xterm -font 10x20 -g 100x25 -e"] # open in a new terminal with big font
+        # prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"]          # add gdb
+        # prefix=["xterm -font 10x20 -g 100x25 -e gdbserver localhost:3100"]    # add gdb-server to use with vsCode
+        prefix=["xterm -font 10x20 -g 100x25 -e"]                               # open in a new terminal with big font
     )
 
     thermal_node = Node(
@@ -46,7 +43,7 @@ def generate_launch_description():
             ("/to_detect", "/carla/sensors_home/static_termic_camera/image"),
             ("/camera_info", "/carla/sensors_home/static_termic_camera/camera_info"),
             # ("/detection_3d", "/bytetrack/detections3d"),
-            ("/detection_2d", "/bytetrack/detections2d")
+            ("/detection_2d", "/carla/sensors_home/static_termic_camera/det2d")
         ],
         parameters=[
             {"show_debug": False},
@@ -63,7 +60,7 @@ def generate_launch_description():
             ("/camera_info", "/carla/sensors_home/static_rgb_camera/camera_info"),
             ("/depth", "/carla/sensors_home/static_depth_camera/image"),
             # ("/detection_3d", "/bytetrack/detections3d"),
-            ("/detection_2d", "/bytetrack/detections2d")
+            ("/detection_2d", "/carla/sensors_home/static_rgb_camera/det2d")
         ],
         parameters=[
             {"confidence_threshold": 0.1},
@@ -126,9 +123,9 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
-    #ld.add_action(thermal_node)
-    ld.add_action(yolo_node)
-    ld.add_action(lidar_node)
+    ld.add_action(thermal_node)
+    # ld.add_action(yolo_node)
+    # ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
     ld.add_action(bag_process)

@@ -22,6 +22,8 @@ BBTracker::BBTracker()
   camera_list_desc.description = "List of the CameraInfo topics";
   auto image_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
   image_list_desc.description = "List of the Images retreived from cameras topics, it should have the same order and size as camera_list if show_image_projection is set";
+  auto det2d_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  det2d_list_desc.description = "List of the Detection2DArray topics used together with the CameraInfo of camera_list, it should have the same order and size as camera_list";
   // Tracker Time
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
@@ -54,6 +56,7 @@ BBTracker::BBTracker()
   vector<double> mul_p03d(8,1.0), mul_p02d(8,1.0), mul_process_noise(8,1.0), mul_mn3d(6,1.0), mul_mn2d(5,1.0);
   vector<std::string> camera_info_topics = {"/camera/info1"};
   vector<std::string> image_topics = {"/camera/image1"};
+  vector<std::string> det2d_topics = {"bytetrack/detections2d"};
 
   // Visualization
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
@@ -63,6 +66,7 @@ BBTracker::BBTracker()
   this->declare_parameter("max_dt_past", 2000, max_dt_desc);
   this->declare_parameter("camera_list", camera_info_topics, camera_list_desc);
   this->declare_parameter("image_list", image_topics, image_list_desc);
+  this->declare_parameter("detection2d_list", det2d_topics, det2d_list_desc);
 
   // Tracker Time
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
@@ -89,6 +93,7 @@ BBTracker::BBTracker()
   int max_dt_past =       get_parameter("max_dt_past").as_int();
   camera_info_topics =    get_parameter("camera_list").as_string_array();
   image_topics =          get_parameter("image_list").as_string_array();
+  det2d_topics =          get_parameter("detection2d_list").as_string_array();
 
   // Tracker Time
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
@@ -112,36 +117,79 @@ BBTracker::BBTracker()
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
           "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
 
-  _detection2d.subscribe(this, "bytetrack/detections2d");
-
-
-  // TODO: Add a subscriber for each camera info topic, something like this used in benchmark
-  // int id = 0;
-  // for (auto camera_topic : _cameras){
-  //   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cam_sub;
-  //   std::function<void(std::shared_ptr<sensor_msgs::msg::CameraInfo>)> callback_fun = std::bind(
-  //     &BBBenchmark::camera_info_callback, this, _1, id, _cameras_max_dist[id]);
-    
-  //   cam_sub = this->create_subscription<sensor_msgs::msg::CameraInfo>(camera_topic, rclcpp::QoS(rclcpp::KeepLast(1)), callback_fun);
-  //   _cameras_sub.push_back(cam_sub);
-  //   _last_transform_camera.push_back(geometry_msgs::msg::Transform());
-  //   _tf2_transform_camera.push_back(tf2::Transform());
-  //   _camera_models.push_back(image_geometry::PinholeCameraModel());
-  //   id++;
-  // }
-
-  _camera_info.subscribe(this, "bytetrack/camera_info");
-
   if(_show_img_projection){
-    _camera_image.subscribe(this, "bytetrack/camera_image");
-    _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-    _detection2d, _camera_info, _camera_image, 100);
-    _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+    int id = 0;
+    for (auto camera_topic : camera_info_topics){
+      std::function< void
+                        ( const vision_msgs::msg::Detection2DArray::ConstSharedPtr&, 
+                          const sensor_msgs::msg::CameraInfo::ConstSharedPtr&, 
+                          const sensor_msgs::msg::Image::ConstSharedPtr&
+                        ) 
+                    > callback_fun = std::bind(
+        &BBTracker::add_detection2D_image, this, id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      
+      _camera_info_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(this, camera_topic));
+      _camera_image_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(this, image_topics[id]));
+      _detection2d_subs.emplace_back(std::make_shared<message_filters::Subscriber<vision_msgs::msg::Detection2DArray>>(this, det2d_topics[id]));
+
+      std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                        sensor_msgs::msg::CameraInfo, 
+                                                        sensor_msgs::msg::Image>> sync_det_image;
+      sync_det_image = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, 
+          sensor_msgs::msg::Image>>(*_detection2d_subs[id], *_camera_info_subs[id], *_camera_image_subs[id], 100);
+      // It needs a double bind, don't know why
+      sync_det_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+
+      _sync_det_images.push_back(sync_det_image);
+      cout << "sync number " << id << 
+        "\ncamera_info topic: " << camera_topic << 
+        "\nimage topic: " << image_topics[id] <<
+        "\nDetection topic: " << det2d_topics[id] 
+        << endl;
+
+      id++;
+    }
+
+    // This is the single TimeSync
+    // _camera_image.subscribe(this, "bytetrack/camera_image");
+    // _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+    // _detection2d, _camera_info, _camera_image, 100);
+    // _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
   }
   else{
-    _sync_det2d = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>>(
-    _detection2d, _camera_info, 100);
-    _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
+    int id = 0;
+    for (auto camera_topic : camera_info_topics){
+      std::function< void
+                        ( const vision_msgs::msg::Detection2DArray::ConstSharedPtr&, 
+                          const sensor_msgs::msg::CameraInfo::ConstSharedPtr&
+                        ) 
+                    > callback_fun = std::bind(
+        &BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2);
+      
+      _camera_info_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(this, camera_topic));
+      _detection2d_subs.emplace_back(std::make_shared<message_filters::Subscriber<vision_msgs::msg::Detection2DArray>>(this, det2d_topics[id]));
+
+      std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                        sensor_msgs::msg::CameraInfo>> sync_det_no_image;
+      sync_det_no_image = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                                          sensor_msgs::msg::CameraInfo>>(*_detection2d_subs[id],
+                                                                           *_camera_info_subs[id], 100);
+      // It needs a double bind, don't know why
+      sync_det_no_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2));
+
+      _sync_det_no_images.push_back(sync_det_no_image);
+      cout << "sync number " << id << 
+        "\ncamera_info topic: " << camera_topic << 
+        "\nDetection topic: " << det2d_topics[id] 
+        << endl;
+
+      id++;
+    }
+
+    // This is for the single TimeSync
+    // _sync_det2d = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>>(
+    // _detection2d, _camera_info, 100);
+    // _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
   }
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
@@ -397,7 +445,9 @@ void addColorLegend(cv::Mat& image, const std::vector<cv::Scalar>& colors, const
     }
 }
 
-void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
+void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, 
+                                      const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, 
+                                      const sensor_msgs::msg::Image::ConstSharedPtr& image) {
   cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
 
   std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
@@ -450,7 +500,7 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
     addColorLegend(cv_ptr_track->image, {CV_RGB(0, 0, 255), CV_RGB(255, 0, 0)}, {"Tracked Objects", "Detected Objects"});
 
-    std::string window_name1 = "Tracked and Detected Objects";
+    std::string window_name1 = format("Tracked and Detected Objects (%d)", id);
     cv::imshow(window_name1, cv_ptr_track->image);
     // std::string window_name2 = "Detected Objects";
     // cv::imshow(window_name2, cv_ptr_detect->image);

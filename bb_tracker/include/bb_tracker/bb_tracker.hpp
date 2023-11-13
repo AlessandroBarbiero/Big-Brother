@@ -56,7 +56,9 @@ class BBTracker : public rclcpp::Node
     void decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
     void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
-    void add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
+    void add_detection2D_image( int id, const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, 
+                                const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, 
+                                const sensor_msgs::msg::Image::ConstSharedPtr& image);
     vector<STrack*> update_tracker(std::vector<Object3D>& new_objects);
     vector<STrack*> update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void publish_stracks(vector<STrack*>& output_stracks);
@@ -98,11 +100,19 @@ class BBTracker : public rclcpp::Node
     rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection3d;
 
     // Detection 2D
-    message_filters::Subscriber<vision_msgs::msg::Detection2DArray> _detection2d;
-    message_filters::Subscriber<sensor_msgs::msg::CameraInfo> _camera_info;
-    message_filters::Subscriber<sensor_msgs::msg::Image> _camera_image;
-    std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>> _sync_det_camera;
-    std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>> _sync_det2d;
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>> _camera_info_subs;
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>> _camera_image_subs;
+    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::Detection2DArray>>> _detection2d_subs;
+    std::vector<std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                                  sensor_msgs::msg::CameraInfo, 
+                                                                  sensor_msgs::msg::Image>>> _sync_det_images;
+    std::vector<std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                                  sensor_msgs::msg::CameraInfo>>> _sync_det_no_images;
+    // std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+    //                                                   sensor_msgs::msg::CameraInfo, 
+    //                                                   sensor_msgs::msg::Image>> _sync_det_camera;
+    // std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+    //                                                   sensor_msgs::msg::CameraInfo>> _sync_det2d;
 
 
     BYTETracker _tracker;
