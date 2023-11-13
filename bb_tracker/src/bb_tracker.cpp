@@ -450,7 +450,7 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
     addColorLegend(cv_ptr_track->image, {CV_RGB(0, 0, 255), CV_RGB(255, 0, 0)}, {"Tracked Objects", "Detected Objects"});
 
-    std::string window_name1 = "Tracked (Blue) and Detected (Red) Objects";
+    std::string window_name1 = "Tracked and Detected Objects";
     cv::imshow(window_name1, cv_ptr_track->image);
     // std::string window_name2 = "Detected Objects";
     // cv::imshow(window_name2, cv_ptr_detect->image);
