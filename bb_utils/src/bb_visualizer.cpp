@@ -363,53 +363,53 @@ void BBVisualizer::writeStats(){
 
 void BBVisualizer::plotPieGraphs(int dim){
   static const char* labels1[]    = {"True Positive","False Positive"};
-  int data1[]                     = {_true_positive,  _false_positive};
+  float data1[]                     = {1.0f * _true_positive / (_true_positive + _false_positive),  1.0f * _false_positive / (_true_positive + _false_positive)};
   static ImPlotPieChartFlags flags = 0;
   ImGui::SetNextItemWidth(dim);
 
   if (ImPlot::BeginPlot("##Pie1", ImVec2(dim,dim), ImPlotFlags_Equal | ImPlotFlags_NoMouseText)) {
       ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
       ImPlot::SetupAxesLimits(0, 1, 0, 1);
-      ImPlot::PlotPieChart(labels1, data1, 2, 0.5, 0.5, 0.4, "%.0f", 90, flags);
+      ImPlot::PlotPieChart(labels1, data1, 2, 0.5, 0.5, 0.4, "%.2f", 90, flags);
       ImPlot::EndPlot();
   }
 
   ImGui::SameLine();
 
   static const char* labels2[]    = {"TOT True Positive","TOT False Positive"};
-  int data2[]                     = {_tot_true_positive,  _tot_false_positive};
+  float data2[]                     = {1.0f * _tot_true_positive / (_tot_true_positive + _tot_false_positive),  1.0f * _tot_false_positive/ (_tot_true_positive + _tot_false_positive)};
   ImGui::SetNextItemWidth(dim);
 
   if (ImPlot::BeginPlot("##Pie2", ImVec2(dim,dim), ImPlotFlags_Equal | ImPlotFlags_NoMouseText)) {
       ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
       ImPlot::SetupAxesLimits(0, 1, 0, 1);
-      ImPlot::PlotPieChart(labels2, data2, 2, 0.5, 0.5, 0.4, "%.0f", 90, flags);
+      ImPlot::PlotPieChart(labels2, data2, 2, 0.5, 0.5, 0.4, "%.2f", 90, flags);
       ImPlot::EndPlot();
   }
 
 
 
   static const char* labels3[]    = {"Find","Missed"};
-  int data3[]                     = {_true_positive,  _missed};
+  float data3[]                     = {1.0f * _true_positive / (_true_positive + _missed),  1.0f * _missed / (_true_positive + _missed)};
   ImGui::SetNextItemWidth(dim);
 
   if (ImPlot::BeginPlot("##Pie3", ImVec2(dim,dim), ImPlotFlags_Equal | ImPlotFlags_NoMouseText)) {
       ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
       ImPlot::SetupAxesLimits(0, 1, 0, 1);
-      ImPlot::PlotPieChart(labels3, data3, 2, 0.5, 0.5, 0.4, "%.0f", 90, flags);
+      ImPlot::PlotPieChart(labels3, data3, 2, 0.5, 0.5, 0.4, "%.2f", 90, flags);
       ImPlot::EndPlot();
   }
 
   ImGui::SameLine();
 
   static const char* labels4[]    = {"TOT Find","TOT Missed"};
-  int data4[]                     = {_tot_true_positive,  _tot_missed};
+  float data4[]                     = {1.0f * _tot_true_positive / (_tot_true_positive + _tot_missed),  1.0f * _tot_missed / (_tot_true_positive + _tot_missed)};
   ImGui::SetNextItemWidth(dim);
 
   if (ImPlot::BeginPlot("##Pie4", ImVec2(dim,dim), ImPlotFlags_Equal | ImPlotFlags_NoMouseText)) {
       ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, ImPlotAxisFlags_NoDecorations);
       ImPlot::SetupAxesLimits(0, 1, 0, 1);
-      ImPlot::PlotPieChart(labels4, data4, 2, 0.5, 0.5, 0.4, "%.0f", 90, flags);
+      ImPlot::PlotPieChart(labels4, data4, 2, 0.5, 0.5, 0.4, "%.2f", 90, flags);
       ImPlot::EndPlot();
   }
 }
@@ -424,7 +424,7 @@ bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfac
         switch (sort_spec->ColumnIndex)
         {
         case 0:    delta = (a.track_id - b.track_id);                              break;
-        case 1:    delta = (a.is_activated ? 1 : -1);                               break;
+        case 1:    delta = (a.is_activated ? 1 : -1);                              break;
         case 2:    delta = (strcmp(a.state.c_str(), b.state.c_str()));             break;
         case 3:    delta = (strcmp(a.class_name.c_str(), b.class_name.c_str()));   break;
         case 4:    delta = (a.score - b.score);                                    break;
