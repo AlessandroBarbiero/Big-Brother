@@ -187,7 +187,7 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
   KAL_MEAN result;
   float 
     x = state(0),
-    y = state(1) + (state(4)>0 ? state(3) : state(2)), // I want the bottom-center of the box
+    y = state(1),
     // a = state(2),
     // b = state(3),
     // theta = state(4),
@@ -204,14 +204,17 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
           1.0;
   ray.normalize();
 
+  Eigen::Vector3f dim = priorDimensions.at(class_label);
   Eigen::Vector3f z_vector_world(0.0,0.0,1.0), ground_normal, point_on_ground;
   Eigen::Matrix3f rotMat;
   rotMat = vMat.block<3, 3>(0, 0);
   ground_normal = rotMat * z_vector_world;
   ground_normal.normalize();
   point_on_ground = vMat.block<3,1>(0,3);
-  float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2)) /
+  // Intersection vector and plane parallel to the ground at half prior height
+  float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2) + dim(2)/2.0) /
             (ray(0)*ground_normal(0) + ray(1)*ground_normal(1) + ray(2)*ground_normal(2));
+  
 
   Eigen::Vector4f point_camera_frame, point_world_frame;
   point_camera_frame << ray * t, 1.0;
@@ -219,19 +222,19 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
   point_world_frame /= point_world_frame(3);
 
   float l_ratio, d_ratio, h;
-  Eigen::Vector3f dim = priorDimensions.at(class_label);
+  
   l_ratio = dim(0)/dim(2);
   d_ratio = dim(1)/dim(2);
   h = dim(2);
 
   result << point_world_frame(0), // x
             point_world_frame(1), // y
-            state(4),               // yaw
+            state(4),             // yaw
             l_ratio,
             d_ratio,
             h,
-            0.0,    // v
-            0.0;    // w
+            0.0,                  // v
+            0.0;                  // w
   return result;
 }
 

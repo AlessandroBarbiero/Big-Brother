@@ -48,24 +48,23 @@ namespace byte_kalman
 		_observation_mat2D(3,3)=0;
 		_observation_mat2D(3,5)=1;
 
-		this->_std_weight_position = 0.01;
+		this->_std_weight_cm = 0.01;
 		this->_std_weight_angle = M_PI / 180.0;
 		this->_std_weight_size = 0.01;
-		this->_std_weight_velocity = 0.10;
-		this->_std_weight_pixel = 10.0;
+		this->_std_weight_pixel = 1.0;
 
 
 		// Starting variance -> accuracy of the estimate
 		KAL_MEAN std_p03d;
 		std_p03d << 
-			2 * 	_std_weight_position, 	// x
-			2 * 	_std_weight_position,	// y
+			2 * 	_std_weight_cm, 		// x
+			2 * 	_std_weight_cm,			// y
 			10 * 	_std_weight_angle, 		// theta
 					_std_weight_size,		// l_ratio
 					_std_weight_size,		// d_ratio
-			5 * 	_std_weight_size,		// h
-			10 * 	_std_weight_velocity,	// v
-			10 * 	_std_weight_velocity;	// w
+			5 * 	_std_weight_cm,			// h
+			10 * 	_std_weight_cm,			// v
+			10 * 	_std_weight_angle;	// w
 
 		KAL_MEAN tmp_p03d = std_p03d.array().square();
 		this->_var_P0_3D = tmp_p03d.asDiagonal();
@@ -73,14 +72,14 @@ namespace byte_kalman
 		// Starting variance -> accuracy of the estimate
 		KAL_MEAN std_p02d;
 		std_p02d << 
-			10 * 	_std_weight_position, 	// x
-			10 * 	_std_weight_position,	// y
+			10 * 	_std_weight_cm, 		// x
+			10 * 	_std_weight_cm,			// y
 			90 * 	_std_weight_angle, 		// theta
 					_std_weight_size,		// l_ratio
 				 	_std_weight_size,		// d_ratio
-			 		_std_weight_size,		// h
-			10 * 	_std_weight_velocity,	// v
-			10 * 	_std_weight_velocity;	// w
+			 		_std_weight_cm,			// h
+			10 * 	_std_weight_cm,			// v
+			10 * 	_std_weight_angle;	// w
 
 		KAL_MEAN tmp_p02d = std_p02d.array().square();
 		this->_var_P0_2D = tmp_p02d.asDiagonal();
@@ -88,14 +87,14 @@ namespace byte_kalman
 		// V1, Accuracy of the prediction
 		KAL_MEAN std_process_noise;
 		std_process_noise << 
-			_std_weight_position, 	// x
-			_std_weight_position,	// y
+			_std_weight_cm, 		// x
+			_std_weight_cm,			// y
 			_std_weight_angle, 		// theta
 			_std_weight_size,		// l_ratio
 			_std_weight_size,		// d_ratio
-			_std_weight_size,		// h
-			_std_weight_velocity,	// v
-			_std_weight_velocity;	// w
+			_std_weight_cm,			// h
+			_std_weight_cm,			// v
+			_std_weight_angle;	// w
 
 		KAL_MEAN tmp_process = std_process_noise.array().square();
 		// This is V1
@@ -105,15 +104,15 @@ namespace byte_kalman
 		// V2, Accuracy of the measurement
 		DETECTBOX3D std_mn3d;
 		std_mn3d << 
-			_std_weight_position,
-			_std_weight_position,
+			_std_weight_cm,
+			_std_weight_cm,
 			_std_weight_angle, 
 			_std_weight_size, 
 			_std_weight_size, 
-			_std_weight_size;
+			_std_weight_cm;
 		DETECTBOX3D tmp_mn3d = std_mn3d.array().square();
 		this->_measure_noise3D_var = tmp_mn3d.asDiagonal();
-
+ 
 
 		// V2, Accuracy of the measurement
 		DETECTBOX2D std_mn2d;
@@ -132,42 +131,42 @@ namespace byte_kalman
 		
 		KAL_MEAN std_p03d;
 		std_p03d << 
-			_std_weight_position, 	// x
-			_std_weight_position,	// y
+			_std_weight_cm, 		// x
+			_std_weight_cm,			// y
 			_std_weight_angle, 		// theta
 			_std_weight_size,		// l_ratio
 			_std_weight_size,		// d_ratio
-			_std_weight_size,		// h
-			_std_weight_velocity,	// v
-			_std_weight_velocity;	// w
+			_std_weight_cm,			// h
+			_std_weight_cm,			// v
+			_std_weight_angle;		// w
 		std_p03d.array() *= mul_p03d.array();
 		KAL_MEAN tmp_p03d = std_p03d.array().square();
 		this->_var_P0_3D = tmp_p03d.asDiagonal();
 
 		KAL_MEAN std_p02d;
 		std_p02d << 
-			_std_weight_position, 	// x
-			_std_weight_position,	// y
+			_std_weight_cm, 		// x
+			_std_weight_cm,			// y
 			_std_weight_angle, 		// theta
 			_std_weight_size,		// l_ratio
 			_std_weight_size,		// d_ratio
-			_std_weight_size,		// h
-			_std_weight_velocity,	// v
-			_std_weight_velocity;	// w
+			_std_weight_cm,			// h
+			_std_weight_cm,			// v
+			_std_weight_angle;		// w
 		std_p02d.array() *= mul_p02d.array();
 		KAL_MEAN tmp_p02d = std_p02d.array().square();
 		this->_var_P0_2D = tmp_p02d.asDiagonal();
 		 
 		KAL_MEAN std_process_noise;
 		std_process_noise << 
-			_std_weight_position, 	// x
-			_std_weight_position,	// y
+			_std_weight_cm, 		// x
+			_std_weight_cm,			// y
 			_std_weight_angle, 		// theta
 			_std_weight_size,		// l_ratio
 			_std_weight_size,		// d_ratio
-			_std_weight_size,		// h
-			_std_weight_velocity,	// v
-			_std_weight_velocity;	// w
+			_std_weight_cm,			// h
+			_std_weight_cm,			// v
+			_std_weight_angle;		// w
 		std_process_noise.array() *= mul_process_noise.array();
 		KAL_MEAN tmp_process = std_process_noise.array().square();
 		// This is V1
@@ -176,12 +175,12 @@ namespace byte_kalman
 		// Compute V2
 		DETECTBOX3D std_mn3d;
 		std_mn3d << 
-			_std_weight_position,
-			_std_weight_position,
+			_std_weight_cm,
+			_std_weight_cm,
 			_std_weight_angle, 
 			_std_weight_size, 
 			_std_weight_size, 
-			_std_weight_size;
+			_std_weight_cm;
 		std_mn3d.array() *= mul_mn3d.array();
 		DETECTBOX3D tmp_mn3d = std_mn3d.array().square();
 		this->_measure_noise3D_var = tmp_mn3d.asDiagonal();

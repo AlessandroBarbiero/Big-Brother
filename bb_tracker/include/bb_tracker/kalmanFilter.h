@@ -134,10 +134,9 @@ namespace byte_kalman
 		KAL_HCOVA3D _measure_noise3D_var;
 		KAL_HCOVA2D _measure_noise2D_var;
 
-		float _std_weight_position;
+		float _std_weight_cm;
 		float _std_weight_size;
 		float _std_weight_angle;
-		float _std_weight_velocity;
 		float _std_weight_pixel;
 		int detection3D_dim = 6;
 		int detection2D_dim = 5;

@@ -28,37 +28,37 @@ bb_tracker:
       high_thresh: 0.6
       match_thresh: 0.8
 
-      # Kalman Filter
+      # Kalman Filter (consider cm, degrees, cm/s and degrees/s as MU)
       # P0 3D
       mul_p03d: [
          10.,10.,       # position
          10.,           # yaw
          30.,30.,30.,   # size
-         10.,10.        # velocity
+         100.,18.       # velocity
          ]
       # P0 2D
       mul_p02d: [
          10.,10.,    # position
          90.,        # yaw
          1.,1.,1.,   # size
-         10.,10.     # velocity
+         100.,18.    # velocity
          ]
       # V1
       mul_process_noise: [
          1.,1.,      # position
          1.,         # yaw
          1.,1.,1.,   # size
-         1.,1.       # velocity
+         10.,10.     # velocity
          ]
       # V2 3D
       mul_mn3d: [
-         5.,5.,       # position
+         5.,5.,         # position
          5.,            # yaw
          45.,45.,45.    # size
          ]
       # V2 2D
       mul_mn2d: [
-         1.,1.,    # position
-         10.,10.,    # semi-axes
-         45.         # theta
+         10.,10.,       # position
+         100.,100.,     # semi-axes
+         45.            # theta
          ]
