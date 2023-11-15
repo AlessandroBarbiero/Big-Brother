@@ -11,6 +11,8 @@ BBTracker::BBTracker()
   // Visualization
   auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
   show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
+  auto show_covariance_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  show_covariance_desc.description = "Set to true to visualize the covariance of the position of the objects considered by the tracker";
   auto points_track_desc = rcl_interfaces::msg::ParameterDescriptor{};
   points_track_desc.description = "Number of points to show per each track.";
   // Detection
@@ -60,6 +62,7 @@ BBTracker::BBTracker()
 
   // Visualization
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
+  this->declare_parameter("show_covariance", false, show_covariance_desc);
   this->declare_parameter("points_per_track", 100, points_track_desc);
   // Detection
   this->declare_parameter("left_handed_system", false, left_handed_system_desc);
@@ -198,6 +201,7 @@ BBTracker::BBTracker()
   _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
   _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
+  _covariance_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/covariance", 10);
 
   _tracks_publisher = this->create_publisher<bb_interfaces::msg::STrackArray>("bytetrack/active_tracks_explicit", 10);
 
@@ -656,14 +660,63 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
 
 // %%%%%%%%%% Visualization
 
+visualization_msgs::msg::Marker drawCovariance(const Eigen::Vector2f& mean, const Eigen::Matrix2f& covMatrix, int32_t id, std_msgs::msg::Header header)
+{
+  visualization_msgs::msg::Marker tempMarker;
+  tempMarker.header.frame_id = header.frame_id;
+  tempMarker.header.stamp = header.stamp;
+  tempMarker.type = visualization_msgs::msg::Marker::CYLINDER;
+  tempMarker.action = visualization_msgs::msg::Marker::ADD;
+  tempMarker.ns = "Covariance2D";
+  tempMarker.lifetime = rclcpp::Duration(0,200 * NANO_IN_MILLIS);
+
+  tempMarker.id = id;
+  tempMarker.pose.position.x = mean[0];
+  tempMarker.pose.position.y = mean[1];
+  tempMarker.pose.position.z = 0;
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix2f> eig(covMatrix);
+
+  const Eigen::Vector2f& eigValues (eig.eigenvalues());
+  const Eigen::Matrix2f& eigVectors (eig.eigenvectors());
+
+  float angle = (atan2(eigVectors(1, 0), eigVectors(0, 0)));
+
+  double lengthMajor = sqrt(eigValues[0]);
+  double lengthMinor = sqrt(eigValues[1]);
+
+  tempMarker.scale.x = 10 * lengthMajor;
+  tempMarker.scale.y = 10 * lengthMinor;
+  tempMarker.scale.z = 0.001;
+
+  tempMarker.pose.orientation.w = cos(angle*0.5);
+  tempMarker.pose.orientation.z = sin(angle*0.5);
+
+  // Make it purple
+  tempMarker.color.r = 128;
+  tempMarker.color.g = 0;
+  tempMarker.color.b = 128;
+  tempMarker.color.a = 0.5;
+
+  return tempMarker;
+}
+
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   vision_msgs::msg::Detection3DArray out_message;
   geometry_msgs::msg::PoseArray poses_message;
   visualization_msgs::msg::MarkerArray path_markers;
   visualization_msgs::msg::MarkerArray text_markers;
+  visualization_msgs::msg::MarkerArray covariance_markers;
   bb_interfaces::msg::STrackArray s_track_array_msg;
 
   convert_into_detections(output_stracks, &out_message);
+
+  bool show_covariance = get_parameter("show_covariance").as_bool();
+
+  if(show_covariance){
+    covariance_markers.markers.clear();
+    covariance_markers.markers.reserve(output_stracks.size());
+  }
 
   poses_message.header = out_message.header;
   s_track_array_msg.header = out_message.header;
@@ -679,18 +732,6 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     auto current_track = output_stracks[i];
     vector<float> minwdh = current_track->minwdh;
 
-    #ifdef DEBUG
-      // std::cout << "Seeing " << current_track->class_name << " number " << current_track->track_id << " -- Score: " << current_track->score << std::endl;
-      // std::cout << "minwdh values: " 
-      //           << " x=" << minwdh[0] + minwdh[3]/2
-      //           << " y=" << minwdh[1] + minwdh[4]/2
-      //           << " z=" << minwdh[2] + minwdh[5]/2
-      //           << " w=" << minwdh[3]
-      //           << " d=" << minwdh[4]
-      //           << " h=" << minwdh[5]
-      //           << std::endl;
-    #endif
-
     auto single_det = out_message.detections[i];
 
     s_track_array_msg.tracks.push_back(current_track->toMessage());
@@ -701,6 +742,11 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     path_markers.markers.push_back(path_marker);
     text_markers.markers.push_back(text);
     poses_message.poses.push_back(single_det.bbox.center);
+
+    if(show_covariance)
+      covariance_markers.markers.push_back(drawCovariance( current_track->mean.block<1, 2>(0, 0),
+                                                         current_track->covariance.block<2, 2>(0, 0), 
+                                                         current_track->track_id, out_message.header));
   }
 
   _det_publisher->publish(out_message);
@@ -708,6 +754,9 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   _det_poses_publisher->publish(poses_message);
   _path_publisher->publish(path_markers);
   _text_publisher->publish(text_markers);
+
+  if(show_covariance)
+    _covariance_publisher->publish(covariance_markers);
 
 }
 
@@ -804,7 +853,6 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
   text = track->text_marker;
   return track->path_marker;
 }
-
 
 
 // %%%%%%%%%%%%%%

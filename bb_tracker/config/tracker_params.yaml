@@ -3,6 +3,7 @@ bb_tracker:
       fixed_frame: sensors_home
       # Visualization
       show_img_projection: true
+      show_covariance: false
       points_per_track: 100
       # Detection
       left_handed_system: true
@@ -39,8 +40,8 @@ bb_tracker:
       # P0 2D
       mul_p02d: [
          10.,10.,    # position
-         90.,        # yaw
-         1.,1.,1.,   # size
+         10.,        # yaw
+         1.,1.,10.,   # size
          100.,18.    # velocity
          ]
       # V1
