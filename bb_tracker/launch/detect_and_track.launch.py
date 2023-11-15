@@ -27,13 +27,12 @@ def generate_launch_description():
         executable="bb_tracker",
         remappings=[
             # ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info")
-
         ],
         parameters=[config],
         output='screen',
         #prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"]          # add gdb
         #prefix=["xterm -font 10x20 -g 100x25 -e gdbserver localhost:3100"]    # add gdb-server to use with vsCode
-        prefix=["xterm -font 10x20 -g 100x25 -e"]                               # open in a new terminal with big font
+        prefix=["xterm -font 10x20 -g 100x25 -e"]                              # open in a new terminal with big font
     )
 
     thermal_node = Node(
