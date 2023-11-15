@@ -2,6 +2,7 @@
 #include <memory>
 // ROS2
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/parameter_events_filter.hpp>
 #include <tf2/transform_datatypes.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -52,6 +53,7 @@ class BBTracker : public rclcpp::Node
     void change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, const std::string& new_frame);
 
   private:
+    rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters);
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects);
     void decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
     void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
@@ -109,12 +111,8 @@ class BBTracker : public rclcpp::Node
                                                                   sensor_msgs::msg::Image>>> _sync_det_images;
     std::vector<std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
                                                                   sensor_msgs::msg::CameraInfo>>> _sync_det_no_images;
-    // std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
-    //                                                   sensor_msgs::msg::CameraInfo, 
-    //                                                   sensor_msgs::msg::Image>> _sync_det_camera;
-    // std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
-    //                                                   sensor_msgs::msg::CameraInfo>> _sync_det2d;
-
+    
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr _callback_handle;
 
     BYTETracker _tracker;
     vector<Object3D> _objects_buffer;

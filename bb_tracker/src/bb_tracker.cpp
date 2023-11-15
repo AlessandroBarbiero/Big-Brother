@@ -89,7 +89,6 @@ BBTracker::BBTracker()
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
   // Visualization
-  _show_img_projection=   get_parameter("show_img_projection").as_bool();
   int points_per_track=   get_parameter("points_per_track").as_int();
   // Detection
   bool lh_system =        get_parameter("left_handed_system").as_bool();
@@ -120,7 +119,7 @@ BBTracker::BBTracker()
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
           "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
 
-  if(_show_img_projection){
+  if(get_parameter("show_img_projection").as_bool()){
     int id = 0;
     for (auto camera_topic : camera_info_topics){
       std::function< void
@@ -206,6 +205,9 @@ BBTracker::BBTracker()
   _tracks_publisher = this->create_publisher<bb_interfaces::msg::STrackArray>("bytetrack/active_tracks_explicit", 10);
 
   // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  // Add callback when a parameter is changed
+  _callback_handle = this->add_on_set_parameters_callback(std::bind(&BBTracker::parametersCallback, this, std::placeholders::_1));
 
   // Reserve space trying to avoid frequent dynamical reallocation
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
@@ -419,6 +421,18 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
   }
 }
 
+rcl_interfaces::msg::SetParametersResult BBTracker::parametersCallback(const std::vector<rclcpp::Parameter> &parameters){
+  rcl_interfaces::msg::SetParametersResult result;
+  result.successful = true;
+  result.reason = "success";
+  for(auto p : parameters){
+    if(p.get_name() == "show_img_projection" && p.get_type_name() == "bool" && p.as_bool() == false){
+      cv::destroyAllWindows();
+    }
+  }
+  return result;
+}
+
 // TODO: delete
 // Function that prints the posizion of the mouse on click over image
 // void mouse_callback(int event, int x, int y, int flags, void* userdata)
@@ -454,6 +468,13 @@ void addColorLegend(cv::Mat& image, const std::vector<cv::Scalar>& colors, const
 void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, 
                                       const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, 
                                       const sensor_msgs::msg::Image::ConstSharedPtr& image) {
+
+  // Check that the parameter is still set, if not avoid publishing the projections
+  if(!get_parameter("show_img_projection").as_bool()){
+    add_detection2D(detection_msg, camera_info);
+    return;
+  }
+
   cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
 
   std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
@@ -494,6 +515,7 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
     {
+      // TODO:: check
       if(obj.is_activated)
         draw_ellipse(cv_ptr_track, obj, P, vMat);
     }

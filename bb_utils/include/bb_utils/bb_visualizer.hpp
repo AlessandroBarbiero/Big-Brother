@@ -86,6 +86,8 @@ class BBVisualizer : public rclcpp::Node
 
     void visualizeStats();
 
+    void setParameters();
+
     void openDataFile();
 
     void writeDataToFile();
@@ -95,6 +97,8 @@ class BBVisualizer : public rclcpp::Node
     void writeStats();
 
     void plotPieGraphs(int dim);
+
+    void setROSParameter(std::string paramName, bool value);
 
 
   private:
