@@ -462,8 +462,19 @@ void STrack::multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_im
 		stracks[i]->vis2D_tlbr = tlbrFromEllipse(e_state);
 	}
 
+	// TODO: choose what to filter out
 	// 3. filter out objects outside image
-	auto isOutsideImage = [&](STrack* x){ return !boxInImage(x->vis2D_tlbr[0], x->vis2D_tlbr[1], x->vis2D_tlbr[2], x->vis2D_tlbr[3], width, height); };
+	// auto isOutsideImage = [&](STrack* x){ return !boxInImage(x->vis2D_tlbr[0], x->vis2D_tlbr[1], x->vis2D_tlbr[2], x->vis2D_tlbr[3], width, height); };
+	
+	// Remove only objects with the center outside the image (Keep it if rectangle goes outside)
+	auto isOutsideImage = [&](STrack* x){ 
+		float cx, cy;
+		cx = (x->vis2D_tlbr[0]+x->vis2D_tlbr[2])/2.0;
+		cy = (x->vis2D_tlbr[1]+x->vis2D_tlbr[3])/2.0;
+
+		return (cx<-10 || cx>width+10 || cy<-10 || cy>height+10); 
+		};
+
 	moveIt = std::remove_if(stracks.begin(), stracks.end(), isOutsideImage);
 	outside_image.insert(outside_image.end(), std::make_move_iterator(moveIt), std::make_move_iterator(stracks.end()));
 	stracks.erase(moveIt, stracks.end());

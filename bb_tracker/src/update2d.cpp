@@ -220,7 +220,6 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
-		// if (this->frame_id - this->lost_stracks[i].end_frame() > this->track_buffer)  [OLD way with frame_id]
 		if(last_det_time_ms - this->lost_stracks[i].last_filter_update_ms > lost_ttl)
 		{
 			this->lost_stracks[i].mark_removed();

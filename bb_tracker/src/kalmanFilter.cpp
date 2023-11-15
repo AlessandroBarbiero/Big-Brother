@@ -224,8 +224,8 @@ namespace byte_kalman
 
 		KAL_COVA P0 = _var_P0_2D;
 		
-		return update2D(mean, P0, measurement);
-		//return std::make_pair(mean, P0);
+		//return update2D(mean, P0, measurement);
+		return std::make_pair(mean, P0);
 	}
 
 	void KalmanFilter::predict(KAL_MEAN &mean, KAL_COVA &covariance, double dt)

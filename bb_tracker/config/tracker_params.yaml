@@ -28,7 +28,7 @@ bb_tracker:
       track_thresh: 0.5
       high_thresh: 0.6
       match_thresh: 0.8
-
+ 
       # Kalman Filter (consider cm, degrees, cm/s and degrees/s as MU)
       # P0 3D
       mul_p03d: [
