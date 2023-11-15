@@ -161,7 +161,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_track.size(); i++)
 	{
 		STrack *track = r_tracked_stracks[u_track[i]];
-		if (last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -172,7 +172,8 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 		}
 	}
 
-	// Deal with unconfirmed tracks, usually tracks with only one beginning frame
+	////////////////// Step 3.1: Update unconfirmed tracks //////////////////
+	// Deal with unconfirmed tracks, usually tracks with only one beginning frame, update with high value detections
 	detections.clear();
 	detections.assign(detections_cp.begin(), detections_cp.end());
 
@@ -193,7 +194,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_unconfirmed.size(); i++)
 	{
 		STrack *track = unconfirmed[u_unconfirmed[i]];
-		if(last_det_time_ms>track->last_filter_update_ms && last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -205,7 +206,6 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 
 
 	////////////////// Step 4: Init new stracks //////////////////
-	// TODO: look if activate a track from 2d detection
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
 		Object2D *new_obj = &detections[u_detection[i]];
