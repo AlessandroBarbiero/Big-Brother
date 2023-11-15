@@ -1,5 +1,6 @@
 #include <bb_tracker/lapjv.h>
 #include "BYTETracker.cpp"
+#define BYTE_REAL_TIME
 
 vector<STrack*> BYTETracker::joint_stracks(vector<STrack*> &tlista, vector<STrack> &tlistb)
 {
@@ -279,19 +280,68 @@ vector<vector<float> > BYTETracker::iou_distance(vector<STrack> &atracks, vector
 	return cost_matrix;
 }
 
-// TODO: implement
 vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack> &atracks, vector<Object2D> &btracks){
-	vector<vector<float> > aminmaxs, bminmaxs;
-	return aminmaxs;
+	vector<vector<float> > atlbrs, btlbrs;
+	for (size_t i = 0; i < atracks.size(); i++)
+	{
+		atlbrs.push_back(atracks[i].vis2D_tlbr);
+	}
+	for (size_t i = 0; i < btracks.size(); i++)
+	{
+		btlbrs.push_back(btracks[i].tlbr);
+	}
+
+	vector<vector<float> > _ious = ious_2d(atlbrs, btlbrs);
+	vector<vector<float> > cost_matrix;
+	for (size_t i = 0; i < _ious.size(); i++)
+	{
+		vector<float> _iou;
+		for (size_t j = 0; j < _ious[i].size(); j++)
+		{
+			_iou.push_back(1 - _ious[i][j]);
+		}
+		cost_matrix.push_back(_iou);
+	}
+
+	return cost_matrix;
 }
 
-// TODO: implement
 vector<vector<float> > BYTETracker::iou_distance2d(vector<STrack*> &atracks, vector<Object2D> &btracks, int &dist_size, int &dist_size_size){
-	vector<vector<float> > aminmaxs, bminmaxs;
-	return aminmaxs;
+	vector<vector<float> > cost_matrix;
+	if (atracks.size() * btracks.size() == 0)
+	{
+		dist_size = atracks.size();
+		dist_size_size = btracks.size();
+		return cost_matrix;
+	}
+	vector<vector<float> > atlbrs, btlbrs;
+	for (size_t i = 0; i < atracks.size(); i++)
+	{
+		atlbrs.push_back(atracks[i]->vis2D_tlbr);
+	}
+	for (size_t i = 0; i < btracks.size(); i++)
+	{
+		btlbrs.push_back(btracks[i].tlbr);
+	}
+
+	dist_size = atracks.size();
+	dist_size_size = btracks.size();
+
+	vector<vector<float> > _ious = ious_2d(atlbrs, btlbrs);
+	
+	for (size_t i = 0; i < _ious.size();i++)
+	{
+		vector<float> _iou;
+		for (size_t j = 0; j < _ious[i].size(); j++)
+		{
+			_iou.push_back(1 - _ious[i][j]);
+		}
+		cost_matrix.push_back(_iou);
+	}
+
+	return cost_matrix;
 }
 
-// CHECK
 vector<vector<float> > BYTETracker::ious_2d(vector<vector<float> > &atlbrs, vector<vector<float> > &btlbrs)
 {
 	vector<vector<float> > ious;
@@ -299,17 +349,17 @@ vector<vector<float> > BYTETracker::ious_2d(vector<vector<float> > &atlbrs, vect
 		return ious;
 
 	ious.resize(atlbrs.size());
-	for (int i = 0; i < ious.size(); i++)
+	for (size_t i = 0; i < ious.size(); i++)
 	{
 		ious[i].resize(btlbrs.size());
 	}
 
 	//bbox_ious
-	for (int k = 0; k < btlbrs.size(); k++)
+	for (size_t k = 0; k < btlbrs.size(); k++)
 	{
 		vector<float> ious_tmp;
 		float box_area = (btlbrs[k][2] - btlbrs[k][0] + 1)*(btlbrs[k][3] - btlbrs[k][1] + 1);
-		for (int n = 0; n < atlbrs.size(); n++)
+		for (size_t n = 0; n < atlbrs.size(); n++)
 		{
 			float iw = min(atlbrs[n][2], btlbrs[k][2]) - max(atlbrs[n][0], btlbrs[k][0]) + 1;
 			if (iw > 0)
@@ -358,8 +408,8 @@ double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowso
 		if (!extend_cost)
 		{
 			cout << "set extend_cost=True" << endl;
-			system("pause");
-			exit(0);
+			int val = system("pause");
+			exit(val);
 		}
 	}
 		
@@ -439,8 +489,8 @@ double BYTETracker::lapjv(const vector<vector<float> > &cost, vector<int> &rowso
 	if (ret != 0)
 	{
 		cout << "Calculate Wrong!" << endl;
-		system("pause");
-		exit(0);
+		int val = system("pause");
+		exit(val);
 	}
 
 	double opt = 0.0;
@@ -498,4 +548,35 @@ Scalar BYTETracker::get_color(int idx)
 {
 	idx += 3;
 	return Scalar(37 * idx % 255, 17 * idx % 255, 29 * idx % 255);
+}
+
+void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms){
+	#ifdef BYTE_REAL_TIME
+	auto end_timer = chrono::system_clock::now();
+	auto ms_elapsed = chrono::duration_cast<chrono::milliseconds>(end_timer - last_update_time).count();
+	current_time_ms += ms_elapsed;
+	last_update_time = chrono::system_clock::now();
+	if(detection_time_ms > current_time_ms){
+		current_time_ms = detection_time_ms;
+	}
+	#else
+	// if not real time use the time of the messages to update the time
+	for(auto track : output_stracks){
+		if(current_time_ms<track->last_filter_update_ms)
+			current_time_ms = track->last_filter_update_ms;
+	}
+	#endif
+	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
+}
+
+void BYTETracker::get_predicted_output(vector<STrack*>& output_stracks, int64_t detection_time_ms){
+	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
+	{
+		if (this->tracked_stracks[i].is_activated)
+		{
+			output_stracks.push_back(&this->tracked_stracks[i]);
+		}
+	}
+
+	predict_at_current_time(output_stracks, detection_time_ms);
 }

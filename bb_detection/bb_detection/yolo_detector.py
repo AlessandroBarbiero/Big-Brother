@@ -46,6 +46,8 @@ class YoloDetector(Node):
             namespace='',
             parameters=[
                 ('show_debug', True),
+                ('publish_2d', True),
+                ('publish_3d', True),
                 ('confidence_threshold', 0.5)
             ]
         )
@@ -98,41 +100,50 @@ class YoloDetector(Node):
         return SetParametersResult(successful=True)
         
 
-
     def detect_objects(self, data: Image, camera_info: CameraInfo, depth: Image):
         """
         Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes,
         It can also show the debug image if the parameter is set
         """
-        
-        # Compute the transformation from the Default frame to remove tilted orientation from bboxes
-        from_frame_rel = camera_info.header.frame_id
-        to_frame_rel = DEFAULT_FRAME
-
-        try:
-            tf : TransformStamped = self.tf_buffer.lookup_transform(
-                to_frame_rel,
-                from_frame_rel,
-                rclpy.time.Time())
-        except TransformException as ex:
-            self.get_logger().info(
-                f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
-            return
-        
-        inverse_tf_rotation = tf.transform.rotation
-        inverse_tf_rotation.w = -inverse_tf_rotation.w
-        r90_zaxis = Quaternion(w=0.707, x=0.0, y=0.0, z=0.707)
-        q_to_apply = quaternion_multiply(inverse_tf_rotation,r90_zaxis)
+        publish_3d = self.get_parameter('publish_3d').value
+        publish_2d = self.get_parameter('publish_2d').value
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
             self.get_logger().info("Started detecting images")
             self.no_image_detected_yet = False
+
+        if(publish_3d):
+            # Compute the transformation from the Default frame to remove tilted orientation from bboxes
+            from_frame_rel = camera_info.header.frame_id
+            to_frame_rel = DEFAULT_FRAME
+
+            try:
+                tf : TransformStamped = self.tf_buffer.lookup_transform(
+                    to_frame_rel,
+                    from_frame_rel,
+                    rclpy.time.Time())
+            except TransformException as ex:
+                self.get_logger().info(
+                    f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+                return
+            
+            inverse_tf_rotation = tf.transform.rotation
+            inverse_tf_rotation.w = -inverse_tf_rotation.w
+            r90_zaxis = Quaternion(w=0.707, x=0.0, y=0.0, z=0.707)
+            q_to_apply = quaternion_multiply(inverse_tf_rotation,r90_zaxis)
     
+            # Convert ROS Image message to OpenCV image
+            cv_dep = self.br.imgmsg_to_cv2(depth, "32FC1")
+
+            detections3d_msg = Detection3DArray()
+            detections3d_msg.header = data.header
+            camera_model = PinholeCameraModel()
+            camera_model.fromCameraInfo(camera_info)
+
         # Convert ROS Image message to OpenCV image
         cv_image = self.br.imgmsg_to_cv2(data)
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
-        cv_dep = self.br.imgmsg_to_cv2(depth, "32FC1")
 
         # Perform object detection on an image using the model
         results = self.yolo.predict(
@@ -144,67 +155,17 @@ class YoloDetector(Node):
             )
         results: Results = results[0].cpu()
 
-        # create detections msg
-        detections3d_msg = Detection3DArray()
-        detections3d_msg.header = data.header
 
-        detections2d_msg = Detection2DArray()
-        detections2d_msg.header = data.header
-
-        camera_model = PinholeCameraModel()
-        camera_model.fromCameraInfo(camera_info)
+        if(publish_2d):
+            detections2d_msg = Detection2DArray()
+            detections2d_msg.header = data.header
 
 
         for box_data in results.boxes:
 
-            detection3d = Detection3D()
-            detection3d.header = detections3d_msg.header
-
-            detection2d = Detection2D()
-            detection2d.header = detections2d_msg.header
-
             # get label and score
             label = self.yolo.names[int(box_data.cls)]
             score = float(box_data.conf)
-
-            # get boxes values
-            box = box_data.xywh[0]
-
-            uv_coordinates = (box[0], box[1])
-            bbox_image_size = (box[2], box[3])
-
-            detection2d.bbox.center.x = float(uv_coordinates[0])
-            detection2d.bbox.center.y = float(uv_coordinates[1])
-            detection2d.bbox.size_x = float(bbox_image_size[0])
-            detection2d.bbox.size_y = float(bbox_image_size[1])
-
-
-            # The depth data is stored inside the cv_dep numpy array -> y are the rows and x are columns
-            z_value = cv_dep[int(uv_coordinates[1])][int(uv_coordinates[0])]
-
-            # bottom-left
-            min_pt = (int(uv_coordinates[0] - bbox_image_size[0] / 2.0),
-                            int(uv_coordinates[1] - bbox_image_size[1] / 2.0))
-            # top-right
-            max_pt = (int(uv_coordinates[0] + bbox_image_size[0] / 2.0),
-                            int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
-
-            # Project the 3 points
-            detection3d.bbox.center.position.x, \
-                detection3d.bbox.center.position.y, \
-                    detection3d.bbox.center.position.z  = project_to_3D_space(camera_model, uv_coordinates, z_value)
-            
-            min_pt_3d = project_to_3D_space(camera_model, min_pt, z_value)
-            max_pt_3d = project_to_3D_space(camera_model, max_pt, z_value)
-            
-            # Add an orientation to remove the tilt of the camera and place the bbox horizontally
-            detection3d.bbox.center.orientation = q_to_apply
-
-            # Compute the size of the bounding box looking at the projections of the two vertexes
-            detection3d.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
-            detection3d.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
-            detection3d.bbox.size.z = self.class_to_z_val[label]
-
             # get track id
             track_id = ""
             if box_data.is_track:
@@ -214,8 +175,59 @@ class YoloDetector(Node):
             hypothesis = ObjectHypothesisWithPose()
             hypothesis.id = label
             hypothesis.score = score
-            detection3d.results.append(hypothesis)
-            detection2d.results.append(hypothesis)
+
+            # get boxes values
+            box = box_data.xywh[0]
+
+            uv_coordinates = (box[0], box[1])
+            bbox_image_size = (box[2], box[3])
+
+            # bottom-left
+            min_pt = (int(uv_coordinates[0] - bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] - bbox_image_size[1] / 2.0))
+            # top-right
+            max_pt = (int(uv_coordinates[0] + bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
+
+            if(publish_2d):
+                detection2d = Detection2D()
+                detection2d.header = detections2d_msg.header
+
+                detection2d.bbox.center.x = float(uv_coordinates[0])
+                detection2d.bbox.center.y = float(uv_coordinates[1])
+                detection2d.bbox.size_x = float(bbox_image_size[0])
+                detection2d.bbox.size_y = float(bbox_image_size[1])
+
+                detection2d.results.append(hypothesis)
+                detections2d_msg.detections.append(detection2d)
+
+            if(publish_3d):
+                detection3d = Detection3D()
+                detection3d.header = detections3d_msg.header
+
+                # The depth data is stored inside the cv_dep numpy array -> y are the rows and x are columns
+                z_value = cv_dep[int(uv_coordinates[1])][int(uv_coordinates[0])]
+
+                # Project the 3 points
+                detection3d.bbox.center.position.x, \
+                    detection3d.bbox.center.position.y, \
+                        detection3d.bbox.center.position.z  = project_to_3D_space(camera_model, uv_coordinates, z_value)
+                
+                min_pt_3d = project_to_3D_space(camera_model, min_pt, z_value)
+                max_pt_3d = project_to_3D_space(camera_model, max_pt, z_value)
+                
+                # Add an orientation to remove the tilt of the camera and place the bbox horizontally
+                detection3d.bbox.center.orientation = q_to_apply
+
+                # Compute the size of the bounding box looking at the projections of the two vertexes
+                detection3d.bbox.size.x = float(max_pt_3d[0]-min_pt_3d[0])
+                detection3d.bbox.size.y = float(max_pt_3d[1]-min_pt_3d[1])
+                detection3d.bbox.size.z = self.class_to_z_val[label]
+
+                detection3d.results.append(hypothesis)
+                # append msg
+                detections3d_msg.detections.append(detection3d)
+
 
             if(self.get_parameter('show_debug').value):
                 # draw boxes for debug
@@ -234,13 +246,11 @@ class YoloDetector(Node):
                 cv2.putText(cv_image, label, pos, font,
                             1, color, 1, cv2.LINE_AA)
 
-            # append msg
-            detections3d_msg.detections.append(detection3d)
-            detections2d_msg.detections.append(detection2d)
-
         # publish detections
-        self._pub.publish(detections3d_msg)
-        self._pub2d.publish(detections2d_msg)
+        if(publish_3d):
+            self._pub.publish(detections3d_msg)
+        if(publish_2d):
+            self._pub2d.publish(detections2d_msg)
 
         if(self.get_parameter('show_debug').value):
             # Display image

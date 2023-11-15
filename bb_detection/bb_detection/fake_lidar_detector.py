@@ -15,6 +15,8 @@ from geometry_msgs.msg import TransformStamped, Point
 # Python
 from typing import List
 import numpy as np
+import random
+from copy import deepcopy
 
 from .utility import classes_to_detect
 
@@ -28,10 +30,17 @@ class FakeDetector(Node):
             parameters=[
                 ('lidar_list', ["/lidar_topic"]),
                 ('lidar_max_distances', [30]),
-                ("fixed_frame", "/map")
+                ("fixed_frame", "/map"),
+                ("random_seed", 42),
+                ("percentage_miss", 0.15),
+                ("noise_position", 0.01),
+                ("noise_size", 0.01),
+                ("noise_orientation", 0.001),
+                ("active", True)
             ]
         )
-
+        random_seed = self.get_parameter('random_seed').value
+        random.seed(random_seed)
         self.lidar_list = self.get_parameter('lidar_list').value
         self.lidar_max_distances = self.get_parameter('lidar_max_distances').value
         self.fixed_frame = self.get_parameter('fixed_frame').value
@@ -103,14 +112,30 @@ class FakeDetector(Node):
         return filtered
 
     def publish_detections(self, stamp):
+        active = self.get_parameter('active').value
+        if(not active):
+            return
         detections_msg = Detection3DArray()
         detections_msg.header.stamp = stamp
         detections_msg.header.frame_id = self.fixed_frame
   
         all_objects = self.static_objects + self.moving_objects  
         seen_objects = self.filter_lidar(all_objects)
+
+        percentage_miss = self.get_parameter('percentage_miss').value
+        noise_position = self.get_parameter('noise_position').value
+        noise_size = self.get_parameter('noise_size').value
+        noise_orient = self.get_parameter('noise_orientation').value
+
         marker : Marker
         for marker in seen_objects:
+            rnd_miss = random.uniform(0,1)
+            if(rnd_miss<percentage_miss):
+                continue
+            rnd_pos =       [random.uniform(-noise_position, noise_position) for _ in range(0,3)]
+            rnd_size =      [random.uniform(-noise_size, noise_size) for _ in range(0,3)]
+            rnd_orient =    [random.uniform(-noise_orient, noise_orient) for _ in range(0,4)]
+
             detection_a = Detection3D()
             detection_a.header = detections_msg.header
             # create hypothesis
@@ -118,17 +143,36 @@ class FakeDetector(Node):
 
             if marker.ns.lower() in classes_to_detect:
                 hypothesis.id = marker.ns.lower()
+                hypothesis.score = 0.9
             else:
                 if marker.scale.x>1.0 or marker.scale.y>1.0:
                     hypothesis.id = "car"
                 else:
                     hypothesis.id = "person"
-            hypothesis.score = 1.0
+                hypothesis.score = 0.8
 
             detection_a.results.append(hypothesis)
 
-            detection_a.bbox.center = marker.pose
-            detection_a.bbox.size = marker.scale
+            detection_a.bbox.center = deepcopy(marker.pose)
+            detection_a.bbox.center.position.x += rnd_pos[0]
+            detection_a.bbox.center.position.y += rnd_pos[1]
+            detection_a.bbox.center.position.z += rnd_pos[2]
+            detection_a.bbox.center.orientation.x += rnd_orient[0]
+            detection_a.bbox.center.orientation.y += rnd_orient[1]
+            detection_a.bbox.center.orientation.z += rnd_orient[2]
+            detection_a.bbox.center.orientation.w += rnd_orient[3]
+
+            detection_a.bbox.size = deepcopy(marker.scale)
+            detection_a.bbox.size.x += rnd_size[0]
+            detection_a.bbox.size.y += rnd_size[1]
+            detection_a.bbox.size.z += rnd_size[2]
+
+            if detection_a.bbox.size.x < 0.30:
+                detection_a.bbox.size.x = 0.30
+            if detection_a.bbox.size.y < 0.30:
+                detection_a.bbox.size.y = 0.30
+            if detection_a.bbox.size.z < 0.30:
+                detection_a.bbox.size.z = 0.30
 
             detections_msg.detections.append(detection_a)
 

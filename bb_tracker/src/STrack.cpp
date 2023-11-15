@@ -1,7 +1,36 @@
 #include <bb_tracker/STrack.h>
-#define MILLIS_IN_SECONDS 1000
 
-STrack::STrack(vector<float> minwdh_, float score, std::string class_name, unsigned long int time_ms)
+size_t STrack::last_points_capacity = 10;
+
+std::unordered_map<int, std::string> STrack::trackStateToString{
+	{0,"New"},
+	{1,"Tracked"},
+	{2,"Lost"},
+	{3,"Removed"}
+};
+
+STrack::STrack(Object2D *obj, ClassLabel class_label)
+{
+	this->vis2D_tlbr = obj->tlbr;
+
+	is_activated = false;
+	track_id = 0;
+	state = TrackState::New;
+
+	minwdh.resize(6);
+	minmax.resize(6);
+	
+	frame_id = 0;
+	tracklet_len = 0;
+	this->score = obj->prob;
+	this->class_label = class_label;
+	start_frame = 0;
+	last_filter_update_ms = obj->time_ms;
+
+	this->last_points.set_capacity(STrack::last_points_capacity);
+}
+
+STrack::STrack(vector<float> minwdh_, float score, ClassLabel class_label, int64_t time_ms)
 {
 	_minwdh.resize(6);
 	_minwdh.assign(minwdh_.begin(), minwdh_.end());
@@ -18,9 +47,11 @@ STrack::STrack(vector<float> minwdh_, float score, std::string class_name, unsig
 	frame_id = 0;
 	tracklet_len = 0;
 	this->score = score;
-	this->class_name = class_name;
+	this->class_label = class_label;
 	start_frame = 0;
 	last_filter_update_ms = time_ms;
+
+	this->last_points.set_capacity(STrack::last_points_capacity);
 }
 
 STrack::~STrack()
@@ -28,7 +59,7 @@ STrack::~STrack()
 	// std::cout<<"track deleted, id: "<< track_id << " size: " << path_marker.points.size() << std::endl;
 }
 
-void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
+void STrack::activate3D(byte_kalman::EKF &kalman_filter, int frame_id)
 {
 	this->kalman_filter = kalman_filter;
 	this->track_id = this->next_id();
@@ -42,15 +73,18 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	_minwdh_tmp[5] = this->_minwdh[5];
 	vector<float> xyzaah = minwdh_to_xyzaah(_minwdh_tmp);
 
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];
-	xyaah_box[1] = xyzaah[1];
-	xyaah_box[2] = xyzaah[3];
-	xyaah_box[3] = xyzaah[4];
-	xyaah_box[4] = xyzaah[5];
-	auto mc = this->kalman_filter.initiate(xyaah_box);
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = this->theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
+	auto mc = this->kalman_filter.initiate3D(xy_yaw_aah_box);
 	this->mean = mc.first;
 	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
 	theta = mean[2];
 
 	static_minwdh();
@@ -62,84 +96,219 @@ void STrack::activate(byte_kalman::EKF &kalman_filter, int frame_id)
 	{
 		this->is_activated = true;
 	}
-	//this->is_activated = true;
+
 	this->frame_id = frame_id;
 	this->start_frame = frame_id;
 }
 
-// TODO: implement
-void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id){
-	return;
+void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ_MATRIX &P, int frame_id)
+{
+	this->kalman_filter = kalman_filter;
+	this->track_id = this->next_id();
+
+	DETECTBOX2D xyabt_box;
+	xyabt_box[0] = (vis2D_tlbr[0] + vis2D_tlbr[2])/2.0;
+	xyabt_box[1] = (vis2D_tlbr[1] + vis2D_tlbr[3])/2.0;
+	xyabt_box[2] = (vis2D_tlbr[2] - vis2D_tlbr[0])/2.0;
+	xyabt_box[3] = (vis2D_tlbr[3] - vis2D_tlbr[1])/2.0;
+	xyabt_box[4] = 0;
+	if(xyabt_box[2]<xyabt_box[3]){
+		// a is the longest semi-axis, b the shortest
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
+
+	// TODO: remove if not used by initiate
+	auto sh_P = std::make_shared<PROJ_MATRIX>(P);
+	auto sh_V = std::make_shared<TRANSFORMATION>(V);
+	setViewProjection(sh_V, sh_P);
+
+	auto mc = this->kalman_filter.initiate2D(xyabt_box, class_label, V, P);
+	this->mean = mc.first;
+	this->covariance = mc.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
+	theta = mean[2];
+
+	// The state has to be updated before the static minwdh in 2D
+	this->state = TrackState::Tracked;
+	static_minwdh();
+	static_minmax();
+
+	this->tracklet_len = 0;
+	if (frame_id == 1)
+	{
+		this->is_activated = true;
+	}
+	this->frame_id = frame_id;
+	this->start_frame = frame_id;
+}
+
+void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
+{
+	vector<float> tlbr = new_track.tlbr;
+
+	DETECTBOX2D xyabt_box;
+	xyabt_box[0] = (tlbr[0]+tlbr[2])/2.0;	// x
+	xyabt_box[1] = (tlbr[1]+tlbr[3])/2.0;	// y
+	xyabt_box[2] = (tlbr[2]-tlbr[0])/2.0;	// a
+	xyabt_box[3] = (tlbr[3]-tlbr[1])/2.0;	// b
+	xyabt_box[4] = 0;						// theta
+	if(xyabt_box[2]<xyabt_box[3]){
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
+
+	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
+
+	auto current_time_ms = new_track.time_ms;
+	updateTrackState(mc, current_time_ms, new_track.prob, new_track.label, frame_id, true);
+
+	if (new_id)
+		this->track_id = next_id();
 }
 
 void STrack::re_activate(STrack &new_track, int frame_id, bool new_id)
 {
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = new_track.theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
+
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
+
 	auto current_time_ms = new_track.last_filter_update_ms;
+	updateTrackState(mc, current_time_ms, new_track.score, new_track.class_label, frame_id, true);
 
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];
-	xyaah_box[1] = xyzaah[1];
-	xyaah_box[2] = xyzaah[3];
-	xyaah_box[3] = xyzaah[4];
-	xyaah_box[4] = xyzaah[5];
-
-	// CHECK dt
-	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
-	last_filter_update_ms = current_time_ms;
-	this->mean = mc.first;
-	this->covariance = mc.second;
-	theta = mean[2];
-
-	static_minwdh();
-	static_minmax();
-
-	this->tracklet_len = 0;
-	this->state = TrackState::Tracked;
-	this->is_activated = true;
-	this->frame_id = frame_id;
-	this->score = new_track.score;
 	if (new_id)
 		this->track_id = next_id();
 }
 
-// TODO: implement
-void STrack::update(Object2D &new_track, int frame_id){
-	return;
+bool STrack::checkOldDetection(int64_t detection_time_ms){
+	if(this->last_filter_update_ms > detection_time_ms){
+		// Saved state is more updated than detection, just delete the projection
+		this->mean_predicted = this->mean;
+		this->covariance_predicted = this->covariance;
+		static_minwdh();
+		static_minmax();
+		return true;
+	}
+	return false;
 }
 
-void STrack::update(STrack &new_track, int frame_id)
-{
+void STrack::updateClassLabel(ClassLabel new_label, float new_score){
+	// this is the maximum value in meters that the dimensions can differ from prior
+	static float margin = 1.0; 
+
+	if(this->class_label == new_label){
+		// The new score is the average between the old*2 and new
+		this->score = (this->score*2 + new_score)/3;
+		auto priorDim = priorDimensions.at(this->class_label);
+		// Respect the priors
+		if(		this->mean(5) > (priorDim[2]+margin)  ||
+				this->mean(3) > (priorDim[0]+margin)/priorDim[2]  ||
+				this->mean(4) > (priorDim[1]+margin)/priorDim[2])
+		{
+			this->mean(5) = priorDim[2];
+			this->mean(3) = priorDim[0]/priorDim[2];
+			this->mean(4) = priorDim[1]/priorDim[2];
+		}
+	}
+	else{
+		// The score is decreased and new priors are applied if object change class
+		this->score = (this->score*2 - new_score)/3;
+		if(this->score < 0.5){
+			this->class_label = new_label;
+			// Apply new priors
+			auto priorDim = priorDimensions.at(this->class_label);
+			this->mean(3) = priorDim[0]/priorDim[2]; //l_ratio
+			this->mean(4) = priorDim[1]/priorDim[2]; //d_ratio
+			this->mean(5) = priorDim[2];			 //h
+		}
+	}
+}
+
+void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, ClassLabel new_label, int frame_id, bool reset_tracklet_len){
+
+	if(reset_tracklet_len)
+		this->tracklet_len = 0;
+	else
+		this->tracklet_len++;
 	this->frame_id = frame_id;
-	this->tracklet_len++;
-	auto current_time_ms = new_track.last_filter_update_ms;
 
-	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
-
-	DETECTBOX3D xyaah_box;
-	xyaah_box[0] = xyzaah[0];	// x
-	xyaah_box[1] = xyzaah[1];	// y
-	xyaah_box[2] = xyzaah[3];	// w/h
-	xyaah_box[3] = xyzaah[4];	// d/h
-	xyaah_box[4] = xyzaah[5];	// h
-
-	// CHECK dt
-	double dt = (current_time_ms - last_filter_update_ms)/MILLIS_IN_SECONDS;
-	auto mc = this->kalman_filter.update(this->mean, this->covariance, xyaah_box, dt);
-	last_filter_update_ms = current_time_ms;
-	this->mean = mc.first;
-	this->covariance = mc.second;
-	theta = mean[2];
+	last_filter_update_ms = detection_time_ms;
+	this->mean = updated_values.first;
+	updateClassLabel(new_label, new_score);
+	this->covariance = updated_values.second;
+	this->mean_predicted = this->mean;
+	this->covariance_predicted = this->covariance;
+	theta = this->mean[2];
 
 	static_minwdh();
 	static_minmax();
 
 	this->state = TrackState::Tracked;
 	this->is_activated = true;
+}
 
-	// The new score is the average between the old and new
-	this->score = (this->score + new_track.score)/2;
+void STrack::update(Object2D &new_track, int frame_id)
+{
+	auto current_time_ms = new_track.time_ms;
+
+	// TODO: removed old update
+	// if(checkOldDetection(current_time_ms))
+	// 	return; // Saved state is more updated than detection, do not update
+
+	// Handle detection and update
+	vector<float> tlbr = new_track.tlbr;
+
+	DETECTBOX2D xyabt_box;
+	xyabt_box[0] = (tlbr[0]+tlbr[2])/2.0;	// x
+	xyabt_box[1] = (tlbr[1]+tlbr[3])/2.0;	// y
+	xyabt_box[2] = (tlbr[2]-tlbr[0])/2.0;	// a
+	xyabt_box[3] = (tlbr[3]-tlbr[1])/2.0;	// b
+	xyabt_box[4] = 0;						// theta
+	if(xyabt_box[2]<xyabt_box[3]){
+		std::swap(xyabt_box[2], xyabt_box[3]);
+		xyabt_box[4] = M_PI / 2.0;  // 90°
+	}
+
+	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
+
+	auto new_score = new_track.prob;
+	// TODO: removed time update
+	updateTrackState(mc, current_time_ms, new_score, new_track.label, frame_id);
+	//updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
+}
+
+void STrack::update(STrack &new_track, int frame_id)
+{
+	auto current_time_ms = new_track.last_filter_update_ms;
+
+	// TODO: removed old detection
+	// if(checkOldDetection(current_time_ms))
+	// 	return; // Saved state is more updated than detection, do not update
+
+	// Handle detection and update
+	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
+
+	DETECTBOX3D xy_yaw_aah_box;
+	xy_yaw_aah_box[0] = xyzaah[0];	// x
+	xy_yaw_aah_box[1] = xyzaah[1];	// y
+	xy_yaw_aah_box[2] = new_track.theta;
+	xy_yaw_aah_box[3] = xyzaah[3];	// w/h
+	xy_yaw_aah_box[4] = xyzaah[4];	// d/h
+	xy_yaw_aah_box[5] = xyzaah[5];	// h
+
+	auto mc = this->kalman_filter.update3D(this->mean_predicted, this->covariance_predicted, xy_yaw_aah_box);
+
+	auto new_score = new_track.score;
+	updateTrackState(mc, current_time_ms, new_score, new_track.class_label, frame_id);
 }
 
 void STrack::static_minwdh()
@@ -168,6 +337,21 @@ void STrack::static_minwdh()
 	minwdh[0] -= minwdh[3] / 2;		// x min
 	minwdh[1] -= minwdh[4] / 2;		// y min
 
+}
+
+void STrack::static_minwdh_predicted()
+{
+	minwdh[0] = mean_predicted[0];	// x center
+	minwdh[1] = mean_predicted[1];	// y center
+	minwdh[2] = 0.0;				// z min
+	minwdh[3] = mean_predicted[3];	// w/h
+	minwdh[4] = mean_predicted[4];	// d/h
+	minwdh[5] = mean_predicted[5];	// h 
+
+	minwdh[3] *= minwdh[5];			// w
+	minwdh[4] *= minwdh[5];			// d
+	minwdh[0] -= minwdh[3] / 2;		// x min
+	minwdh[1] -= minwdh[4] / 2;		// y min
 }
 
 void STrack::static_minmax()
@@ -226,15 +410,71 @@ int STrack::end_frame()
 	return this->frame_id;
 }
 
-void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, unsigned long int current_time_ms)
+void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, int64_t current_time_ms)
 {
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		// CHECK dt
 		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
-		kalman_filter.predict(stracks[i]->mean, stracks[i]->covariance, dt);
-		// stracks[i]->last_filter_update_ms = current_time_ms;
-		stracks[i]->static_minwdh();
+		
+		// Predict objects also in the past to exclude them from the association
+		// if(dt<=0){	// Predict new value only if the current time is after the last update
+		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
+		// 	continue;
+		// }
+
+		stracks[i]->mean_predicted = stracks[i]->mean;
+		stracks[i]->covariance_predicted = stracks[i]->covariance;
+
+		kalman_filter.predict(stracks[i]->mean_predicted, stracks[i]->covariance_predicted, dt);
+
+		stracks[i]->static_minwdh_predicted();
 		stracks[i]->static_minmax();
 	}
+}
+
+
+
+// Project the predicted mean into the image, separate the objects that are outside the image in another vector
+void STrack::multi_project(vector<STrack*> &stracks, vector<STrack*> &outside_image, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height){
+	// 1. filter out objects behind the camera
+	auto isBehindCamera = [&](STrack* x){ return objectBehindCamera(x->mean_predicted[0], x->mean_predicted[1], x->mean_predicted[5]/2.0, V); };
+	auto moveIt = std::remove_if(stracks.begin(), stracks.end(), isBehindCamera);
+	outside_image.insert(outside_image.end(), std::make_move_iterator(moveIt), std::make_move_iterator(stracks.end()));
+	stracks.erase(moveIt, stracks.end());
+
+	// 2. project the ellipsoid
+	for (unsigned int i = 0; i < stracks.size(); i++){
+		ELLIPSE_STATE e_state = ellipseFromEllipsoidv2(stracks[i]->mean_predicted, V, P);
+		// Define an Axis Aligned Bounding Box from the ellipse (it is used for the IoU) 
+		stracks[i]->vis2D_tlbr = tlbrFromEllipse(e_state);
+	}
+
+	// 3. filter out objects outside image
+	auto isOutsideImage = [&](STrack* x){ return !boxInImage(x->vis2D_tlbr[0], x->vis2D_tlbr[1], x->vis2D_tlbr[2], x->vis2D_tlbr[3], width, height); };
+	moveIt = std::remove_if(stracks.begin(), stracks.end(), isOutsideImage);
+	outside_image.insert(outside_image.end(), std::make_move_iterator(moveIt), std::make_move_iterator(stracks.end()));
+	stracks.erase(moveIt, stracks.end());
+
+	auto sh_P = std::make_shared<PROJ_MATRIX>(P);
+	auto sh_V = std::make_shared<TRANSFORMATION>(V);
+	for (auto track: stracks){
+		track->setViewProjection(sh_V, sh_P);
+	}
+}
+
+void STrack::setViewProjection(std::shared_ptr<TRANSFORMATION> V, std::shared_ptr<PROJ_MATRIX> P){
+	kalman_filter.P = P;
+	kalman_filter.V = V;
+}
+
+bb_interfaces::msg::STrack STrack::toMessage(){
+	bb_interfaces::msg::STrack message;
+	message.is_activated = 	is_activated;
+	message.track_id =		track_id;
+	message.state =			trackStateToString[state];
+	message.mean = 			vector<float>(mean.data(), mean.data() + mean.rows() * mean.cols());
+	message.covariance = 	vector<float>(covariance.data(), covariance.data() + covariance.rows() * covariance.cols());
+	message.class_name = 	classLabelString[(int)class_label];
+	message.score = 		score;
+	return message;
 }

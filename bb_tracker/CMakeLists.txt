@@ -27,9 +27,13 @@ link_directories(${CUDA_LIBRARIES})
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(tf2_ros REQUIRED)
+
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+
+find_package(bb_interfaces REQUIRED)
+
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_geometry REQUIRED)
@@ -46,11 +50,14 @@ install(DIRECTORY
 
 file(GLOB BYTE_traker_files
     src/BYTEtracker.cpp 
+    src/update2d.cpp
+    src/update3d.cpp
     src/kalmanFilter.cpp 
     src/lapjv.cpp 
     src/STrack.cpp 
     src/utils.cpp
     src/EKF.cpp
+    src/ellipsoid_ellipse.cpp
 )
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,7 +78,8 @@ ament_target_dependencies(bb_tracker
   OpenCV
   cv_bridge
   image_geometry
-  # bb_interfaces
+  
+  bb_interfaces
   )
 # -----------
 

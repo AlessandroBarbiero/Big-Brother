@@ -1,148 +1,254 @@
 #include <bb_tracker/bb_tracker.hpp>
 
 // #define DEBUG
+#define NO_PROGRESS // Avoid printing the fps and number of tracks
 #define OBJECT_BUFFER_SIZE 500
 
 BBTracker::BBTracker()
 : Node("bb_tracker"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
 {
-  // ROS Parameters
+  // %%%%%%%%%% ROS Parameters %%%%%%%%%%%%%%
+  // Visualization
+  auto show_image_projection_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  show_image_projection_desc.description = "Set to true to visualize the projection of the objects considered by the tracker and the new detections 2D on the image, the image topic should be remapped to bytetrack/camera_image";
+  auto points_track_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  points_track_desc.description = "Number of points to show per each track.";
+  // Detection
+  auto left_handed_system_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  left_handed_system_desc.description = "Set to true to if the Detections 3D come from a left handed system like Unreal Engine (yaw angle is rotated 180 degrees)";
+  auto max_dt_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  max_dt_desc.description = "Max interval (current time - new detection time) in milliseconds, older detections are discarded";
+  auto camera_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  camera_list_desc.description = "List of the CameraInfo topics";
+  auto image_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  image_list_desc.description = "List of the Images retreived from cameras topics, it should have the same order and size as camera_list if show_image_projection is set";
+  auto det2d_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  det2d_list_desc.description = "List of the Detection2DArray topics used together with the CameraInfo of camera_list, it should have the same order and size as camera_list";
+  // Tracker Time
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
   auto unconfirmed_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
   unconfirmed_ttl_desc.description = "Milliseconds an unconfirmed object is not seen before removing it.";
   auto lost_ttl_desc = rcl_interfaces::msg::ParameterDescriptor{};
   lost_ttl_desc.description = "Number of milliseconds a track is kept if it is not seen in the scene.";
+  // Tracker Thresholds
   auto t_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   t_thresh_desc.description = "This threshold is used to divide initially the detections into high and low score, high score detections are considered first for matching";
   auto h_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   h_thresh_desc.description = "This threshold is used to determine whether a high score detected object should be considered as a new object if it does not match with previously considered tracklets";
   auto m_thresh_desc = rcl_interfaces::msg::ParameterDescriptor{};
   m_thresh_desc.description = "This threshold is used during the association step to establish the correspondence between existing tracks and newly detected objects.";
+  // Kalman Filter
+  auto mul_p03d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_p03d_desc.description = "List of multiplicators for the varaince P0 in 3D detection to use within the Kalman Filter";
+  auto mul_p02d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_p02d_desc.description = "List of multiplicators for the varaince P0 in 2D detection to use within the Kalman Filter";
+  auto mul_process_noise_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_process_noise_desc.description = "List of multiplicators for the varaince of the Process Noise to use within the Kalman Filter";
+  auto mul_mn3d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_mn3d_desc.description = "List of multiplicators for the varaince of the Measurement Noise in 3D detections to use within the Kalman Filter";
+  auto mul_mn2d_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  mul_mn2d_desc.description = "List of multiplicators for the varaince of the Measurement Noise in 2D detections to use within the Kalman Filter";
+
   auto fixed_frame_desc = rcl_interfaces::msg::ParameterDescriptor{};
   fixed_frame_desc.description = "The fixed frame the BYTETracker has to use, all the detections has to give a transform for this frame";
+
+  vector<double> mul_p03d(8,1.0), mul_p02d(8,1.0), mul_process_noise(8,1.0), mul_mn3d(6,1.0), mul_mn2d(5,1.0);
+  vector<std::string> camera_info_topics = {"/camera/info1"};
+  vector<std::string> image_topics = {"/camera/image1"};
+  vector<std::string> det2d_topics = {"bytetrack/detections2d"};
+
+  // Visualization
+  this->declare_parameter("show_img_projection", false, show_image_projection_desc);
+  this->declare_parameter("points_per_track", 100, points_track_desc);
+  // Detection
+  this->declare_parameter("left_handed_system", false, left_handed_system_desc);
+  this->declare_parameter("max_dt_past", 2000, max_dt_desc);
+  this->declare_parameter("camera_list", camera_info_topics, camera_list_desc);
+  this->declare_parameter("image_list", image_topics, image_list_desc);
+  this->declare_parameter("detection2d_list", det2d_topics, det2d_list_desc);
+
+  // Tracker Time
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
   this->declare_parameter("unconfirmed_ttl", 300, unconfirmed_ttl_desc);
   this->declare_parameter("lost_ttl", 1000, lost_ttl_desc);
+  // Tracker Thresholds
   this->declare_parameter("track_thresh", 0.5, t_thresh_desc);
   this->declare_parameter("high_thresh", 0.6, h_thresh_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
+  // Kalman Filter
+  this->declare_parameter("mul_p03d", mul_p03d, mul_p03d_desc);
+  this->declare_parameter("mul_p02d", mul_p02d, mul_p02d_desc);
+  this->declare_parameter("mul_process_noise", mul_process_noise, mul_process_noise_desc);
+  this->declare_parameter("mul_mn3d", mul_mn3d, mul_mn3d_desc);
+  this->declare_parameter("mul_mn2d", mul_mn2d, mul_mn2d_desc);
+
   this->declare_parameter("fixed_frame", "sensors_home", fixed_frame_desc);
 
+  // Visualization
+  _show_img_projection=   get_parameter("show_img_projection").as_bool();
+  int points_per_track=   get_parameter("points_per_track").as_int();
+  // Detection
+  bool lh_system =        get_parameter("left_handed_system").as_bool();
+  int max_dt_past =       get_parameter("max_dt_past").as_int();
+  camera_info_topics =    get_parameter("camera_list").as_string_array();
+  image_topics =          get_parameter("image_list").as_string_array();
+  det2d_topics =          get_parameter("detection2d_list").as_string_array();
+
+  // Tracker Time
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
   int unconfirmed_ttl =   get_parameter("unconfirmed_ttl").as_int();
   int lost_ttl        =   get_parameter("lost_ttl").as_int();
+  // Tracker Thresholds
   float h_thresh =        get_parameter("high_thresh").as_double();
   float t_thresh =        get_parameter("track_thresh").as_double();
   float m_thresh =        get_parameter("match_thresh").as_double();
+  // Kalman Filter
+  mul_p03d =              get_parameter("mul_p03d").as_double_array();
+  mul_p02d =              get_parameter("mul_p02d").as_double_array();
+  mul_process_noise =     get_parameter("mul_process_noise").as_double_array();
+  mul_mn3d =              get_parameter("mul_mn3d").as_double_array();
+  mul_mn2d =              get_parameter("mul_mn2d").as_double_array();
+  
   _fixed_frame =          get_parameter("fixed_frame").as_string();
 
-  // ROS Subscriber and Publisher
+
+  // %%%%%%%%% ROS Subscriber and Publisher %%%%%%%%%%
   _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
           "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
 
-  _detection2d.subscribe(this, "bytetrack/detections2d");
-  _camera_info.subscribe(this, "bytetrack/camera_info");
-  _camera_image.subscribe(this, "bytetrack/camera_image");
+  if(_show_img_projection){
+    int id = 0;
+    for (auto camera_topic : camera_info_topics){
+      std::function< void
+                        ( const vision_msgs::msg::Detection2DArray::ConstSharedPtr&, 
+                          const sensor_msgs::msg::CameraInfo::ConstSharedPtr&, 
+                          const sensor_msgs::msg::Image::ConstSharedPtr&
+                        ) 
+                    > callback_fun = std::bind(
+        &BBTracker::add_detection2D_image, this, id, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+      
+      _camera_info_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(this, camera_topic));
+      _camera_image_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(this, image_topics[id]));
+      _detection2d_subs.emplace_back(std::make_shared<message_filters::Subscriber<vision_msgs::msg::Detection2DArray>>(this, det2d_topics[id]));
 
-  _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-  _detection2d, _camera_info, _camera_image, 100);
+      std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                        sensor_msgs::msg::CameraInfo, 
+                                                        sensor_msgs::msg::Image>> sync_det_image;
+      sync_det_image = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, 
+          sensor_msgs::msg::Image>>(*_detection2d_subs[id], *_camera_info_subs[id], *_camera_image_subs[id], 100);
+      // It needs a double bind, don't know why
+      sync_det_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
-  // Register the callback function
-  _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+      _sync_det_images.push_back(sync_det_image);
 
-  // _detection2d = this->create_subscription<vision_msgs::msg::Detection2DArray>(
-  //         "bytetrack/detections2d", 10, std::bind(&BBTracker::add_detection2D, this, _1));
+      cout << "Listening Detection 2D (" << id << ") using"
+        "\n\tCameraInfo topic:\t" << camera_topic << 
+        "\n\tImage topic:\t\t" << image_topics[id] <<
+        "\n\tDetection topic:\t" << det2d_topics[id] 
+        << endl;
+
+      id++;
+    }
+
+    // This is the single TimeSync
+    // _camera_image.subscribe(this, "bytetrack/camera_image");
+    // _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
+    // _detection2d, _camera_info, _camera_image, 100);
+    // _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
+  }
+  else{
+    int id = 0;
+    for (auto camera_topic : camera_info_topics){
+      std::function< void
+                        ( const vision_msgs::msg::Detection2DArray::ConstSharedPtr&, 
+                          const sensor_msgs::msg::CameraInfo::ConstSharedPtr&
+                        ) 
+                    > callback_fun = std::bind(
+        &BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2);
+      
+      _camera_info_subs.emplace_back(std::make_shared<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>(this, camera_topic));
+      _detection2d_subs.emplace_back(std::make_shared<message_filters::Subscriber<vision_msgs::msg::Detection2DArray>>(this, det2d_topics[id]));
+
+      std::shared_ptr<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                        sensor_msgs::msg::CameraInfo>> sync_det_no_image;
+      sync_det_no_image = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, 
+                                                                          sensor_msgs::msg::CameraInfo>>(*_detection2d_subs[id],
+                                                                           *_camera_info_subs[id], 100);
+      // It needs a double bind, don't know why
+      sync_det_no_image->registerCallback(std::bind(callback_fun, std::placeholders::_1, std::placeholders::_2));
+
+      _sync_det_no_images.push_back(sync_det_no_image);
+
+      cout << "Listening Detection 2D (" << id << ") using"
+        "\n\tCameraInfo topic:\t" << camera_topic << 
+        "\n\tDetection topic:\t\t" << det2d_topics[id] 
+        << endl;
+
+      id++;
+    }
+
+    // This is for the single TimeSync
+    // _sync_det2d = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>>(
+    // _detection2d, _camera_info, 100);
+    // _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
+  }
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
   _det_poses_publisher = this->create_publisher<geometry_msgs::msg::PoseArray>("bytetrack/poses", 10);
   _path_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/active_paths", 10);
   _text_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("bytetrack/text", 10);
 
-  // ROS Timer [Old version with periodic updates]
-  // std::chrono::milliseconds ms_to_call((1000/fps));
-  // _timer = this->create_wall_timer(
-  //     ms_to_call, std::bind(&BBTracker::update_tracker, this));
+  _tracks_publisher = this->create_publisher<bb_interfaces::msg::STrackArray>("bytetrack/active_tracks_explicit", 10);
+
+  // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
   // Reserve space trying to avoid frequent dynamical reallocation
   _objects_buffer.reserve(OBJECT_BUFFER_SIZE);
 
+  STrack::last_points_capacity = points_per_track;
+
   // Init BYTETracker object
-  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, t_thresh, h_thresh, m_thresh);
-  _num_detections = 0;
+  _tracker.init(time_to_lost, unconfirmed_ttl, lost_ttl, max_dt_past, t_thresh, h_thresh, m_thresh, lh_system);
+  _tracker.initVariance(mul_p03d, mul_p02d, mul_process_noise, mul_mn3d, mul_mn2d);
   _num_updates = 0;
   _total_ms = 0;
 
   RCLCPP_INFO(this->get_logger(), "Ready to track");
 }
 
-void BBTracker::update_tracker(std::vector<Object3D>& new_objects){
+vector<STrack*> BBTracker::update_tracker(std::vector<Object3D>& new_objects){
   _num_updates++;
 
-  // Update the tracker
-  auto start = chrono::system_clock::now();
-
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack*> output_stracks = _tracker.update(new_objects);
-
-  auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
-
-  #ifdef DEBUG
-    std::cout << "Tracker updated showing " << output_stracks.size() <<
-    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
-  #endif
-
-  publish_stracks(output_stracks);
-
-  // Show Progress
-  #ifndef DEBUG
-  std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
-  std::cout.flush();
-  #endif
-
-  #ifdef DEBUG
-  std::cout<< "Tracks published" << std::endl;
-  #endif
+  return _tracker.update(new_objects);
 }
 
-void BBTracker::update_tracker(std::vector<Object2D>& new_objects){
+vector<STrack*> BBTracker::update_tracker(std::vector<Object2D>& new_objects, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info){
   _num_updates++;
 
-  // Update the tracker
-  auto start = chrono::system_clock::now();
+  // Get values for 2D update from camera info
+  TRANSFORMATION V = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
 
   // Get the Tracks for the objects currently beeing tracked
-  vector<STrack*> output_stracks = _tracker.update(new_objects);
-
-  auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
-
-  #ifdef DEBUG
-    std::cout << "Tracker updated showing " << output_stracks.size() <<
-    (output_stracks.size()>1 ? " tracks" : " track") << std::endl;
-  #endif
-
-  publish_stracks(output_stracks);
-
-  // Show Progress
-  #ifndef DEBUG
-  std::cout << format("frame: %d fps: %lu num_tracks: %lu", _num_updates, _num_updates * 1000000 / _total_ms, output_stracks.size()) << "\r";
-  std::cout.flush();
-  #endif
-
-  #ifdef DEBUG
-  std::cout<< "Tracks published" << std::endl;
-  #endif
+  return _tracker.update(new_objects, P, V, camera_info->width, camera_info->height);
 }
 
-void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
+void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, const std::string& new_frame){
   std::string old_frame = old_message->header.frame_id;
   geometry_msgs::msg::TransformStamped tf_result;
   try {
     tf_result = _tf_buffer.lookupTransform(new_frame, old_frame, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
-    std::cout << "No transform exists for the given tfs" << std::endl;
+    RCLCPP_INFO_STREAM(this->get_logger(), "Change_frame-> No transform exists for the given tfs: " << old_frame << " - " << new_frame);
     return;
   }
   tf2::Quaternion q(
@@ -157,18 +263,6 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
     tf_result.transform.translation.z
   );
   tf2::Transform transform(q, p);
-
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox BEFORE transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
 
   for(auto& detect : old_message->detections){
 
@@ -194,55 +288,51 @@ void BBTracker::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray>
     detect.bbox.size.z = s.z();
   }
 
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox AFTER transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
-
   old_message->header.frame_id = new_frame;
   return;
 }
 
 void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects) {
-    auto detections = detections_message->detections;
-    objects.reserve(detections.size());
-    for(auto detection : detections){
-      // Decode
-      Object3D obj;
-      obj.box = detection.bbox;
-      obj.label = BYTETracker::class_to_int[detection.results[0].id];
-      obj.prob = detection.results[0].score;
-      obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
+  auto detections = detections_message->detections;
+  objects.reserve(detections.size());
+  for(auto detection : detections){
+    // Decode
+    Object3D obj;
+    obj.box = detection.bbox;
+    obj.label = BYTETracker::class_to_label[detection.results[0].id];
+    obj.prob = detection.results[0].score;
+    obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
-      objects.push_back(obj);
-    }
-    #ifdef DEBUG
-      std::cout << "Number of objects: " << objects.size() << std::endl;
-    #endif
+    objects.push_back(obj);
+  }
+  #ifdef DEBUG
+    std::cout << "Number of objects 3D: " << objects.size() << std::endl;
+  #endif
 }
 
-void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
+void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
     auto detections = detections_message->detections;
     objects.reserve(detections.size());
     for(auto detection : detections){
       // Decode
       Object2D obj;
-      obj.box = detection.bbox;
-      obj.label = BYTETracker::class_to_int[detection.results[0].id];
+      // if(detection.bbox.center.theta != 0){
+      //   //TODO: think about handling tilted bbox
+      // }
+      obj.tlbr = {
+        static_cast<float>(detection.bbox.center.x-detection.bbox.size_x/2),
+        static_cast<float>(detection.bbox.center.y-detection.bbox.size_y/2),
+        static_cast<float>(detection.bbox.center.x+detection.bbox.size_x/2),
+        static_cast<float>(detection.bbox.center.y+detection.bbox.size_y/2),
+         };
+      obj.label = BYTETracker::class_to_label[detection.results[0].id];
       obj.prob = detection.results[0].score;
       obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
 
       objects.push_back(obj);
     }
     #ifdef DEBUG
-      std::cout << "Number of objects: " << objects.size() << std::endl;
+      std::cout << "Number of objects 2D: " << objects.size() << std::endl;
     #endif
 }
 
@@ -253,16 +343,13 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   #ifdef DEBUG
     RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
   #endif
-  _num_detections++;
-  if (_num_detections % 50 == 0)
-  {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
-  }
+
   if (detections_message->detections.empty())
     return;
 
-  // Decode detections
   auto start = chrono::system_clock::now();
+
+// -----------------------
 
   // Move all the detections to a common fixed frame
   if(detections_message->header.frame_id != _fixed_frame){
@@ -272,52 +359,221 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   vector<Object3D> objects3D;
   // Put detection3d array inside the object structure
   decode_detections(detections_message, objects3D);
+  vector<STrack*> output_stracks = update_tracker(objects3D);
+  publish_stracks(output_stracks);
+
+// ----------------------
 
   auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+  auto duration = chrono::duration_cast<chrono::microseconds>(end - start).count();
+  _total_ms = _total_ms + duration;
 
-  update_tracker(objects3D);
+  #ifndef NO_PROGRESS
+    std::cout << format("(3D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+    std::cout.flush();
+  #endif
+
+  if (_num_updates % 50 == 0)
+  {
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+  }
 }
 
-void BBTracker::add_detection2D(std::shared_ptr<vision_msgs::msg::Detection2DArray> detections_message)
+void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
   #ifdef DEBUG
-    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
+    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detection_msg->header.frame_id.c_str());
   #endif
-  _num_detections++;
-  if (_num_detections % 50 == 0)
-  {
-      RCLCPP_INFO(this->get_logger(), "Processing Detection number %d, Update number %d (Ideally %lu fps)", _num_detections, _num_updates, _num_updates * 1000000 / _total_ms);
-  }
-  if (detections_message->detections.empty())
+
+  if (detection_msg->detections.empty())
     return;
 
-  // Decode detections
   auto start = chrono::system_clock::now();
+
+  // ------------------------
 
   vector<Object2D> objects2D;
   // Put detection2d array inside the object structure
-  decode_detections(detections_message, objects2D);
+  decode_detections(detection_msg, objects2D);
+  vector<STrack*> output_stracks = update_tracker(objects2D, camera_info);
+  publish_stracks(output_stracks);
+
+  // ------------------------
 
   auto end = chrono::system_clock::now();
-  _total_ms = _total_ms + chrono::duration_cast<chrono::microseconds>(end - start).count();
+  auto duration = chrono::duration_cast<chrono::microseconds>(end - start).count();
+  _total_ms = _total_ms + duration;
 
-  update_tracker(objects2D);
+  #ifndef NO_PROGRESS
+   std::cout << format("(2D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+   std::cout.flush();
+  #endif
+
+  if (_num_updates % 50 == 0)
+  {
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+  }
 }
 
-void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image) {
+// TODO: delete
+// Function that prints the posizion of the mouse on click over image
+// void mouse_callback(int event, int x, int y, int flags, void* userdata)
+// {
+//   if  ( event == EVENT_LBUTTONDOWN )
+//   {
+//     cout << "----> Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+//   }
+// }
+
+// Add a color legend on the right showing colors and relative label on the image
+void addColorLegend(cv::Mat& image, const std::vector<cv::Scalar>& colors, const std::vector<std::string>& labels) {
+    int legendWidth = 150;  // Width of the legend box
+    int legendHeight = 5 + 20 * colors.size();  // Height of the legend box, with a little space between each color
+    int startX = image.cols - legendWidth;  // X-coordinate to start drawing the legend box
+    int startY = 10;  // Y-coordinate to start drawing the legend box at the top
+
+    // Create a white background for the legend
+    cv::Rect legendRect(startX, startY, legendWidth, legendHeight);
+    cv::rectangle(image, legendRect, cv::Scalar(255, 255, 255), -1);
+
+    // Draw rectangles with colors and corresponding labels in the legend
+    int rectWidth = 15;  // Width of the color square
+    int rectHeight = 15;  // Height of the color square
+    for (size_t i = 0; i < colors.size(); ++i) {
+        cv::Rect rect(startX + 5, startY + 5 + i * (rectHeight + 5), rectWidth, rectHeight);
+        cv::rectangle(image, rect, colors[i], -1);
+        cv::putText(image, labels[i], cv::Point(startX + rectWidth + 15, startY + 5 + i * (rectHeight + 5) + rectHeight - 3),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(0, 0, 0), 1);
+    }
+}
+
+void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, 
+                                      const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, 
+                                      const sensor_msgs::msg::Image::ConstSharedPtr& image) {
+  cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
+
+  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
+
+  // Predict the position of the objects before drawing them
+  std::vector<STrack *> objPtr;
+  for(size_t i=0; i<trackedObj.size(); i++){
+    objPtr.push_back(&trackedObj[i]);
+  }
+  int64_t current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
+  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
+
+  // TODO: delete Fake points to test the draw
+  // std::vector<STrack> trackedObj;
+  // trackedObj.push_back(real_trackedObj[0]);
+  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
+
+  // ---------
+
+  TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+
+  // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
+  // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
+  // P = [K | 0]
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
+
+  try
+  {
+    // cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
+    cv_ptr_track = cv_bridge::toCvCopy(image, image->encoding);
+    // Draw ellipses for tracked objects
+    for(auto obj :trackedObj)
+    {
+      if(obj.is_activated)
+        draw_ellipse(cv_ptr_track, obj, P, vMat);
+    }
+
+    // Draw ellipses for incoming detections
+    for(auto det : detection_msg->detections)
+      cv::ellipse(cv_ptr_track->image, Point(det.bbox.center.x, det.bbox.center.y),
+              Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
+              360, CV_RGB(255, 0, 0),
+              1, LINE_AA);
+
+    addColorLegend(cv_ptr_track->image, {CV_RGB(0, 0, 255), CV_RGB(255, 0, 0)}, {"Tracked Objects", "Detected Objects"});
+
+    std::string window_name1 = format("Tracked and Detected Objects (%d)", id);
+    cv::imshow(window_name1, cv_ptr_track->image);
+    // std::string window_name2 = "Detected Objects";
+    // cv::imshow(window_name2, cv_ptr_detect->image);
+    // cv::setMouseCallback(window_name, mouse_callback);
+    cv::waitKey(1);
+
+  }
+  catch (cv_bridge::Exception& e)
+  {
+      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+  }
+
+  add_detection2D(detection_msg, camera_info);
+
+  return;
+}
+
+void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
   cv_bridge::CvImagePtr cv_ptr;
-  image_geometry::PinholeCameraModel cam_model;
-  cam_model.fromCameraInfo(camera_info);
-  auto projMat = cam_model.projectionMatrix();
-  auto trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
+  std::vector<STrack *> objPtr;
+  for(size_t i=0; i<trackedObj.size(); i++){
+    objPtr.push_back(&trackedObj[i]);
+  }
+  // Predict the position of the objects before drawing them
+  int64_t current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
+  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
+
+  TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
+
+  // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
+  // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
+  // P = [K | 0]
+  PROJ_MATRIX P;
+  int p_index = 0;
+  for (int i = 0; i < 3; ++i) {
+      for (int j = 0; j < 4; ++j) {
+          P(i, j) = camera_info->p[p_index];
+          p_index++;
+      }
+  }
+
+  try
+  {
+    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
+    // Draw ellipses for tracked objects
+    for(auto obj :trackedObj)
+      draw_ellipse(cv_ptr, obj, P, vMat);
+
+    std::string window_name = "Image Window";
+    cv::imshow(window_name, cv_ptr->image);
+    cv::waitKey(1);
+
+  }
+  catch (cv_bridge::Exception& e)
+  {
+      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+  }
+  return;
+}
+
+TRANSFORMATION BBTracker::getViewMatrix(const std::string& from_tf, const std::string& camera_tf){
+  TRANSFORMATION vMat;
 
   geometry_msgs::msg::TransformStamped tf_result;
   try {
-    tf_result = _tf_buffer.lookupTransform(camera_info->header.frame_id, _fixed_frame, rclcpp::Time(0));
+    tf_result = _tf_buffer.lookupTransform(camera_tf, from_tf, rclcpp::Time(0));
   } catch (tf2::TransformException& ex) {
-    RCLCPP_INFO_STREAM(this->get_logger(), "No transform exists for the given tfs: " << _fixed_frame << " - " << camera_info->header.frame_id);
-    return;
+    RCLCPP_INFO_STREAM(this->get_logger(), "getViewMatrix-> No transform exists for the given tfs: " << from_tf << " - " << camera_tf);
+    return vMat.setZero();
   }
 
   tf2::Quaternion q(
@@ -334,120 +590,70 @@ void BBTracker::add_detection2D_image(const vision_msgs::msg::Detection2DArray::
 
   tf2::Matrix3x3 rot_m(q);
   
-  VIEW_MATRIX vMat;
+  // vMat = [Rot  | center_of_other_tf_in_new_tf]
+  //        [0    |               1             ]
   vMat << rot_m[0][0], rot_m[0][1], rot_m[0][2], p.x(),
           rot_m[1][0], rot_m[1][1], rot_m[1][2], p.y(),
           rot_m[2][0], rot_m[2][1], rot_m[2][2], p.z(),
-          0.0,          0.0,          0.0,        1.0;
+          0.0,          0.0,          0.0,       1.0;  
 
+  // Same as doing these operations to find view Matrix starting from the inverse transform
+  // TRANSFORMATION cameraMat, vMat , rotMat, transMat;
+  // transMat << 1.0, 0.0, 0.0, p.x(),
+  //             0.0, 1.0, 0.0, p.y(),
+  //             0.0, 0.0, 1.0, p.z(),
+  //             0.0, 0.0, 0.0, 1.0;
+  // rotMat << rot_m[0][0], rot_m[0][1], rot_m[0][2], 0.0,
+  //           rot_m[1][0], rot_m[1][1], rot_m[1][2], 0.0,
+  //           rot_m[2][0], rot_m[2][1], rot_m[2][2], 0.0,
+  //           0.0,          0.0,          0.0,       1.0;
+  // cameraMat = transMat * rotMat;     
+  // vMat = cameraMat.inverse();  
 
-  try
-  {
-    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
-    for(auto det : detection_msg->detections)
-      cv::ellipse(cv_ptr->image, Point(det.bbox.center.x, det.bbox.center.y),
-              Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
-              360, CV_RGB(255, 0, 0),
-              1, LINE_AA);
-    for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, projMat, vMat);
-
-    cv::imshow("Image Window", cv_ptr->image);
-    cv::waitKey(1);
-
-  }
-  catch (cv_bridge::Exception& e)
-  {
-      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
-  }
-  return;
+  return vMat;
 }
 
-void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, cv::Matx34d projMat, VIEW_MATRIX vMat){
-  // To create a matrix representing the quadric of the ellipsoid use 
-  // [1/a 0 0 cx]
-  // [0 1/b 0 cy]
-  // [0 0 1/c cz]
-  // [0  0  0  1]
-  // With a b c semiaxes
+void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX& P, TRANSFORMATION& vMat){
+  // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
+  float cx,cy,cz;
 
-  // TODO: try with method described in "Factorization based structure from motion with object priors" by Paul Gay et al.
+  KAL_MEAN state = obj.mean_predicted;
 
-  // Create an Eigen 3x4 matrix and copy the values from cv::Matx34d
-  Eigen::Matrix<float, 3, 4, Eigen::RowMajor> P;
-  for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 4; ++j) {
-          P(i, j) = float(projMat(i, j));
-      }
-  }
+  cx = state(0);
+  cy = state(1);
+  cz = state(5)/2.0;
 
-  // 1 >>> Transform bbox into ellipsoid 3D
-  float a,b,c,cx,cy,cz;
+  // Filter out objects behind the camera
+  if(objectBehindCamera(cx,cy,cz,vMat))
+    return;
 
-  vector<float> minwdh = obj.minwdh;
+  ELLIPSE_STATE ellipse_state = ellipseFromEllipsoidv2(state, vMat, P);
 
-  a = minwdh[3]/2;
-  b = minwdh[4]/2;
-  c = minwdh[5]/2;
-
-  cx = minwdh[0] + a;
-  cy = minwdh[1] + b;
-  cz = minwdh[2] + c;
-
-  Eigen::Matrix<float, 4, 4, Eigen::RowMajor> quadric;
-  quadric << 1.0f/a, 0.0f, 0.0f, cx,
-            0.0f, 1.0f/b, 0.0f, cy,
-            0.0f, 0.0f, 1.0f/c, cz,
-            0.0f, 0.0f, 0.0f, 1.0f;
-
-
-  // 2 >>> Transform Ellipsoid 3D in ellipse 2D
   float ea, eb, ecx, ecy, theta; // Variables of the ellipse
-  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> conic;
-  // Eigen::Matrix<float, 3, 3, Eigen::RowMajor> adj_conic;
-  conic = P * vMat * quadric * vMat.transpose() * P.transpose();
-  // conic = adj_conic * 1.0/adj_conic.determinant();
 
+  ecx = ellipse_state(0);
+  ecy = ellipse_state(1);
+  ea = ellipse_state(2);
+  eb = ellipse_state(3);
+  theta = ellipse_state(4);
 
-  // 3 >>> Compute parameters from conic form of ellipse
-  float A,B,C,D,E,F;
-  Eigen::Matrix<float, 3, 3, Eigen::RowMajor> M0;
-  Eigen::Matrix<float, 2, 2, Eigen::RowMajor> M;
+  if(ellipseInImage(ecx,ecy,ea,eb,  image_ptr->image.cols,image_ptr->image.rows)){
+    // Draw the rectangle around the ellipse
+    cv::Point2i min_pt, max_pt;
+    vector<float> tlbr_ellipse = tlbrFromEllipse(ecx,ecy,ea,eb,theta);
+    min_pt = {static_cast<int>(tlbr_ellipse[0]), static_cast<int>(tlbr_ellipse[1])};
+    max_pt = {static_cast<int>(tlbr_ellipse[2]), static_cast<int>(tlbr_ellipse[3])};
+    cv::rectangle(image_ptr->image, cv::Rect(min_pt, max_pt), CV_RGB(0,0,255), 1, LINE_AA);
 
-  A = conic(0,0);
-  B = conic(0,1)+conic(1,0);
-  C = conic(1,1);
-  D = conic(0,2)+conic(2,0);
-  E = conic(1,2)+conic(2,1);
-  F = conic(2,2);
-
-  M0 << F, D/2.0f, E/2.0f,
-        D/2.0f, A, B/2.0f,
-        E/2.0f, B/2.0f, C;
-
-  M <<  A, B/2.0f,
-        B/2.0f, C;
-
-  Eigen::EigenSolver<Eigen::Matrix<float, 2, 2, Eigen::RowMajor>> solver(M);
-  auto eigenvalues = solver.eigenvalues().real();
-
-  ea = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(0)));
-  eb = sqrt(-M0.determinant()/(M.determinant()*eigenvalues(1)));
-  ecx = (B*E - 2.0f*C*D) / (4.0f*A*C - B*B);
-  ecy = (B*D - 2.0f*A*E) / (4.0f*A*C - B*B);
-  theta = atan(B / (A - C)) / 2.0f;
-
-
-  std::cout << "quadric: \n" << quadric << "\n conic: \n" << conic << "\n\tCenter: (" << ecx << " , " << ecy << ")" << std::endl;
-
-  // 4 >>> Draw the ellipse
-  if (ecx-ea > 0 && ecx+ea < image_ptr->image.rows && ecy-eb > 0 && ecy+eb < image_ptr->image.cols){
+    // Draw the ellipse
+    theta = theta * 180/M_PI; // Convert in degrees
     cv::ellipse(image_ptr->image, Point(ecx, ecy),
                 Size(ea, eb), theta, 0,
                 360, CV_RGB(0, 0, 255),
                 1, LINE_AA);
   }
 }
+
 // %%%%%%%%%% Visualization
 
 void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
@@ -455,38 +661,70 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
   geometry_msgs::msg::PoseArray poses_message;
   visualization_msgs::msg::MarkerArray path_markers;
   visualization_msgs::msg::MarkerArray text_markers;
+  bb_interfaces::msg::STrackArray s_track_array_msg;
 
+  convert_into_detections(output_stracks, &out_message);
 
-  out_message.header.stamp = get_clock()->now();
-  out_message.header.frame_id = _fixed_frame;
   poses_message.header = out_message.header;
+  s_track_array_msg.header = out_message.header;
 
   path_markers.markers.clear();
   text_markers.markers.clear();
   path_markers.markers.reserve(output_stracks.size());
   text_markers.markers.reserve(output_stracks.size());
-  out_message.detections.reserve(output_stracks.size());
   poses_message.poses.reserve(output_stracks.size());
+  s_track_array_msg.tracks.reserve(output_stracks.size());
   for (unsigned int i = 0; i < output_stracks.size(); i++)
   {
     auto current_track = output_stracks[i];
     vector<float> minwdh = current_track->minwdh;
 
     #ifdef DEBUG
-      std::cout << "Seeing " << current_track.class_name << " number " << current_track.track_id << " -- Score: " << current_track.score << std::endl;
-      std::cout << "minwdh values: " 
-                << " x=" << minwdh[0] + minwdh[3]/2
-                << " y=" << minwdh[1] + minwdh[4]/2
-                << " z=" << minwdh[2] + minwdh[5]/2
-                << " w=" << minwdh[3]
-                << " d=" << minwdh[4]
-                << " h=" << minwdh[5]
-                << std::endl;
+      // std::cout << "Seeing " << current_track->class_name << " number " << current_track->track_id << " -- Score: " << current_track->score << std::endl;
+      // std::cout << "minwdh values: " 
+      //           << " x=" << minwdh[0] + minwdh[3]/2
+      //           << " y=" << minwdh[1] + minwdh[4]/2
+      //           << " z=" << minwdh[2] + minwdh[5]/2
+      //           << " w=" << minwdh[3]
+      //           << " d=" << minwdh[4]
+      //           << " h=" << minwdh[5]
+      //           << std::endl;
     #endif
+
+    auto single_det = out_message.detections[i];
+
+    s_track_array_msg.tracks.push_back(current_track->toMessage());
+    // Publish a path for each track, with relative text
+    visualization_msgs::msg::Marker text;
+    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
+    text.pose.position.z += single_det.bbox.size.z/2;
+    path_markers.markers.push_back(path_marker);
+    text_markers.markers.push_back(text);
+    poses_message.poses.push_back(single_det.bbox.center);
+  }
+
+  _det_publisher->publish(out_message);
+  _tracks_publisher->publish(s_track_array_msg);
+  _det_poses_publisher->publish(poses_message);
+  _path_publisher->publish(path_markers);
+  _text_publisher->publish(text_markers);
+
+}
+
+void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message){
+  out_message->header.stamp.sec = _tracker.current_time_ms/MILLIS_IN_SECONDS;
+  out_message->header.stamp.nanosec = _tracker.current_time_ms*NANO_IN_MILLIS;
+  // out_message->header.stamp = get_clock()->now();
+  out_message->header.frame_id = _fixed_frame;
+  out_message->detections.reserve(in_stracks.size());
+  for (unsigned int i = 0; i < in_stracks.size(); i++)
+  {
+    auto current_track = in_stracks[i];
+    vector<float> minwdh = current_track->minwdh;
 
     // Show tracking
     vision_msgs::msg::Detection3D single_det = vision_msgs::msg::Detection3D();
-    single_det.header = out_message.header;
+    single_det.header = out_message->header;
     single_det.is_tracking = current_track->is_activated;
     single_det.tracking_id = current_track->track_id;
     single_det.bbox.center.position.x = minwdh[0] + minwdh[3]/2;
@@ -502,25 +740,13 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     single_det.bbox.size.z =            minwdh[5];
 
     auto hypothesis = vision_msgs::msg::ObjectHypothesisWithPose();
-    hypothesis.id = current_track->class_name;
+    hypothesis.id = classLabelString[(int)current_track->class_label];
     hypothesis.score = current_track->score;
     single_det.results.push_back(hypothesis);
 
-    out_message.detections.push_back(single_det);
-    // Publish a path for each track, with relative text
-    visualization_msgs::msg::Marker text;
-    visualization_msgs::msg::Marker path_marker = createPathMarker(current_track, out_message.header, single_det.bbox.center.position, text);
-    text.pose.position.z += single_det.bbox.size.z/2;
-    path_markers.markers.push_back(path_marker);
-    text_markers.markers.push_back(text);
-    poses_message.poses.push_back(single_det.bbox.center);
+    out_message->detections.push_back(single_det);
   }
-
-  _det_publisher->publish(out_message);
-  _det_poses_publisher->publish(poses_message);
-  _path_publisher->publish(path_markers);
-  _text_publisher->publish(text_markers);
-
+  return;
 }
 
 void initPathMarker(visualization_msgs::msg::Marker& path_marker, Scalar& color){
@@ -569,11 +795,11 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
     Scalar s_color = _tracker.get_color(track->track_id);
     initPathMarker(track->path_marker, s_color);
     initTextMarker(track->text_marker, s_color);
-    track->text_marker.text = track->class_name;
+    track->text_marker.text = classLabelString[(int)track->class_label];
     track->text_marker.text.append("-").append(::to_string(track->track_id));
   }
-  track->path_marker.points.push_back(last_point);
-  // path_marker.colors.push_back(s_color);
+  track->last_points.push_back(last_point);
+  track->path_marker.points = track->last_points.buffer_;
   track->text_marker.pose.position = last_point;
   text = track->text_marker;
   return track->path_marker;
@@ -594,5 +820,6 @@ int main(int argc, char * argv[])
   }catch (...){
     getchar();
   }
+  getchar();
   return 0;
 }

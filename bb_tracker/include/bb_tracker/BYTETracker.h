@@ -6,6 +6,7 @@
 #include <map>
 #include <vector>
 #include "dataType.h"
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 using namespace std;
 
@@ -14,6 +15,8 @@ class BYTETracker
 public:
 	BYTETracker();
 	~BYTETracker();
+	void initVariance(std::vector<double>& v_mul_p03d, std::vector<double>& v_mul_p02d, 
+			std::vector<double>& v_mul_process_noise, std::vector<double>& v_mul_mn3d, std::vector<double>& v_mul_mn2d);
 
 	/**
 	 * Initializes the BYTETracker with specified parameters.
@@ -30,15 +33,31 @@ public:
 	 * @param fixed_frame_desc The fixed frame the BYTETracker has to use; all the detections have to give a transform
 	 *                          for this frame.
 	 */
-	void init(u_int time_to_lost = 300, u_int unconfirmed_ttl = 300, u_int lost_ttl = 1000, float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8);
+	void init(int time_to_lost = 300, int unconfirmed_ttl = 300, int lost_ttl = 1000, int max_dt_past = 2000, 
+		float track_thresh = 0.5, float high_thresh = 0.6, float match_thresh = 0.8, bool left_handed_system = false);
 
 	vector<STrack*> update(const vector<Object3D>& objects);
-	vector<STrack*> update(const vector<Object2D>& objects);
+
+	/**
+	 * Updates the BYTETracker with data coming from a detection 2D.
+	 *
+	 * @param objects 2D detections (BBox, classification and time)
+	 * @param P Projection matrix from an object in the camera frame to an object in the image.
+	 * @param V View matrix that transform a point from the fixed frame (the one objects are saved respect to) to the camera frame
+	 * @param width width in pixels of the image the decetions are taken from
+	 * @param height height in pixels of the image the decetions are taken from
+	 * @return The list of STracks currently seen by the tracker 
+	 */
+	vector<STrack*> update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height);
 	Scalar get_color(int idx);
 	vector<STrack> getTrackedObj();
 
-	static std::unordered_map<std::string, int> class_to_int;
-	static std::unordered_map<int, std::string> int_to_class;
+	static std::unordered_map<std::string, ClassLabel> class_to_label;
+
+	byte_kalman::EKF kalman_filter;
+	// The current time is updated every time a detection come
+	// if a detection time is after the predicted current time, that become the current time
+	int64_t current_time_ms;
 
 private:
 	/**
@@ -101,16 +120,22 @@ private:
 	double lapjv(const vector<vector<float> > &cost, vector<int> &rowsol, vector<int> &colsol, 
 		bool extend_cost = false, float cost_limit = LONG_MAX, bool return_cost = true);
 
+	void predict_at_current_time(vector<STrack*>& output_stracks, int64_t detection_time_ms);
+	void get_predicted_output(vector<STrack*>& output_stracks, int64_t detection_time_ms);
+
 private:
 
 	float track_thresh;
 	float high_thresh;
 	float match_thresh;
 	int frame_id;
-	u_int time_to_lost, lost_ttl, unconfirmed_ttl;
+	int time_to_lost, lost_ttl, unconfirmed_ttl, max_dt_past;
+	bool left_handed_system;
+
+	std::chrono::time_point<std::chrono::system_clock> last_update_time;
 
 	vector<STrack> tracked_stracks;
 	vector<STrack> lost_stracks;
-	vector<STrack> removed_stracks;
-	byte_kalman::EKF kalman_filter;
+	CircularBuffer<STrack> removed_stracks;
+
 };
