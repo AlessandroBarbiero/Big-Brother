@@ -278,11 +278,24 @@ void STrack::update(Object2D &new_track, int frame_id)
 		xyabt_box[4] = M_PI / 2.0;  // 90°
 	}
 
+	double yaw = 0;
+	// If the object is new compute the orientation projecting the new position and computing the vector from the old to the new position
+	if(!this->is_activated){
+		Eigen::Vector3f second_point = projectPoint2D({xyabt_box[0], xyabt_box[1]}, mean(5)/2.0, *this->kalman_filter.V, *this->kalman_filter.P);
+		double dx = second_point(0) - mean(0);
+		double dy = second_point(1) - mean(1);
+
+		// Calculate the yaw angle using atan2
+		yaw = std::atan2(dy, dx);
+	}
+
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
-	auto new_score = new_track.prob;
+	if(!this->is_activated)
+		mc.first(2) = yaw;
+
 	// TODO: removed time update
-	updateTrackState(mc, current_time_ms, new_score, new_track.label, frame_id);
+	updateTrackState(mc, current_time_ms, new_track.prob, new_track.label, frame_id);
 	//updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
 }
 

@@ -182,15 +182,10 @@ Eigen::Vector3f find_3d_point_on_line(const Eigen::Vector3f& normalized_vector, 
     return Eigen::Vector3f(x, y, z_value);
 }
 
-
-KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P){
-  KAL_MEAN result;
+Eigen::Vector3f projectPoint2D(Eigen::Vector2f point2D, float plane_height, TRANSFORMATION &vMat, PROJ_MATRIX &P){
   float 
-    x = state(0),
-    y = state(1),
-    // a = state(2),
-    // b = state(3),
-    // theta = state(4),
+    x = point2D(0),
+    y = point2D(1),
     tx = 0,
     ty = 0,
     // Projection
@@ -204,7 +199,6 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
           1.0;
   ray.normalize();
 
-  Eigen::Vector3f dim = priorDimensions.at(class_label);
   Eigen::Vector3f z_vector_world(0.0,0.0,1.0), ground_normal, point_on_ground;
   Eigen::Matrix3f rotMat;
   rotMat = vMat.block<3, 3>(0, 0);
@@ -212,7 +206,7 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
   ground_normal.normalize();
   point_on_ground = vMat.block<3,1>(0,3);
   // Intersection vector and plane parallel to the ground at half prior height
-  float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2) + dim(2)/2.0) /
+  float t = (point_on_ground(0)*ground_normal(0) + point_on_ground(1)*ground_normal(1) + point_on_ground(2)*ground_normal(2) + plane_height) /
             (ray(0)*ground_normal(0) + ray(1)*ground_normal(1) + ray(2)*ground_normal(2));
   
 
@@ -220,6 +214,15 @@ KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label
   point_camera_frame << ray * t, 1.0;
   point_world_frame = vMat.inverse() * point_camera_frame;
   point_world_frame /= point_world_frame(3);
+  return point_world_frame.block<3, 1>(0,0);
+}
+
+KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P){
+  KAL_MEAN result;
+
+  Eigen::Vector3f dim = priorDimensions.at(class_label);
+
+  Eigen::Vector3f point_world_frame = projectPoint2D({state(0), state(1)}, dim(2)/2.0, vMat, P);
 
   float l_ratio, d_ratio, h;
   

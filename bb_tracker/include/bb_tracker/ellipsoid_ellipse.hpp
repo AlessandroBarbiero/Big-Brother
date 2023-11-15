@@ -89,6 +89,10 @@ ELLIPSE_STATE ellipseFromEllipsoidv1(Eigen::Matrix<float, 1, 8> state, TRANSFORM
  */
 ELLIPSE_STATE ellipseFromEllipsoidv2(Eigen::Matrix<float, 1, 8> state, TRANSFORMATION &vMat, PROJ_MATRIX &P);
 
+// Compute the intersection between a vector starting from the camera center
+// passing through the point 2D and the horiontal plane placed at a given height
+Eigen::Vector3f projectPoint2D(Eigen::Vector2f point2D, float plane_height, TRANSFORMATION &vMat, PROJ_MATRIX &P);
+
 KAL_MEAN ellipsoidFromEllipse(const ELLIPSE_STATE &state, ClassLabel class_label, TRANSFORMATION &vMat, PROJ_MATRIX &P);
 
 inline bool ellipseInImage(float ecx, float ecy, float ea, float eb, int width, int height){
