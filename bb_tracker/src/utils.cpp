@@ -572,10 +572,9 @@ void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64
 void BYTETracker::get_predicted_output(vector<STrack*>& output_stracks, int64_t detection_time_ms){
 	for (unsigned int i = 0; i < this->tracked_stracks.size(); i++)
 	{
+		// TODO: show only activated stracks
 		if (this->tracked_stracks[i].is_activated)
-		{
 			output_stracks.push_back(&this->tracked_stracks[i]);
-		}
 	}
 
 	predict_at_current_time(output_stracks, detection_time_ms);
