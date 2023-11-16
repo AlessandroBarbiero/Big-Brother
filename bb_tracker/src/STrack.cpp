@@ -258,8 +258,6 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 
 void STrack::update(Object2D &new_track, int frame_id)
 {
-	auto current_time_ms = new_track.time_ms;
-
 	// TODO: removed old update
 	// if(checkOldDetection(current_time_ms))
 	// 	return; // Saved state is more updated than detection, do not update
@@ -279,24 +277,29 @@ void STrack::update(Object2D &new_track, int frame_id)
 	}
 
 	double yaw = 0;
+	Eigen::Vector3f second_point;
 	// If the object is new compute the orientation projecting the new position and computing the vector from the old to the new position
 	if(!this->is_activated){
-		Eigen::Vector3f second_point = projectPoint2D({xyabt_box[0], xyabt_box[1]}, mean(5)/2.0, *this->kalman_filter.V, *this->kalman_filter.P);
+		second_point = projectPoint2D({xyabt_box[0], xyabt_box[1]}, mean(5)/2.0, *this->kalman_filter.V, *this->kalman_filter.P);
 		double dx = second_point(0) - mean(0);
 		double dy = second_point(1) - mean(1);
 
 		// Calculate the yaw angle using atan2
 		yaw = std::atan2(dy, dx);
+		this->mean_predicted(2) = yaw;
 	}
 
 	auto mc = this->kalman_filter.update2D(this->mean_predicted, this->covariance_predicted, xyabt_box);
 
-	if(!this->is_activated)
+	if(!this->is_activated){
 		mc.first(2) = yaw;
+		mc.first(0) = second_point(0);
+		mc.first(1) = second_point(1);
+	}
 
-	// TODO: removed time update
-	updateTrackState(mc, current_time_ms, new_track.prob, new_track.label, frame_id);
-	//updateTrackState(mc, this->last_filter_update_ms, new_score, frame_id);
+	// TODO: possibility to remove time update
+	updateTrackState(mc, new_track.time_ms, new_track.prob, new_track.label, frame_id);
+	//updateTrackState(mc, this->last_filter_update_ms, new_track.prob, new_track.label, frame_id);
 }
 
 void STrack::update(STrack &new_track, int frame_id)
@@ -425,11 +428,13 @@ int STrack::end_frame()
 
 void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, int64_t current_time_ms)
 {
+	//cout << "Multi predict" << endl;
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
-		double dt = (current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
+		// Predict objects also in the past
+		double dt = static_cast<double>(current_time_ms - stracks[i]->last_filter_update_ms)/MILLIS_IN_SECONDS;
+		//cout << "id: "<< stracks[i]->track_id << " - delta t = " << dt << endl;
 		
-		// Predict objects also in the past to exclude them from the association
 		// if(dt<=0){	// Predict new value only if the current time is after the last update
 		// 	cout << "try to predict back in time for track: " << stracks[i]->track_id << "\nOld time: " << stracks[i]->last_filter_update_ms << " | New time: " << current_time_ms << endl;
 		// 	continue;

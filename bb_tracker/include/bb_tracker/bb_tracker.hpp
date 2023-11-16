@@ -29,8 +29,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-#define NANO_IN_MILLIS 1000000 //10^6
-#define MICRO_IN_SECOND 1000000 //10^6
+#define NANO_IN_MILLIS 1000000.0 //10^6
+#define MICRO_IN_SECOND 1000000.0 //10^6
 
 using std::placeholders::_1;
 using std::placeholders::_2;
