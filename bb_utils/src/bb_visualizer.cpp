@@ -129,20 +129,28 @@ void BBVisualizer::setParameters(){
   ImGui::Begin("Actions", NULL, window_flags);
 
   if(ImGui::Button("Show Covariance")){
-    setROSParameter("show_covariance", true);
+    setROSParameter("bb_tracker", "show_covariance", true);
   }
   ImGui::SameLine();
   if(ImGui::Button("Hide Covariance")){
-    setROSParameter("show_covariance", false);
+    setROSParameter("bb_tracker", "show_covariance", false);
   }
 
 
   if(ImGui::Button("Show 2D Proj")){
-    setROSParameter("show_img_projection", true);
+    setROSParameter("bb_tracker", "show_img_projection", true);
   }
   ImGui::SameLine();
   if(ImGui::Button("Hide 2D Proj")){
-    setROSParameter("show_img_projection", false);
+    setROSParameter("bb_tracker", "show_img_projection", false);
+  }
+
+  if(ImGui::Button("Activate 3D det")){
+    setROSParameter("fake_lidar_detector", "active", true);
+  }
+  ImGui::SameLine();
+  if(ImGui::Button("Hide 3D det")){
+    setROSParameter("fake_lidar_detector", "active", false);
   }
 
   ImGui::End();
@@ -440,12 +448,14 @@ void BBVisualizer::plotPieGraphs(int dim){
   }
 }
 
-void BBVisualizer::setROSParameter(std::string paramName, bool value){
+void BBVisualizer::setROSParameter(std::string node_name, std::string paramName, bool value){
   auto parameter = rcl_interfaces::msg::Parameter();
   auto request = std::make_shared<rcl_interfaces::srv::SetParametersAtomically::Request>();
-  auto service_name = "/bb_tracker/set_parameters_atomically";
+  std::string service_name = "/";
+  service_name.append(node_name).append("/set_parameters_atomically");
 
-  static std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParametersAtomically>> client = 
+  static std::unordered_map<std::string, std::shared_ptr<rclcpp::Client<rcl_interfaces::srv::SetParametersAtomically>>> client_map;
+  client_map[service_name] = 
           this->create_client<rcl_interfaces::srv::SetParametersAtomically>(service_name); // E.g.: serviceName = "/turtlesim/set_parameters_atomically"
 
   parameter.name = paramName;
@@ -454,14 +464,14 @@ void BBVisualizer::setROSParameter(std::string paramName, bool value){
 
   request->parameters.push_back(parameter);
 
-  while (!client->wait_for_service(1s)) {
+  while (!client_map[service_name]->wait_for_service(1s)) {
       if (!rclcpp::ok()) {
       RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Interrupted while waiting for the service. Exiting.");
       return;
       }
       RCLCPP_INFO_STREAM(this->get_logger(), "service " << service_name <<" not available, waiting again..."); 
   }
-  auto result = client->async_send_request(request);
+  auto result = client_map[service_name]->async_send_request(request);
 }
 
 bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfaces::msg::STrack& b)

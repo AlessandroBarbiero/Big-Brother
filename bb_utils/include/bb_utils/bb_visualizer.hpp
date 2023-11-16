@@ -6,6 +6,7 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <unordered_map>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -98,7 +99,7 @@ class BBVisualizer : public rclcpp::Node
 
     void plotPieGraphs(int dim);
 
-    void setROSParameter(std::string paramName, bool value);
+    void setROSParameter(std::string node_name, std::string paramName, bool value);
 
 
   private:
