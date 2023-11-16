@@ -1,10 +1,13 @@
 #include <bb_tracker/BYTETracker.h>
 
 vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX& P, TRANSFORMATION& V, uint32_t width, uint32_t height)
-{
+{	
 	vector<STrack*> output_stracks;
 	int64_t last_det_time_ms = objects.back().time_ms;
+
 	if(this->current_time_ms - last_det_time_ms > this->max_dt_past){
+		cout << "Received a too old detection -> discard it\n" << 
+			"Current time (ms): " << this->current_time_ms << " - Detection time (ms): " << last_det_time_ms << endl;
 		get_predicted_output(output_stracks, last_det_time_ms);
 		return output_stracks;
 	}
