@@ -375,13 +375,13 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
   _total_ms = _total_ms + duration;
 
   #ifndef NO_PROGRESS
-    std::cout << format("(3D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+    std::cout << format("(3D) update: %d fps: %d num_tracks: %lu", _num_updates, static_cast<int>(MICRO_IN_SECOND / duration), output_stracks.size()) << "\r";
     std::cout.flush();
   #endif
 
   if (_num_updates % 50 == 0)
   {
-      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, static_cast<int>(_num_updates * MICRO_IN_SECOND / _total_ms), static_cast<int>(MICRO_IN_SECOND / duration));
   }
 }
 
@@ -411,13 +411,13 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
   _total_ms = _total_ms + duration;
 
   #ifndef NO_PROGRESS
-   std::cout << format("(2D) update: %d fps: %lu num_tracks: %lu", _num_updates, MICRO_IN_SECOND / duration, output_stracks.size()) << "\r";
+   std::cout << format("(2D) update: %d fps: %d num_tracks: %lu", _num_updates, static_cast<int>(MICRO_IN_SECOND / duration), output_stracks.size()) << "\r";
    std::cout.flush();
   #endif
 
   if (_num_updates % 50 == 0)
   {
-      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, _num_updates * MICRO_IN_SECOND / _total_ms, MICRO_IN_SECOND / duration);
+      RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, static_cast<int>(_num_updates * MICRO_IN_SECOND / _total_ms), static_cast<int>(MICRO_IN_SECOND / duration));
   }
 }
 
@@ -469,13 +469,12 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
                                       const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, 
                                       const sensor_msgs::msg::Image::ConstSharedPtr& image) {
 
+  add_detection2D(detection_msg, camera_info);
+
   // Check that the parameter is still set, if not avoid publishing the projections
   if(!get_parameter("show_img_projection").as_bool()){
-    add_detection2D(detection_msg, camera_info);
     return;
   }
-
-  add_detection2D(detection_msg, camera_info);
 
   cv_bridge::CvImagePtr cv_ptr_track;
 
@@ -512,7 +511,6 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
 
   try
   {
-    // cv_ptr_detect = cv_bridge::toCvCopy(image, image->encoding);
     cv_ptr_track = cv_bridge::toCvCopy(image, image->encoding);
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
@@ -525,18 +523,21 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     }
 
     // Draw ellipses for incoming detections
-    for(auto det : detection_msg->detections)
+    for(auto det : detection_msg->detections){
       cv::ellipse(cv_ptr_track->image, Point(det.bbox.center.x, det.bbox.center.y),
               Size(det.bbox.size_x/2.0, det.bbox.size_y/2.0), 0, 0,
               360, CV_RGB(255, 0, 0),
               1, LINE_AA);
+      // If the score is enough to initiate a new object write it in green
+      cv::Scalar color_text = (det.results[0].score > _tracker.high_thresh ? CV_RGB(0, 255, 0) : CV_RGB(255, 0, 0));
+      cv::putText(cv_ptr_track->image, format("%.2f", det.results[0].score), Point(det.bbox.center.x, det.bbox.center.y),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.4, color_text, 1);
+    }
 
     addColorLegend(cv_ptr_track->image, {CV_RGB(0, 0, 255), CV_RGB(255, 0, 0)}, {"Tracked Objects", "Detected Objects"});
 
     std::string window_name1 = format("Tracked and Detected Objects (%d)", id);
     cv::imshow(window_name1, cv_ptr_track->image);
-    // std::string window_name2 = "Detected Objects";
-    // cv::imshow(window_name2, cv_ptr_detect->image);
     // cv::setMouseCallback(window_name, mouse_callback);
     cv::waitKey(1);
 
@@ -785,8 +786,8 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
 }
 
 void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs::msg::Detection3DArray* out_message){
-  out_message->header.stamp.sec = _tracker.current_time_ms/MILLIS_IN_SECONDS;
-  out_message->header.stamp.nanosec = _tracker.current_time_ms*NANO_IN_MILLIS;
+  out_message->header.stamp.sec = static_cast<uint32_t>(_tracker.current_time_ms/MILLIS_IN_SECONDS);
+  out_message->header.stamp.nanosec = static_cast<uint32_t>(_tracker.current_time_ms*NANO_IN_MILLIS);
   // out_message->header.stamp = get_clock()->now();
   out_message->header.frame_id = _fixed_frame;
   out_message->detections.reserve(in_stracks.size());

@@ -61,6 +61,10 @@ public:
 	// if a detection time is after the predicted current time, that become the current time
 	int64_t current_time_ms;
 
+	float track_thresh;
+	float high_thresh;
+	float match_thresh;
+
 private:
 	/**
 	 * Combines two vectors of STrack objects into a single vector.
@@ -127,9 +131,6 @@ private:
 
 private:
 
-	float track_thresh;
-	float high_thresh;
-	float match_thresh;
 	int frame_id;
 	int time_to_lost, lost_ttl, unconfirmed_ttl, max_dt_past;
 	bool left_handed_system;
