@@ -475,7 +475,9 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     return;
   }
 
-  cv_bridge::CvImagePtr cv_ptr_detect, cv_ptr_track;
+  add_detection2D(detection_msg, camera_info);
+
+  cv_bridge::CvImagePtr cv_ptr_track;
 
   std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
 
@@ -484,7 +486,7 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
   for(size_t i=0; i<trackedObj.size(); i++){
     objPtr.push_back(&trackedObj[i]);
   }
-  int64_t current_time_ms = detection_msg->header.stamp.sec*1000 + detection_msg->header.stamp.nanosec/1e+6;
+  int64_t current_time_ms = detection_msg->header.stamp.sec*MILLIS_IN_SECONDS + detection_msg->header.stamp.nanosec/NANO_IN_MILLIS;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
   // TODO: delete Fake points to test the draw
@@ -515,8 +517,10 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     // Draw ellipses for tracked objects
     for(auto obj :trackedObj)
     {
-      // TODO:: check
+      // show only activated stracks
+      #ifndef SHOW_INACTIVE_TRACKS
       if(obj.is_activated)
+      #endif
         draw_ellipse(cv_ptr_track, obj, P, vMat);
     }
 
@@ -541,8 +545,6 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
   {
       RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
   }
-
-  add_detection2D(detection_msg, camera_info);
 
   return;
 }

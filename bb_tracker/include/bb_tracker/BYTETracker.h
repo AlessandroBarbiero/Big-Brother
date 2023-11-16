@@ -8,6 +8,8 @@
 #include "dataType.h"
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+//#define SHOW_INACTIVE_TRACKS
+
 using namespace std;
 
 class BYTETracker
