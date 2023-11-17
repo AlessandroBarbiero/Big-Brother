@@ -1,5 +1,7 @@
 #include <bb_tracker/STrack.h>
 
+// #define ACCEPT_OLD_DETECTION // Add this define to accept older detections
+
 size_t STrack::last_points_capacity = 10;
 
 std::unordered_map<int, std::string> STrack::trackStateToString{
@@ -258,9 +260,10 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 
 void STrack::update(Object2D &new_track, int frame_id)
 {
-	// TODO: removed old update
-	// if(checkOldDetection(current_time_ms))
-	// 	return; // Saved state is more updated than detection, do not update
+	#ifndef ACCEPT_OLD_DETECTION
+	if(checkOldDetection(new_track.time_ms))
+		return; // Saved state is more updated than detection, do not update
+	#endif
 
 	// Handle detection and update
 	vector<float> tlbr = new_track.tlbr;
@@ -306,9 +309,10 @@ void STrack::update(STrack &new_track, int frame_id)
 {
 	auto current_time_ms = new_track.last_filter_update_ms;
 
-	// TODO: removed old detection
-	// if(checkOldDetection(current_time_ms))
-	// 	return; // Saved state is more updated than detection, do not update
+	#ifndef ACCEPT_OLD_DETECTION
+	if(checkOldDetection(current_time_ms))
+		return; // Saved state is more updated than detection, do not update
+	#endif
 
 	// Handle detection and update
 	vector<float> xyzaah = minwdh_to_xyzaah(new_track.minwdh);
