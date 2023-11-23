@@ -14,7 +14,12 @@ for arg in sys.argv:
 
 def generate_launch_description():
     bag_folder = os.getenv('BAG_DIR') # set environmental variable BAG_DIR to the current directory where you save the bag files
-    rviz_folder = os.getenv('RVIZ2_DIR') # set environmental variable RVIZ2_DIR to the current directory where you save the rviz2 config
+
+    rviz_config = os.path.join(
+        get_package_share_directory('bb_tracker'),
+        '.rviz2',
+        'tracker.rviz'
+    )
 
     config = os.path.join(
         get_package_share_directory('bb_tracker'),
@@ -114,7 +119,7 @@ def generate_launch_description():
             namespace='',
             executable='rviz2',
             name='rviz2',
-            arguments=['-d', [os.path.join(rviz_folder, 'tracker.rviz')]],
+            arguments=['-d', rviz_config],
             output='log',
             prefix=["xterm -e"] # open in a new terminal
         )
@@ -122,9 +127,9 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
-    ld.add_action(thermal_node)
-    # ld.add_action(yolo_node)
-    # ld.add_action(lidar_node)
+    #ld.add_action(thermal_node)
+    ld.add_action(yolo_node)
+    ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
     ld.add_action(bag_process)

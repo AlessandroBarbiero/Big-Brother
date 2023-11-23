@@ -45,6 +45,7 @@ include_directories(include)
 install(DIRECTORY
   launch
   config
+  .rviz2
   DESTINATION share/${PROJECT_NAME}
 )
 
