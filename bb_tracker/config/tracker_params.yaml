@@ -21,7 +21,7 @@ bb_tracker:
          "/carla/sensors_home/static_termic_camera/det2d"
       ]
       # Tracker Time
-      time_to_lost: 1500
+      time_to_lost: 1000
       unconfirmed_ttl: 1000
       lost_ttl: 2000
       # Tracker Thresh
@@ -32,10 +32,10 @@ bb_tracker:
       # Kalman Filter (consider cm, degrees, cm/s and degrees/s as MU)
       # P0 3D
       mul_p03d: [
-         10.,10.,       # position
+         15.,15.,       # position
          10.,           # yaw
-         30.,30.,30.,   # size
-         100.,18.       # velocity
+         10.,10.,30.,   # size
+         150.,18.       # velocity
          ]
       # P0 2D
       mul_p02d: [
@@ -53,8 +53,8 @@ bb_tracker:
          ]
       # V2 3D
       mul_mn3d: [
-         5.,5.,         # position
-         5.,            # yaw
+         10.,10.,         # position
+         10.,            # yaw
          45.,45.,45.    # size
          ]
       # V2 2D
