@@ -21,17 +21,20 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 #include <rosgraph_msgs/msg/clock.hpp>
+#include <vision_msgs/msg/detection2_d_array.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <rcl_interfaces/msg/log.hpp>
 
 // To run this type:
-// ros2 run bb_utils rewrite_bag_timestamps /path/to/input.bag /path/to/output.bag
+// ros2 run bb_utils rewrite_bag_timestamps /path/to/input.bag /path/to/output.bag [-a]
 // Example:
-// ros2 run bb_utils rewrite_bag_timestamps /home/ale/bag_files/static_sensors_only /home/ale/bag_files/static_sensors_only_correct_ts
+// ros2 run bb_utils rewrite_bag_timestamps /home/ale/bag_files/static_sensors_only /home/ale/bag_files/static_sensors_only_correct_ts -a
 
 builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::SerializedBagMessage> bag_message, std::string topic_type);
 bool endsWithSubstring(const std::string& str, const std::string& subStr);
 
 // Function that rewrites the timestamps inside the input_bag to match the timestamps inside the messages and publishes a new bag
-void rewriteBagTimestamps(const std::string& input_bag, const std::string& output_bag)
+void rewriteBagTimestamps(const std::string& input_bag, const std::string& output_bag, bool keep_all_topics = false)
 {
 
   std::vector<std::string> topics_to_keep = {
@@ -72,6 +75,15 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
   
   // Set the filter
   rosbag2_storage::StorageFilter storage_filter;
+
+  if(keep_all_topics){
+    const auto all_topics = reader->get_all_topics_and_types();
+    topics_to_keep.clear();
+    for (auto topic : all_topics) {
+      topics_to_keep.push_back(topic.name);
+    }
+  }
+
   for (auto topic : topics_to_keep) {
       storage_filter.topics.push_back(topic);
   }
@@ -182,6 +194,9 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
   static rclcpp::Serialization<rosgraph_msgs::msg::Clock> clock_serializer;
   static rclcpp::Serialization<visualization_msgs::msg::MarkerArray> marker_array_serializer;
   static rclcpp::Serialization<derived_object_msgs::msg::ObjectArray> object_array_serializer;
+  static rclcpp::Serialization<vision_msgs::msg::Detection2DArray> det2d_serializer;
+  static rclcpp::Serialization<vision_msgs::msg::Detection3DArray> det3d_serializer;
+  static rclcpp::Serialization<rcl_interfaces::msg::Log> log_serializer;
 
   builtin_interfaces::msg::Time stamp;
   rclcpp::SerializedMessage extracted_serialized_msg(*bag_message->serialized_data);
@@ -220,6 +235,24 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
       object_array_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
       stamp = extracted_msg.header.stamp;
     }
+    else if(topic_type == "vision_msgs/msg/Detection2DArray"){
+      vision_msgs::msg::Detection2DArray extracted_msg;
+      det2d_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
+      stamp = extracted_msg.header.stamp;
+    }
+    else if(topic_type == "vision_msgs/msg/Detection3DArray"){
+      vision_msgs::msg::Detection3DArray extracted_msg;
+      det3d_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
+      stamp = extracted_msg.header.stamp;
+    }
+    else if(topic_type == "rcl_interfaces/msg/Log"){
+      rcl_interfaces::msg::Log extracted_msg;
+      log_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
+      stamp = extracted_msg.stamp;
+    }
+    else{
+      std::cerr << "Type " << topic_type << " not supported, look at getStamp() function" << std::endl;
+    }
 
   return stamp;
 }
@@ -231,13 +264,17 @@ int main(int argc, char* argv[])
 
   try {
     // Check the command-line arguments
-    if (argc != 3) {
-      std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag>" << std::endl;
+    if ((argc != 3 && argc != 4) || (argc == 4 && std::string(argv[3]) != "-a")) {
+      std::cerr << "Usage: " << argv[0] << " <input_bag> <output_bag> [-a](keep all)" << std::endl;
       return 1;
     }
 
-    // Rewrite the bag timestamps
-    rewriteBagTimestamps(argv[1], argv[2]);
+    if (argc == 3){
+      rewriteBagTimestamps(argv[1], argv[2]);
+    }
+    else if (argc == 4){
+      rewriteBagTimestamps(argv[1], argv[2], true); // Keep all topics
+    }
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << std::endl;
     rclcpp::shutdown();

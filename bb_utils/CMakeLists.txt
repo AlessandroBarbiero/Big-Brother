@@ -115,6 +115,7 @@ ament_target_dependencies(rewrite_bag_timestamps
   rosbag2_cpp 
   rclcpp
   sensor_msgs
+  vision_msgs
   rosgraph_msgs
   tf2_msgs
   derived_object_msgs
