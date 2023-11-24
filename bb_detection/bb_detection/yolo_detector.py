@@ -65,18 +65,26 @@ class YoloDetector(Node):
                         'motorcycle': 2.0,
                         'truck': 2.0}
         
+        publish_3d = self.get_parameter('publish_3d').value
 
         sub1 = Subscriber(self, Image, "to_detect")
         sub2 = Subscriber(self, CameraInfo, "camera_info")
-        sub3 = Subscriber(self, Image, "depth")
-        self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
-        self._tss.registerCallback(self.detect_objects)
 
-        self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+        if publish_3d:
+            sub3 = Subscriber(self, Image, "depth")
+            self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
+            self._tss.registerCallback(self.detect_objects)
+
+            self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+
+            self.tf_buffer = Buffer()
+            self.tf_listener = TransformListener(self.tf_buffer, self)
+        else:
+            self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
+            self._tss.registerCallback(self.detect_objects2D)
+
         self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
 
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Load a pretrained YOLO model
         self.yolo = YOLO('yolov8m.pt')
@@ -89,6 +97,7 @@ class YoloDetector(Node):
 
         self.br = CvBridge()
         self.no_image_detected_yet = True
+        self.get_logger().info("Ready to detect")
 
     def parameter_callback(self, params):
         '''
@@ -99,6 +108,104 @@ class YoloDetector(Node):
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
         
+    def detect_objects2D(self, data: Image, camera_info: CameraInfo):
+        """
+        Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes 2D,
+        It can also show the debug image if the parameter is set
+        """
+        publish_2d = self.get_parameter('publish_2d').value
+
+        # Display the message on the console if it is the first time
+        if self.no_image_detected_yet:
+            self.get_logger().info("Started detecting images")
+            self.no_image_detected_yet = False
+
+        # Convert ROS Image message to OpenCV image
+        cv_image = self.br.imgmsg_to_cv2(data)
+        cv_image = cv2.cvtColor(cv_image, cv2.COLOR_RGBA2RGB)
+
+        # Perform object detection on an image using the model
+        results = self.yolo.predict(
+                source=cv_image,
+                verbose=False,
+                stream=False,
+                conf=float(self.get_parameter('confidence_threshold').value),
+                classes=self.classes_numbers
+            )
+        results: Results = results[0].cpu()
+
+
+        if(publish_2d):
+            detections2d_msg = Detection2DArray()
+            detections2d_msg.header = data.header
+
+
+        for box_data in results.boxes:
+
+            # get label and score
+            label = self.yolo.names[int(box_data.cls)]
+            score = float(box_data.conf)
+            # get track id
+            track_id = ""
+            if box_data.is_track:
+                track_id = str(int(box_data.id))
+
+            # create hypothesis
+            hypothesis = ObjectHypothesisWithPose()
+            hypothesis.id = label
+            hypothesis.score = score
+
+            # get boxes values
+            box = box_data.xywh[0]
+
+            uv_coordinates = (box[0], box[1])
+            bbox_image_size = (box[2], box[3])
+
+            # bottom-left
+            min_pt = (int(uv_coordinates[0] - bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] - bbox_image_size[1] / 2.0))
+            # top-right
+            max_pt = (int(uv_coordinates[0] + bbox_image_size[0] / 2.0),
+                            int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
+
+            if(publish_2d):
+                detection2d = Detection2D()
+                detection2d.header = detections2d_msg.header
+
+                detection2d.bbox.center.x = float(uv_coordinates[0])
+                detection2d.bbox.center.y = float(uv_coordinates[1])
+                detection2d.bbox.size_x = float(bbox_image_size[0])
+                detection2d.bbox.size_y = float(bbox_image_size[1])
+
+                detection2d.results.append(hypothesis)
+                detections2d_msg.detections.append(detection2d)
+
+            if(self.get_parameter('show_debug').value):
+                # draw boxes for debug
+                if label not in self._class_to_color:
+                    r = random.randint(0, 255)
+                    g = random.randint(0, 255)
+                    box_data = random.randint(0, 255)
+                    self._class_to_color[label] = (r, g, box_data)
+                color = self._class_to_color[label]
+             
+                cv2.rectangle(cv_image, min_pt, max_pt, color, 2)
+
+                label = "{} ({}) ({:.3f})".format(label, str(track_id), score)
+                pos = (min_pt[0] + 5, min_pt[1] + 25)
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                cv2.putText(cv_image, label, pos, font,
+                            1, color, 1, cv2.LINE_AA)
+
+        # publish detections
+        if(publish_2d):
+            self._pub2d.publish(detections2d_msg)
+
+        if(self.get_parameter('show_debug').value):
+            # Display image
+            cv2.imshow("Detection", cv_image)
+            cv2.waitKey(1)
+
 
     def detect_objects(self, data: Image, camera_info: CameraInfo, depth: Image):
         """

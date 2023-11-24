@@ -291,7 +291,7 @@ def _get_struct_fmt(is_bigendian, fields, field_names=None):
 def main(args=None):
     rclpy.init(args=args)
 
-    Logger('LOG').info("Initiatizing node...")
+    Logger('LOG').info("Initializing node...")
 
     detector = FakeDetector()
 
