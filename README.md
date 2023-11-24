@@ -4,6 +4,15 @@ ROS2 Packages for Object Detection and Tracking with sensor fusion in autonomous
 ## Dependencies
 - ROS2 Foxy
 
+Download the necessary ros packages in the usual way
+```cmd
+sudo apt install ros-distro-package
+```
+for example:
+```cmd
+sudo apt install ros-foxy-vision-msgs
+```
+
 ### Yolo detector
 Python packages:
 - opencv-python
@@ -18,13 +27,12 @@ Following the instructions at [NVIDIA ROS2 TAO Pointpillars](https://github.com/
 - [TAO Converter](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tao/resources/tao-converter) 
 
 ### Thermal detector
-
+Python packages:
+- opencv-python
+- cv bridge
 
 ### Tracker
-Download the necessary ros packages in the usual way
-```cmd
-sudo apt install ros-version-package
-```
+
 
 ### Visualizer
 Dependencies:
@@ -34,6 +42,16 @@ Dependencies:
 - [glfw](https://github.com/glfw/glfw)
 
 Download the repositories and add the locations to the [CMakeLists](bb_utils/CMakeLists.txt) file
+
+### Bag recording
+
+```cmd
+sudo apt install ros-foxy-rosbag2
+```
+To add a different storage option with a better compression:
+```cmd
+sudo apt install ros-foxy-rosbag2-storage-mcap
+```
 
 ## Before run
 Set the environmental variable BAG_DIR pointing at the directory where you store the bag files.
