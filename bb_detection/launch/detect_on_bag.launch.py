@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
+from launch.actions import ExecuteProcess, Shutdown
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -18,6 +18,8 @@ for arg in sys.argv:
 def generate_launch_description():
     bag_folder = os.getenv('BAG_DIR') # set environmental variable BAG_DIR to the current directory where you save the bag files
 
+    emit_shutdown_action = Shutdown(reason='Bag play finished')
+
     detect = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('bb_detection'), 'detect.launch.py')])
@@ -30,13 +32,23 @@ def generate_launch_description():
     )
 
     bag_process = ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', bag_folder + bag_name], #, '-r', '0.9'],
+            cmd=['ros2', 'bag', 'play', bag_folder + bag_name, '-r', '0.1'],
+            on_exit=[
+                emit_shutdown_action
+                ],
+        )
+    
+    register_bag = ExecuteProcess(
+            cmd=['ros2', 'bag', 'record', '-a', '-o', bag_folder + bag_name + '_det'], # '-s', 'mcap',
         )
     
     # Add a delay to allow Yolo to initialize the model
     delayed_bag = TimerAction(
         period=15.0, 
-        actions=[bag_process]
+        actions=[
+            register_bag,
+            bag_process
+            ]
         )
 
 
