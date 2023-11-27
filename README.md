@@ -103,5 +103,5 @@ ros2 launch bb_detection detect_on_bag.launch.py bag_name:=custom_bag
 
 To bring back the bag to the right speed use the `rewrite_bag_timestamps` executable from `bb_utils` package:
 ```cmd
-ros2 run bb_utils rewrite_bag_timestamps <input_bag> <output_bag> [-a]
+ros2 run bb_utils rewrite_bag_timestamps /path/to/custom_bag /path/to/new_bag -a
 ```
