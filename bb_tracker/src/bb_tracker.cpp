@@ -26,6 +26,8 @@ BBTracker::BBTracker()
   image_list_desc.description = "List of the Images retreived from cameras topics, it should have the same order and size as camera_list if show_image_projection is set";
   auto det2d_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
   det2d_list_desc.description = "List of the Detection2DArray topics used together with the CameraInfo of camera_list, it should have the same order and size as camera_list";
+  auto det3d_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  det3d_list_desc.description = "List of the Detection3DArray topics from which the tracker will read the 3D detections";
   // Tracker Time
   auto time_to_lost_desc = rcl_interfaces::msg::ParameterDescriptor{};
   time_to_lost_desc.description = "Milliseconds a tracked object is not seen to declare it lost.";
@@ -59,6 +61,7 @@ BBTracker::BBTracker()
   vector<std::string> camera_info_topics = {"/camera/info1"};
   vector<std::string> image_topics = {"/camera/image1"};
   vector<std::string> det2d_topics = {"bytetrack/detections2d"};
+  vector<std::string> det3d_topics = {"bytetrack/detections3d"};
 
   // Visualization
   this->declare_parameter("show_img_projection", false, show_image_projection_desc);
@@ -70,6 +73,7 @@ BBTracker::BBTracker()
   this->declare_parameter("camera_list", camera_info_topics, camera_list_desc);
   this->declare_parameter("image_list", image_topics, image_list_desc);
   this->declare_parameter("detection2d_list", det2d_topics, det2d_list_desc);
+  this->declare_parameter("detection3d_list", det3d_topics, det3d_list_desc);
 
   // Tracker Time
   this->declare_parameter("time_to_lost", 300, time_to_lost_desc);
@@ -96,6 +100,7 @@ BBTracker::BBTracker()
   camera_info_topics =    get_parameter("camera_list").as_string_array();
   image_topics =          get_parameter("image_list").as_string_array();
   det2d_topics =          get_parameter("detection2d_list").as_string_array();
+  det3d_topics =          get_parameter("detection3d_list").as_string_array();
 
   // Tracker Time
   int time_to_lost    =   get_parameter("time_to_lost").as_int();
@@ -116,8 +121,14 @@ BBTracker::BBTracker()
 
 
   // %%%%%%%%% ROS Subscriber and Publisher %%%%%%%%%%
-  _detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
-          "bytetrack/detections3d", 10, std::bind(&BBTracker::add_detection3D, this, _1));
+  cout << "Listening Detection 3D from topics:" << endl;
+  for(auto det3d_topic : det3d_topics){
+    auto detection3d = this->create_subscription<vision_msgs::msg::Detection3DArray>(
+            det3d_topic, 10, std::bind(&BBTracker::add_detection3D, this, _1));
+    _detections3d.push_back(detection3d);
+    
+    cout << "\t" << det3d_topic << endl;
+  }
 
   if(get_parameter("show_img_projection").as_bool()){
     int id = 0;

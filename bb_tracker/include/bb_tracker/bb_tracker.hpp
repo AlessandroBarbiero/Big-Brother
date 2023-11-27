@@ -100,7 +100,7 @@ class BBTracker : public rclcpp::Node
     rclcpp::Publisher<bb_interfaces::msg::STrackArray>::SharedPtr _tracks_publisher;
 
     // Detection 3D
-    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr _detection3d;
+    std::vector<rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr> _detections3d;
 
     // Detection 2D
     std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::CameraInfo>>> _camera_info_subs;
