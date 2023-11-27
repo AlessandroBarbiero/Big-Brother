@@ -10,18 +10,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# ------------ Add for Bytetrack
-option(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
 
 # Eigen3
 include_directories(/usr/include/eigen3)  # <----- Point to an updated version of eigen3
 
-# cuda
-find_package(CUDA REQUIRED)
-include_directories(${CUDA_INCLUDE_DIRS})
-link_directories(${CUDA_LIBRARIES})
-
-# ----------------------------
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
