@@ -25,6 +25,9 @@
 #include <vision_msgs/msg/detection3_d_array.hpp>
 #include <rcl_interfaces/msg/log.hpp>
 
+#define NANOSEC_IN_SEC int64_t(1000000000)
+#define SEC_IN_HOUR int64_t(3600)
+
 // To run this type:
 // ros2 run bb_utils rewrite_bag_timestamps /path/to/input.bag /path/to/output.bag [-a]
 // Example:
@@ -119,7 +122,12 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
   std::cout << std::fixed << std::setprecision(2);
 
   int64_t timestamp;
+  // The starting time of the messages should be the same as the bag to convert
+  auto start_ns = std::chrono::time_point_cast<std::chrono::nanoseconds>(reader->get_metadata().starting_time);
+  int64_t bag_start_time = start_ns.time_since_epoch().count();
+
   int64_t last_clock = 0;
+  int64_t first_clock = 0;
   std::vector<std::shared_ptr<rosbag2_storage::SerializedBagMessage>> messages_to_add;
   std::string name;
   while (rclcpp::ok() && reader->has_next())
@@ -139,14 +147,16 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
       topic_type = topic_to_type.at(bag_message->topic_name);
       // Get the timestamp from the header
       stamp = getStamp(bag_message, topic_type);
-      timestamp = int64_t(stamp.sec) * 1000000000 + int64_t(stamp.nanosec);
+      timestamp = int64_t(stamp.sec) * NANOSEC_IN_SEC + int64_t(stamp.nanosec);
 
       if(bag_message->topic_name=="/clock"){
         last_clock = timestamp;
+        if(first_clock == 0)
+          first_clock = timestamp;
         // Recover static messages
         if(messages_to_add.size()!=0){
           for(auto msg : messages_to_add){
-            msg->time_stamp = last_clock;
+            msg->time_stamp = bag_start_time + (last_clock - first_clock);
             writer->write(msg);
             counter++;
           }
@@ -158,6 +168,12 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
     // std::cout << "topic name: \t" << bag_message->topic_name << std::endl;
     // std::cout << "stamp: \t\t" << bag_message->time_stamp << std::endl;
     // std::cout << "header stamp: \t" << timestamp << std::endl;
+
+    // if the timestamp is before the starting time of the bag -> bring everything to the correct time
+    if (timestamp < bag_start_time)
+      timestamp = bag_start_time + (timestamp - first_clock);
+
+    // std::cout << "published header stamp: \t" << timestamp << std::endl;
 
     // Update the message timestamp
     bag_message->time_stamp=timestamp;
