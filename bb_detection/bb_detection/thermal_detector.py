@@ -48,7 +48,7 @@ class ThermalDetector(Node):
                 ('show_debug', True),
                 ('publish_3d', True),
                 ('publish_2d', True),
-                ('exclude_border_objects', True)
+                ('exclude_border_objects', False)
             ]
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
