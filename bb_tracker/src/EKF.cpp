@@ -5,8 +5,12 @@ namespace byte_kalman
 {
 	KAL_MEAN EKF::predictState(KAL_MEAN &mean, double dt){
     	KAL_MEAN predict_mean;
-    	predict_mean << mean(0) + mean(6)*cos(mean(2))*dt,
-						mean(1) + mean(6)*sin(mean(2))*dt,
+		// Euler integration
+		// predict_mean << mean(0) + mean(6)*cos(mean(2))*dt,
+		// 				mean(1) + mean(6)*sin(mean(2))*dt,
+		// Runge-Kutta integration
+    	predict_mean << mean(0) + mean(6)*dt*cos(mean(2)+(mean(7)*dt)/2),
+						mean(1) + mean(6)*dt*sin(mean(2)+(mean(7)*dt)/2),
 						mean(2) + mean(7)*dt,
 						mean(3),
 						mean(4),
@@ -27,10 +31,20 @@ namespace byte_kalman
 
 	void EKF::computeJacobianMotion(const KAL_MEAN &mean, double dt){
       	_motion_mat = Eigen::MatrixXf::Identity(state_dim, state_dim);
-		_motion_mat(0,6) = cos(mean(2))*dt;
-		_motion_mat(0,2) = - mean(6)*sin(mean(2))*dt;
-		_motion_mat(1,6) = sin(mean(2))*dt;
-		_motion_mat(1,2) = mean(6)*cos(mean(2))*dt;
+		// Euler integration
+		// _motion_mat(0,2) = - mean(6)*sin(mean(2))*dt;
+		// _motion_mat(0,6) = cos(mean(2))*dt;
+		// _motion_mat(1,2) = mean(6)*cos(mean(2))*dt;
+		// _motion_mat(1,6) = sin(mean(2))*dt;
+		// _motion_mat(2,7) = 1.0*dt;
+
+		// Runge-Kutta integration
+		_motion_mat(0,2) = -dt*mean(6)*sin(dt*mean(7)/2 + mean(2));
+		_motion_mat(0,6) = dt*cos(dt*mean(7)/2 + mean(2));
+		_motion_mat(0,7) = -dt*dt*mean(6)*sin(dt*mean(7)/2 + mean(2))/2;
+		_motion_mat(1,2) = dt*mean(6)*cos(dt*mean(7)/2 + mean(2));
+		_motion_mat(1,6) = dt*sin(dt*mean(7)/2 + mean(2));
+		_motion_mat(1,7) = dt*dt*mean(6)*cos(dt*mean(7)/2 + mean(2))/2;
 		_motion_mat(2,7) = 1.0*dt;
   	}
 
