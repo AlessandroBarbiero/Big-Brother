@@ -24,7 +24,7 @@ def generate_launch_description():
     config = os.path.join(
         get_package_share_directory('bb_tracker'),
         'config',
-        'tracker_params.yaml'
+        'tracker_params_no_det.yaml'
     )
 
     tracker_node = Node(

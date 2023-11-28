@@ -1,0 +1,69 @@
+bb_tracker:
+   ros__parameters:
+      fixed_frame: sensors_home
+      # Visualization
+      show_img_projection: true
+      show_covariance: false
+      points_per_track: 100
+      # Detection
+      left_handed_system: true
+      max_dt_past: 2000
+      camera_list: [
+         "/carla/sensors_home/static_rgb_camera/camera_info", 
+         "/carla/sensors_home/static_termic_camera/camera_info"
+         ]
+      image_list: [
+         "/carla/sensors_home/static_rgb_camera/image", 
+         "/carla/sensors_home/static_termic_camera/image"
+         ]
+      detection2d_list: [
+         "/carla/sensors_home/static_rgb_camera/det2d", 
+         "/carla/sensors_home/static_termic_camera/det2d"
+      ]
+      detection3d_list: [
+         #"bytetrack/detections3d",
+         "second_topic"
+      ]
+      # Tracker Time
+      time_to_lost: 1000
+      unconfirmed_ttl: 1000
+      lost_ttl: 2000
+      # Tracker Thresh
+      track_thresh: 0.5
+      high_thresh: 0.5
+      match_thresh: 0.7
+ 
+      # Kalman Filter (consider cm, degrees, cm/s and degrees/s as MU)
+      # P0 3D
+      mul_p03d: [
+         15.,15.,       # position
+         10.,           # yaw
+         10.,10.,30.,   # size
+         100.,20.        # velocity
+         ]
+      # P0 2D
+      mul_p02d: [
+         20.,20.,    # position
+         10.,        # yaw
+         1.,1.,10.,  # size
+         18.,18.     # velocity
+         ]
+      # V1
+      mul_process_noise: [
+         1.,1.,      # position
+         1.,         # yaw
+         1.,1.,1.,   # size
+         10.,10.     # velocity
+         ]
+      # V2 3D
+      mul_mn3d: [
+         10.,10.,       # position
+         10.,           # yaw
+         45.,45.,45.    # size
+         ]
+      # V2 2D
+      mul_mn2d: [
+         10.,10.,       # position
+         100.,100.,     # semi-axes
+         45.            # theta
+         ]
