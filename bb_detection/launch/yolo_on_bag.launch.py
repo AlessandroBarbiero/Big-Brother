@@ -24,8 +24,8 @@ def generate_launch_description():
         ("/depth", "/carla/sensors_home/static_depth_camera/image"),
     ],
     parameters=[
-        {"confidence_threshold": 0.5},
-        {"show_debug": False}
+        {"confidence_threshold": 0.1},
+        {"show_debug": True}
     ]
     )
 
@@ -44,7 +44,8 @@ def generate_launch_description():
             namespace='',
             executable='rviz2',
             name='rviz2',
-            arguments=['-d', [os.path.join(rviz_folder, 'static_sensors.rviz')]]
+            arguments=['-d', [os.path.join(rviz_folder, 'static_sensors.rviz')]],
+            prefix=["xterm -e"] # open in a new terminal
         )
 
     ld = LaunchDescription()

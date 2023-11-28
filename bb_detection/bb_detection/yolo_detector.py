@@ -48,7 +48,8 @@ class YoloDetector(Node):
                 ('show_debug', True),
                 ('publish_2d', True),
                 ('publish_3d', True),
-                ('confidence_threshold', 0.5)
+                ('confidence_threshold', 0.5),
+                ('iou_nms', 0.35)
             ]
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
@@ -130,7 +131,8 @@ class YoloDetector(Node):
                 verbose=False,
                 stream=False,
                 conf=float(self.get_parameter('confidence_threshold').value),
-                classes=self.classes_numbers
+                classes=self.classes_numbers,
+                iou = float(self.get_parameter('iou_nms').value)
             )
         results: Results = results[0].cpu()
 
@@ -258,7 +260,8 @@ class YoloDetector(Node):
                 verbose=False,
                 stream=False,
                 conf=float(self.get_parameter('confidence_threshold').value),
-                classes=self.classes_numbers
+                classes=self.classes_numbers,
+                iou = float(self.get_parameter('iou_nms').value)
             )
         results: Results = results[0].cpu()
 
@@ -371,6 +374,8 @@ def main(args=None):
     rclpy.init(args=args)
 
     yolo_detector = YoloDetector()
+
+    #rclpy.spin(yolo_detector)
 
     try:
         rclpy.spin(yolo_detector)
