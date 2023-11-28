@@ -120,10 +120,10 @@ void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ
 		xyabt_box[4] = M_PI / 2.0;  // 90°
 	}
 
-	// TODO: remove if not used by initiate
-	auto sh_P = std::make_shared<PROJ_MATRIX>(P);
-	auto sh_V = std::make_shared<TRANSFORMATION>(V);
-	setViewProjection(sh_V, sh_P);
+	// Remove bacause not used by initiate, pass as parameters
+	// auto sh_P = std::make_shared<PROJ_MATRIX>(P);
+	// auto sh_V = std::make_shared<TRANSFORMATION>(V);
+	// setViewProjection(sh_V, sh_P);
 
 	auto mc = this->kalman_filter.initiate2D(xyabt_box, class_label, V, P);
 	this->mean = mc.first;
