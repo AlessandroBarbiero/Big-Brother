@@ -186,16 +186,14 @@ Eigen::Vector3f projectPoint2D(Eigen::Vector2f point2D, float plane_height, TRAN
   float 
     x = point2D(0),
     y = point2D(1),
-    tx = 0,
-    ty = 0,
     // Projection
     fx = P(0,0),
     fy = P(1,1),
     cx = P(0,2),
     cy = P(1,2);
   Eigen::Vector3f ray;
-  ray <<  (x-cx-tx)/fx, 
-          (y-cy-ty)/fy,
+  ray <<  (x-cx)/fx, 
+          (y-cy)/fy,
           1.0;
   ray.normalize();
 
