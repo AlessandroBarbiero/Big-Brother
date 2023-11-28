@@ -23,7 +23,8 @@ def generate_launch_description():
             ("/camera_info", "/carla/sensors_home/static_termic_camera/camera_info")
         ],
         parameters=[
-            {"show_debug": False}
+            {"show_debug": True},
+            {"exclude_border_objects": False}
         ]
     )
 
@@ -49,7 +50,8 @@ def generate_launch_description():
             namespace='',
             executable='rviz2',
             name='rviz2',
-            arguments=['-d', [os.path.join(rviz_folder, 'static_sensors.rviz')]]
+            arguments=['-d', [os.path.join(rviz_folder, 'static_sensors.rviz')]],
+            prefix=["xterm -e"] # open in a new terminal
         )
 
     ld = LaunchDescription()

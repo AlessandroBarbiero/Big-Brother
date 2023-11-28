@@ -47,20 +47,27 @@ class ThermalDetector(Node):
             parameters=[
                 ('show_debug', True),
                 ('publish_3d', True),
-                ('publish_2d', True)
+                ('publish_2d', True),
+                ('exclude_border_objects', True)
             ]
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
         
-        self.class_to_depth = {'person': 1.0,
-                            'vehicle': 2.0
+        self.class_to_depth = {'person': 0.8,
+                            'vehicle': 2.0,
+                            'motorcycle': 1.0,
+                            'bicycle': 1.0
                             }
         self.class_to_height = {'person': 1.8,
-                            'vehicle': 1.6
+                            'vehicle': 1.6,
+                            'motorcycle': 1.6,
+                            'bicycle': 1.5
                             }
         
         self.colors = {'person': (60, 20, 220),
-                        'vehicle': (142, 0, 0)
+                        'vehicle': (142, 0, 0),
+                        'motorcycle': (230, 0, 0),
+                        'bicycle': (32,11,119)
                         }
 
         sub1 = Subscriber(self, Image, "to_detect")
@@ -74,9 +81,11 @@ class ThermalDetector(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.class_to_bbox_color = {'person': (255, 0, 0),
-                                'vehicle': (10, 255, 0)
-                                }
+        self.class_to_bbox_color = {'person':       (235, 2, 1),
+                                    'vehicle':      (65, 22, 221),
+                                    'motorcycle':   (37,13,120),
+                                    'bicycle':      (147, 2, 2)
+                                    }
 
         self.br = CvBridge()
         self.no_image_detected_yet = True
@@ -99,6 +108,7 @@ class ThermalDetector(Node):
         """
         publish_3d = self.get_parameter('publish_3d').value
         publish_2d = self.get_parameter('publish_2d').value
+        exclude_border_objects = self.get_parameter('exclude_border_objects').value
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
@@ -175,8 +185,12 @@ class ThermalDetector(Node):
             # Draw bounding boxes around the detected regions
             for contour in contours:
                 x, y, w, h = cv2.boundingRect(contour)
-                left_base_pt = (x, y)
-                right_base_pt = (x+w, y)
+                if (w<10 or h < 10):
+                    continue
+                if (exclude_border_objects and (x<=0 or y<=0 or x+w >= data.width or y+h>= data.height)):
+                    continue
+                left_base_pt = (x, y+h)
+                right_base_pt = (x+w, y+h)
 
                 # Create hypothesis
                 hypothesis = ObjectHypothesisWithPose()
@@ -221,7 +235,7 @@ class ThermalDetector(Node):
 
                 # Draw rectangles in debug image
                 if(self.get_parameter('show_debug').value):
-                    min_pt = left_base_pt
+                    min_pt = (x, y)
                     max_pt = (x+w, y+h)
                     cv2.rectangle(cv_image, min_pt, max_pt, bounding_box_color, 2)
                     pos = (min_pt[0] + 5, min_pt[1] + 25)

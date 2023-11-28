@@ -52,7 +52,8 @@ def generate_launch_description():
         parameters=[
             {"show_debug": False},
             {"publish_3d": False},
-            {"publish_2d": True}
+            {"publish_2d": True},
+            {"exclude_border_objects": False}
         ]
     )
 
@@ -127,9 +128,9 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(tracker_node)
     ld.add_action(bag_name_arg)
-    #ld.add_action(thermal_node)
-    ld.add_action(yolo_node)
-    ld.add_action(lidar_node)
+    ld.add_action(thermal_node)
+    #ld.add_action(yolo_node)
+    #ld.add_action(lidar_node)
     ld.add_action(static_tf)
     ld.add_action(static_tf_2)
     ld.add_action(bag_process)

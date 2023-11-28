@@ -46,7 +46,7 @@ bb_tracker:
          20.,20.,    # position
          10.,        # yaw
          1.,1.,10.,   # size
-         1600.,18.    # velocity
+         1600.,20.    # velocity
          ]
       # V1
       mul_process_noise: [
