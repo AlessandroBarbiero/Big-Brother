@@ -15,6 +15,7 @@
 
 #include "bb_interfaces/msg/stats.hpp"
 #include "bb_interfaces/msg/s_track_array.hpp"
+#include "geometry_msgs/msg/point_stamped.hpp"
 
 #include "imgui_framework.hpp"
 #include "imgui.h"
@@ -74,31 +75,24 @@ class BBVisualizer : public rclcpp::Node
 
     // Make the UI compact because there are so many fields
     static void PushStyleCompact();
-
     static void PopStyleCompact();
 
     void update_stats(std::shared_ptr<bb_interfaces::msg::Stats> stats_message);
-
     void update_stracks(std::shared_ptr<bb_interfaces::msg::STrackArray> strack_message);
+    void point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message);
 
     void update_imgui();
 
     void visualizeTracks();
-
     void visualizeStats();
-
-    void setParameters();
-
-    void openDataFile();
-
-    void writeDataToFile();
-
-    void plotHistory();
-
     void writeStats();
-
+    void plotHistory();
     void plotPieGraphs(int dim);
 
+    void openDataFile();
+    void writeDataToFile();
+
+    void setParameters();
     void setROSParameter(std::string node_name, std::string paramName, bool value);
 
 
@@ -129,4 +123,5 @@ class BBVisualizer : public rclcpp::Node
 
     rclcpp::Subscription<bb_interfaces::msg::Stats>::SharedPtr _stats_sub;
     rclcpp::Subscription<bb_interfaces::msg::STrackArray>::SharedPtr _strack_sub;
+    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr _clicked_point_sub;
 };

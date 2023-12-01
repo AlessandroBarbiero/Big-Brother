@@ -1,5 +1,6 @@
 #include <bb_utils/bb_benchmark.hpp>
 #include <bb_utils/lapjv.h>
+#define HIDE_DEBUG_MESSAGES
 
 BBBenchmark::BBBenchmark()
 : Node("bb_benchmark"), _tf_buffer(this->get_clock()), _tf_listener(_tf_buffer)
@@ -772,6 +773,7 @@ vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::obj_union(vector<vision_msg
 }
 
 void BBBenchmark::show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, std::string ns){
+  #ifndef HIDE_DEBUG_MESSAGES
   visualization_msgs::msg::MarkerArray msg;
   msg.markers.reserve(objects.size());
   for(unsigned long int i = 0; i<objects.size(); i++){
@@ -791,6 +793,7 @@ void BBBenchmark::show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, 
     msg.markers.push_back(marker);
   }
   _debug_pub->publish(msg);
+  #endif
 }
 
 vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_camera(vector<vision_msgs::msg::BoundingBox3D> objects){

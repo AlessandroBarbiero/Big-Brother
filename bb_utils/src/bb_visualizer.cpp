@@ -18,7 +18,16 @@ BBVisualizer::BBVisualizer()
   "benchmark/stats", 10, std::bind(&BBVisualizer::update_stats, this, _1));
   _strack_sub = this->create_subscription<bb_interfaces::msg::STrackArray>(
   "bytetrack/active_tracks_explicit", 10, std::bind(&BBVisualizer::update_stracks, this, _1));
+  _clicked_point_sub = this->create_subscription<geometry_msgs::msg::PointStamped>(
+  "clicked_point", 10, std::bind(&BBVisualizer::point_clicked, this, _1));
 
+}
+
+void BBVisualizer::point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message){
+  RCLCPP_INFO_STREAM(this->get_logger(), "Clicked point: {" << 
+    cp_message->point.x << "," <<
+    cp_message->point.y << "," <<
+    cp_message->point.z << "}");
 }
 
 // Make the UI compact because there are so many fields

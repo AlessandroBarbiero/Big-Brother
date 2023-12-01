@@ -16,6 +16,7 @@ find_package(rclcpp REQUIRED)
 find_package(OpenCV REQUIRED)
 
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(derived_object_msgs REQUIRED)
 find_package(vision_msgs REQUIRED)
@@ -102,6 +103,7 @@ add_executable(bb_visualizer
 ament_target_dependencies(bb_visualizer 
   rclcpp
   std_msgs
+  geometry_msgs
   bb_interfaces
   )
 # Added for ImGui

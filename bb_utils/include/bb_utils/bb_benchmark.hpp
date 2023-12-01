@@ -30,7 +30,6 @@ class BBBenchmark : public rclcpp::Node
 
     void change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame);
 
-
   private:
     void compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void camera_info_callback(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance);
