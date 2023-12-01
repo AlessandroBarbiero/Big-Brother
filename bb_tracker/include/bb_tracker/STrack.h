@@ -76,20 +76,17 @@ public:
 	
 	int frame_id;
 	// milliseconds
-	int64_t last_filter_update_ms;
 	int tracklet_len;
 	int start_frame;
-
+ 
 	LinearBuffer<geometry_msgs::msg::Point> last_points;
 	visualization_msgs::msg::Marker path_marker;
 	visualization_msgs::msg::Marker text_marker;
 
-	KAL_MEAN mean_predicted;
-	KAL_COVA covariance_predicted;
-	KAL_MEAN mean;
-	KAL_COVA covariance;
-	float score;
-	ClassLabel class_label;
+	KAL_STATE state_predicted;
+	KAL_STATE state_current;
+	KAL_STATE state_past;
+	DETECTION last_detection;
 
 private:
 	byte_kalman::EKF kalman_filter;
@@ -100,6 +97,7 @@ private:
 	// Update internal state of the STrack after a kalman filter update
 	void updateTrackState(KAL_DATA& updated_values, int64_t detection_time_ms, float new_score, ClassLabel new_label, int frame_id, bool reset_tracklet_len = false);
 
-	// Update the confidence of the current class label and apply prior information on dimensions to refine mean
-	void updateClassLabel(ClassLabel new_label, float new_score);
+	// Update the confidence of the current class label and apply prior information on dimensions to refine mean. 
+	// Changes are applied to the passed state
+	void updateClassLabel(KAL_STATE& state, ClassLabel new_label, float new_score);
 };

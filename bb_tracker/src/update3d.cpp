@@ -175,7 +175,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	for (unsigned int i = 0; i < u_track.size(); i++)
 	{
 		STrack *track = r_tracked_stracks[u_track[i]];
-		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms - track->state_current.time_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -207,7 +207,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	for (unsigned int i = 0; i < u_unconfirmed.size(); i++)
 	{
 		STrack *track = unconfirmed[u_unconfirmed[i]];
-		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms - track->state_current.time_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -221,7 +221,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	for (unsigned int i = 0; i < u_detection.size(); i++)
 	{
 		STrack *track = &detections[u_detection[i]];
-		if (track->score < this->high_thresh)
+		if (track->state_current.confidence < this->high_thresh)
 			continue;
 		track->activate3D(this->kalman_filter, this->frame_id);
 		activated_stracks.push_back(*track);
@@ -231,7 +231,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
 		// if (this->frame_id - this->lost_stracks[i].end_frame() > this->track_buffer)  [OLD way with frame_id]
-		if(last_det_time_ms - this->lost_stracks[i].last_filter_update_ms > lost_ttl)
+		if(last_det_time_ms - this->lost_stracks[i].state_current.time_ms > lost_ttl)
 		{
 			this->lost_stracks[i].mark_removed();
 			removed_stracks.push_back(this->lost_stracks[i]);

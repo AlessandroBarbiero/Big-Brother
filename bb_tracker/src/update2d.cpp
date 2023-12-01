@@ -70,7 +70,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < strack_pool_out_image.size(); i++)
 	{
 		STrack *track = strack_pool_out_image[i];
-		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms - track->state_current.time_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -85,7 +85,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < unconfirmed_out_image.size(); i++)
 	{
 		STrack *track = unconfirmed_out_image[i];
-		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms - track->state_current.time_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -164,7 +164,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_track.size(); i++)
 	{
 		STrack *track = r_tracked_stracks[u_track[i]];
-		if (last_det_time_ms - track->last_filter_update_ms > time_to_lost)
+		if (last_det_time_ms - track->state_current.time_ms > time_to_lost)
 		{
 			track->mark_lost();
 			lost_stracks.push_back(*track);
@@ -197,7 +197,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	for (unsigned int i = 0; i < u_unconfirmed.size(); i++)
 	{
 		STrack *track = unconfirmed[u_unconfirmed[i]];
-		if(last_det_time_ms - track->last_filter_update_ms > unconfirmed_ttl){
+		if(last_det_time_ms - track->state_current.time_ms > unconfirmed_ttl){
 			track->mark_removed();
 			removed_stracks.push_back(*track);
 		}
@@ -223,7 +223,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	////////////////// Step 5: Update state //////////////////
 	for (unsigned int i = 0; i < this->lost_stracks.size(); i++)
 	{
-		if(last_det_time_ms - this->lost_stracks[i].last_filter_update_ms > lost_ttl)
+		if(last_det_time_ms - this->lost_stracks[i].state_current.time_ms > lost_ttl)
 		{
 			this->lost_stracks[i].mark_removed();
 			removed_stracks.push_back(this->lost_stracks[i]);

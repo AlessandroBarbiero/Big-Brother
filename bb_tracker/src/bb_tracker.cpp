@@ -657,7 +657,7 @@ void BBTracker::draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_M
   // Took inspiration from "Factorization based structure from motion with object priors" by Paul Gay et al.
   float cx,cy,cz;
 
-  KAL_MEAN state = obj.mean_predicted;
+  KAL_MEAN state = obj.state_predicted.mean;
 
   cx = state(0);
   cy = state(1);
@@ -780,8 +780,8 @@ void BBTracker::publish_stracks(vector<STrack*>& output_stracks){
     poses_message.poses.push_back(single_det.bbox.center);
 
     if(show_covariance)
-      covariance_markers.markers.push_back(drawCovariance( current_track->mean.block<1, 2>(0, 0),
-                                                         current_track->covariance.block<2, 2>(0, 0), 
+      covariance_markers.markers.push_back(drawCovariance( current_track->state_current.mean.block<1, 2>(0, 0),
+                                                         current_track->state_current.covariance.block<2, 2>(0, 0), 
                                                          current_track->track_id, out_message.header));
   }
 
@@ -825,8 +825,8 @@ void BBTracker::convert_into_detections(vector<STrack*>& in_stracks, vision_msgs
     single_det.bbox.size.z =            minwdh[5];
 
     auto hypothesis = vision_msgs::msg::ObjectHypothesisWithPose();
-    hypothesis.id = classLabelString[(int)current_track->class_label];
-    hypothesis.score = current_track->score;
+    hypothesis.id = classLabelString[(int)current_track->state_current.label];
+    hypothesis.score = current_track->state_current.confidence;
     single_det.results.push_back(hypothesis);
 
     out_message->detections.push_back(single_det);
@@ -880,7 +880,7 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
     Scalar s_color = _tracker.get_color(track->track_id);
     initPathMarker(track->path_marker, s_color);
     initTextMarker(track->text_marker, s_color);
-    track->text_marker.text = classLabelString[(int)track->class_label];
+    track->text_marker.text = classLabelString[(int)track->state_current.label];
     track->text_marker.text.append("-").append(::to_string(track->track_id));
   }
   track->last_points.push_back(last_point);
