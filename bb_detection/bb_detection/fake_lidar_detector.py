@@ -145,8 +145,10 @@ class FakeDetector(Node):
                 hypothesis.id = marker.ns.lower()
                 hypothesis.score = 0.9
             else:
-                if marker.scale.x>1.0 or marker.scale.y>1.0:
+                if marker.scale.x>2.5 or marker.scale.y>2.5:
                     hypothesis.id = "car"
+                elif marker.scale.x>1.0 or marker.scale.y>1.0:
+                    hypothesis.id = "motorcycle"
                 else:
                     hypothesis.id = "person"
                 hypothesis.score = 0.8
