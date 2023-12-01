@@ -61,6 +61,7 @@ vector<STrack*> BYTETracker::update(const vector<Object2D>& objects, PROJ_MATRIX
 	////////////////// Step 2.1: Prediction and Projection ////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
+	//cout << "Update2D: predict at time of detection" << endl;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	STrack::multi_project(strack_pool, strack_pool_out_image, P, V, width, height);

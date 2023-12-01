@@ -566,6 +566,7 @@ void BYTETracker::predict_at_current_time(vector<STrack*>& output_stracks, int64
 			current_time_ms = track->last_filter_update_ms;
 	}
 	#endif
+	//cout << "Predict at current time before visualize" << endl;
 	STrack::multi_predict(output_stracks, kalman_filter, current_time_ms);
 }
 

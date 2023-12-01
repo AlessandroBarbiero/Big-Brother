@@ -497,6 +497,7 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     objPtr.push_back(&trackedObj[i]);
   }
   int64_t current_time_ms = detection_msg->header.stamp.sec*MILLIS_IN_SECONDS + detection_msg->header.stamp.nanosec/NANO_IN_MILLIS;
+  //cout << "Predict at time of 2d detection for display on image" << endl;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
   // TODO: delete Fake points to test the draw
@@ -570,6 +571,7 @@ void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSh
   }
   // Predict the position of the objects before drawing them
   int64_t current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
+  //cout << "Test ellipse project prediction" << endl;
   STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
 
   TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);

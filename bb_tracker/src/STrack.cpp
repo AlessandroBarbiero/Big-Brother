@@ -260,8 +260,7 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 	}
 	else{	//Det in Past, update with last detection
 
-		// TODO: check
-		// cout<<"\n-----> A detection in the past happen: " << 
+		// cout<<"\n-----> Update track n " << this->track_id << "with a detection in the past: " << 
 		// 	"\ncurrent\t\t" << state_current.time_ms <<
 		// 	"\npast\t\t" << state_past.time_ms <<
 		// 	"\ndetection\t" << detection_time_ms <<
@@ -270,7 +269,7 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		// 	"\nstate past:\n" << state_past.mean <<
 		// 	"\nstate predict:\n"<< state_predicted.mean <<
 		// 	"\nupdated value (new past value):\n"<< updated_values.first <<
-			// endl;
+		//	endl;
 
 		// 1. Finalize first update with detection in the past
 		state_past.time_ms = detection_time_ms;
@@ -503,7 +502,6 @@ int STrack::end_frame()
 // Predict all the stracks respect to the detection time, if the detection happens before the current time, predict respect to the state saved before the current
 void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_filter, int64_t detection_time_ms)
 {
-	//cout << "Predict" << endl;
 	for (unsigned int i = 0; i < stracks.size(); i++)
 	{
 		double dt;
@@ -516,7 +514,6 @@ void STrack::multi_predict(vector<STrack*> &stracks, byte_kalman::EKF &kalman_fi
 			// Detection in the past, project respect to old detection
 			dt = static_cast<double>(detection_time_ms - stracks[i]->state_past.time_ms)/MILLIS_IN_SECONDS;
 			stracks[i]->state_predicted = stracks[i]->state_past;
-			//TODO: check
 			//cout << "id: "<< stracks[i]->track_id << " - delta t = " << dt << endl;
 		}
 

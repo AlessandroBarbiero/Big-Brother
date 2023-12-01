@@ -104,6 +104,7 @@ vector<STrack*> BYTETracker::update(const vector<Object3D>& objects)
 	////////////////// Step 2.1: Prediction ////////////////////////////////////
 	strack_pool = joint_stracks(tracked_stracks, this->lost_stracks);
 	// Project everything with the last time of detection and then do association
+	//cout << "Update3D: predict at time of detection" << endl;
 	STrack::multi_predict(strack_pool, this->kalman_filter, last_det_time_ms);
 
 	////////////////// Step 2.2: First association, with IoU //////////////////
