@@ -15,7 +15,8 @@ def generate_launch_description():
         parameters=[
             {"show_debug": False},
             {"publish_3d": False},
-            {"publish_2d": True}
+            {"publish_2d": True},
+            {"exclude_border_objects": False}
         ]
     )
 
