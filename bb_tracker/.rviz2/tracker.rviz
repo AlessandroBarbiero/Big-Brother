@@ -9,7 +9,7 @@ Panels:
         - /SensorRange1
         - /SensorRange1/Namespaces1
       Splitter Ratio: 0.5
-    Tree Height: 608
+    Tree Height: 441
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -47,7 +47,7 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 6.5000128746032715
+        Max Value: 6.500003814697266
         Min Value: -0.15000009536743164
         Value: true
       Axis: Z
@@ -241,8 +241,7 @@ Visualization Manager:
       Enabled: true
       Name: SensorRange
       Namespaces:
-        camera_fov: true
-        lidar_range: false
+        {}
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -308,25 +307,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 164.59255981445312
+      Distance: 125.62503051757812
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.1708884239196777
-        Y: 45.427249908447266
-        Z: 10.381163597106934
+        X: -1.208073377609253
+        Y: 53.39227294921875
+        Z: 7.954370021820068
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0797967910766602
+      Pitch: 1.389796495437622
       Target Frame: sensors_home
       Value: Orbit (rviz)
-      Yaw: 2.932858467102051
+      Yaw: 2.897857904434204
     Saved: ~
 Window Geometry:
   DebugCamera:

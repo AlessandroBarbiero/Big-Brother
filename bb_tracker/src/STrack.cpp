@@ -122,14 +122,17 @@ void STrack::activate2D(byte_kalman::EKF &kalman_filter, TRANSFORMATION &V, PROJ
 		xyabt_box[4] = M_PI / 2.0;  // 90°
 	}
 
-	auto mc = this->kalman_filter.initiate2D(xyabt_box, state_current.label, V, P);
+	auto mc = static_cast<byte_kalman::KalmanFilter>(this->kalman_filter).initiate2D(xyabt_box, state_current.label, V, P);
 
 	this->state_current.mean = mc.first;
 	this->state_current.covariance = mc.second;
 	this->theta = state_current.mean[2];
 	this->state_predicted = this->state_current;
 
-	last_detection = {xyabt_box, state_current.label, state_current.confidence};
+	auto sh_P = std::make_shared<PROJ_MATRIX>(P);
+	auto sh_V = std::make_shared<TRANSFORMATION>(V);
+	DETECTION2D det2d = {xyabt_box, sh_V, sh_P};
+	last_detection = {det2d, state_current.label, state_current.confidence};
 
 	// The state has to be updated before the static minwdh in 2D
 	this->state = TrackState::Tracked;
@@ -161,7 +164,8 @@ void STrack::re_activate(Object2D &new_track, int frame_id, bool new_id)
 	}
 
 	if(new_track.time_ms > this->state_current.time_ms){
-		last_detection = {xyabt_box, new_track.label, new_track.prob};
+		DETECTION2D det2d = {xyabt_box, kalman_filter.V, kalman_filter.P};
+		last_detection = {det2d, new_track.label, new_track.prob};
 	}
 
 	auto mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, xyabt_box);
@@ -247,7 +251,7 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		this->tracklet_len++;
 	this->frame_id = frame_id;
 
-	if(detection_time_ms >= state_current.time_ms || !is_activated){ // Det in Future or second detection
+	if(detection_time_ms >= state_current.time_ms){ // Det in Future or second detection
 		state_past = state_current;
 		state_current.time_ms = detection_time_ms;
 		state_current.mean = updated_values.first;
@@ -255,12 +259,10 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		updateClassLabel(state_current, new_label, new_score);
 		state_predicted = state_current;
 		theta = state_current.mean(2);
-		if(!is_activated && detection_time_ms<state_current.time_ms)
-			state_past = state_current; // Delete past state and keep two times the current
 	}
 	else{	//Det in Past, update with last detection
 
-		// cout<<"\n-----> Update track n " << this->track_id << "with a detection in the past: " << 
+		// cout<<"\n-----> Update track n " << this->track_id << " with a detection in the past: " << 
 		// 	"\ncurrent\t\t" << state_current.time_ms <<
 		// 	"\npast\t\t" << state_past.time_ms <<
 		// 	"\ndetection\t" << detection_time_ms <<
@@ -269,8 +271,10 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		// 	"\nstate past:\n" << state_past.mean <<
 		// 	"\nstate predict:\n"<< state_predicted.mean <<
 		// 	"\nupdated value (new past value):\n"<< updated_values.first <<
-		//	endl;
+		// 	"\nlast detection:\n"<< (last_detection.detection.index()==1 ? "2D" : "3D") <<
+		// 	endl;
 
+		assert(is_activated);
 		// 1. Finalize first update with detection in the past
 		state_past.time_ms = detection_time_ms;
 		state_past.mean = updated_values.first;
@@ -284,9 +288,12 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		// 2.2 Update with the last detection based on type (2D/3D)
 		KAL_DATA mc;
 		switch(last_detection.detection.index()){
-			case 1: //2D
-				mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, std::get<DETECTBOX2D>(last_detection.detection));
+			case 1: { //2D
+				DETECTION2D last_det2d = std::get<DETECTION2D>(last_detection.detection);
+				setViewProjection(last_det2d.V, last_det2d.P);
+				mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, last_det2d.detectbox);
 				break;
+			}
 			case 2: //3D
 				mc = this->kalman_filter.update3D(this->state_predicted.mean, this->state_predicted.covariance, std::get<DETECTBOX3D>(last_detection.detection));
 				break;
@@ -303,7 +310,6 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 		// cout<<"state current after updating the updated with the last detection:" << 
 		// 	"\nstate current:\n" << state_current.mean << 
 		// 	"\n" << endl;
-
 	}
 
 	static_minwdh();
@@ -311,6 +317,27 @@ void STrack::updateTrackState(KAL_DATA& updated_values, int64_t detection_time_m
 
 	this->state = TrackState::Tracked;
 	this->is_activated = true;
+}
+
+KAL_DATA STrack::correctFirstOrientation2D(DETECTBOX2D second_detection){
+	double yaw;
+	Eigen::Vector3f second_point;
+	double dx,dy;
+	second_point = projectPoint2D({second_detection[0], second_detection[1]}, state_current.mean(5)/2.0, *this->kalman_filter.V, *this->kalman_filter.P);
+	dx = second_point(0) - state_current.mean(0);
+	dy = second_point(1) - state_current.mean(1);
+
+	yaw = std::atan2(dy, dx);
+	this->state_predicted.mean(2) = yaw;
+
+	// Update the state, this is useful to find the starting velocity
+	auto mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, second_detection);
+
+	mc.first(2) = yaw;
+	mc.first(0) = second_point(0);
+	mc.first(1) = second_point(1);
+
+	return mc;
 }
 
 void STrack::update(Object2D &new_track, int frame_id)
@@ -335,36 +362,48 @@ void STrack::update(Object2D &new_track, int frame_id)
 		xyabt_box[4] = M_PI / 2.0;  // 90°
 	}
 
-	double yaw = 0;
-	Eigen::Vector3f second_point = {0,0,0};
-	// If the object is new, compute the orientation projecting the new position and computing the vector from the old to the new position
-	if(!this->is_activated){
-		double dx,dy;
-		second_point = projectPoint2D({xyabt_box[0], xyabt_box[1]}, state_current.mean(5)/2.0, *this->kalman_filter.V, *this->kalman_filter.P);
-		if(det_in_future){
-			dx = second_point(0) - state_current.mean(0);
-			dy = second_point(1) - state_current.mean(1);
-		}
-		else{
-			dx = state_current.mean(0) - second_point(0);
-			dy = state_current.mean(1) - second_point(1);
-		}
-
-		yaw = std::atan2(dy, dx);
-		this->state_predicted.mean(2) = yaw;
-	}
-
 	if(det_in_future){
-		last_detection = {xyabt_box, new_track.label, new_track.prob};
+		DETECTION2D det2d = {xyabt_box, kalman_filter.V, kalman_filter.P};
+		last_detection = {det2d, new_track.label, new_track.prob};
 	}
 
-	// Update the state, it can be done on the prediction of the past or the current state, previously predicted by multi_predict
-	auto mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, xyabt_box);
-
+	KAL_DATA mc;
 	if(!this->is_activated){
-		mc.first(2) = yaw;
-		mc.first(0) = second_point(0);
-		mc.first(1) = second_point(1);
+		if(det_in_future)
+			mc = correctFirstOrientation2D(xyabt_box);
+		else {
+			// First two detections are t1 > t2, second detection in the past
+			// 1. Initiate a new track with values from the first detection in time
+			auto mc = this->kalman_filter.initiate2D(xyabt_box, new_track.label);
+			this->state_current.confidence = new_track.prob;
+			this->state_current.mean = mc.first;
+			this->state_current.covariance = mc.second;
+			this->theta = state_current.mean[2];
+			
+			// 2. Predict the state at the time of the second detection in time, first received
+			double dt = static_cast<double>(state_current.time_ms - detection_time_ms)/MILLIS_IN_SECONDS;
+			this->state_predicted = this->state_current;
+			kalman_filter.predict(state_predicted.mean, state_predicted.covariance, dt);
+
+			// 3. Update the object exploiting the saved detection
+			switch(last_detection.detection.index()){
+				case 1: { //2D
+					DETECTION2D last_det2d = std::get<DETECTION2D>(last_detection.detection);
+					setViewProjection(last_det2d.V, last_det2d.P);
+					mc = correctFirstOrientation2D(last_det2d.detectbox);
+					break;
+				}
+				case 2: //3D
+					mc = this->kalman_filter.update3D(this->state_predicted.mean, this->state_predicted.covariance, std::get<DETECTBOX3D>(last_detection.detection));
+					break;
+			}
+
+			updateTrackState(mc, state_current.time_ms, last_detection.confidence, last_detection.label, frame_id);
+			return;
+		}
+	} else {
+		// Update the state, it can be done on the prediction of the past or the current state, previously predicted by multi_predict
+		mc = this->kalman_filter.update2D(this->state_predicted.mean, this->state_predicted.covariance, xyabt_box);
 	}
 
 	updateTrackState(mc, detection_time_ms, new_track.prob, new_track.label, frame_id);

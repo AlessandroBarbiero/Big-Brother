@@ -21,8 +21,8 @@ bb_tracker:
          "/carla/sensors_home/static_termic_camera/det2d"
       ]
       detection3d_list: [
-         "bytetrack/detections3d",
-         #"second_topic"
+         #"bytetrack/detections3d",
+         "second_topic"
       ]
       # Tracker Time
       time_to_lost: 1000

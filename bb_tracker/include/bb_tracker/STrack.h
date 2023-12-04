@@ -100,4 +100,9 @@ private:
 	// Update the confidence of the current class label and apply prior information on dimensions to refine mean. 
 	// Changes are applied to the passed state
 	void updateClassLabel(KAL_STATE& state, ClassLabel new_label, float new_score);
+
+	// Corrects the orientation of objects initialied from 2D detections.
+	// Compute the orientation projecting the new position and computing the vector from the old to the new position, 
+	// second detection time has to be higher than the current state, no det in the past
+	KAL_DATA correctFirstOrientation2D(DETECTBOX2D second_detection);
 };

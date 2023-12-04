@@ -3,6 +3,10 @@
 
 namespace byte_kalman
 {
+	KAL_DATA EKF::initiate2D(const DETECTBOX2D& measurement, ClassLabel class_label){
+		return KalmanFilter::initiate2D(measurement, class_label, *V, *P);
+	}
+
 	KAL_MEAN EKF::predictState(KAL_MEAN &mean, double dt){
     	KAL_MEAN predict_mean;
 		// Euler integration

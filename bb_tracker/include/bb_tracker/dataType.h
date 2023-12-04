@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include <variant>
+#include <memory>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -30,14 +31,28 @@ static const std::unordered_map<ClassLabel, Eigen::Vector3f> priorDimensions = {
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+// 2D Projection
+typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> TRANSFORMATION;
+typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
+typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> ELLIPSE_STATE; // [X_center, Y_center, semi_axis_A, semi_axis_B, theta (in radians)]
+
+// Detections
 typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> DETECTBOX2D; // 2D xyab(theta)
+typedef struct det2d {
+    DETECTBOX2D detectbox;
+    std::shared_ptr<TRANSFORMATION> V; 	// View Matrix
+    std::shared_ptr<PROJ_MATRIX> P; 	// Projection Matrix
+} DETECTION2D;
+
 typedef Eigen::Matrix<float, 1, 6, Eigen::RowMajor> DETECTBOX3D; // 3D xy(yaw)aah
-typedef std::variant<std::monostate, DETECTBOX2D, DETECTBOX3D> DETECTBOX;
+typedef std::variant<std::monostate, DETECTION2D, DETECTBOX3D> DETECTBOX;
+
 typedef struct det{
     DETECTBOX detection;
     ClassLabel label;
     float confidence;
 } DETECTION;
+
 typedef Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor> DETECTBOX3DSS;
 typedef Eigen::Matrix<float, 1, 128, Eigen::RowMajor> FEATURE;
 typedef Eigen::Matrix<float, Eigen::Dynamic, 128, Eigen::RowMajor> FEATURESS;
@@ -75,11 +90,6 @@ typedef struct t {
 
 //linear_assignment:
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> DYNAMICM;
-
-// 2D Projection
-typedef Eigen::Matrix<float, 4, 4, Eigen::RowMajor> TRANSFORMATION;
-typedef Eigen::Matrix<float, 3, 4, Eigen::RowMajor> PROJ_MATRIX;
-typedef Eigen::Matrix<float, 1, 5, Eigen::RowMajor> ELLIPSE_STATE; // [X_center, Y_center, semi_axis_A, semi_axis_B, theta (in radians)]
 
 
 

@@ -16,6 +16,8 @@ namespace byte_kalman
 		KAL_HDATA2D project2D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 		KAL_HDATA3D project3D(const KAL_MEAN& mean, const KAL_COVA& covariance);
 
+		KAL_DATA initiate2D(const DETECTBOX2D& measurement, ClassLabel class_label);
+
 		std::shared_ptr<TRANSFORMATION> V; 	// View Matrix
 		std::shared_ptr<PROJ_MATRIX> P; 	// Projection Matrix
 
