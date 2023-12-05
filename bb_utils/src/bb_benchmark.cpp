@@ -27,6 +27,9 @@ BBBenchmark::BBBenchmark()
   auto lidar_max_dist_desc = rcl_interfaces::msg::ParameterDescriptor{};
   lidar_max_dist_desc.description = "List of the max distances for object detected by lidars, respect the order of 'lidar_list'";
 
+  auto selection_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  selection_desc.description = "Set to true if a gt object is currently being tracked and want to publish the relative data";
+
   _cameras = {"cam1"};
   _cameras_max_dist = {0};
 
@@ -36,12 +39,17 @@ BBBenchmark::BBBenchmark()
   this->declare_parameter("fps", 30, fps_desc);
   this->declare_parameter("match_thresh", 0.8, m_thresh_desc);
   this->declare_parameter("fixed_frame", "map", fixed_frame_desc);
+
   this->declare_parameter("show_range", true, s_range_desc);
   this->declare_parameter("alpha_range", 0.1, alpha_range_desc);
+
   this->declare_parameter("camera_list", _cameras, camera_list_desc);
   this->declare_parameter("camera_max_distances", _cameras_max_dist, cameras_max_dist_desc);
+
   this->declare_parameter("lidar_list", _lidars, lidar_list_desc);
   this->declare_parameter("lidar_max_distances", _lidars_max_dist, lidar_max_dist_desc);
+
+  this->declare_parameter("active_selection", false, selection_desc);
 
   _fps =              get_parameter("fps").as_int();
   _match_thresh =     get_parameter("match_thresh").as_double();
@@ -55,7 +63,6 @@ BBBenchmark::BBBenchmark()
 
   rclcpp::QoS qos_transient_local(rclcpp::KeepLast(10));
   qos_transient_local.transient_local();
-
 
   // Add a subscriber for each camera info topic 
   int id = 0;
@@ -88,8 +95,14 @@ BBBenchmark::BBBenchmark()
   _ground_truth_sub = this->create_subscription<visualization_msgs::msg::MarkerArray>(
       "carla/markers", rclcpp::QoS(rclcpp::KeepLast(1)), std::bind(&BBBenchmark::save_gt, this, _1));
 
+  _clicked_point_sub = this->create_subscription<geometry_msgs::msg::PointStamped>(
+    "clicked_point", 10, std::bind(&BBBenchmark::point_clicked, this, _1));
+
+
   _debug_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("benchmark/debug", 10);
   _stats_pub = this->create_publisher<bb_interfaces::msg::Stats>("benchmark/stats", 10);
+  _selected_gt_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/selected_gt", 10);
+  _selected_track_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/selected_track", 10);
 
 
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
@@ -125,18 +138,37 @@ void BBBenchmark::init_lidar_tf(){
   _lidar_ready=true;
 }
 
+bb_bench::ClassLabel get_label(std::string ns, double size_x, double size_y){
+  std::string class_name;
+  class_name = ns;
+    if(class_name.empty()){
+      if (size_x>2.5 || size_y>2.5)
+          class_name = "car";
+      else if (size_x>1.0 || size_y>1.0)
+          class_name = "motorcycle";
+      else
+          class_name = "person";
+    }else{
+      // lowercase string
+      std::transform(class_name.begin(), class_name.end(), class_name.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+    }
+    return bb_bench::class_to_label.at(class_name);
+}
+
 void BBBenchmark::save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg){
   if(msg->markers[0].header.frame_id!=_fixed_frame)
     RCLCPP_WARN(this->get_logger(), "static gt should have the same tf as fixed frame");
 
   _static_objects.reserve(msg->markers.size());
-  _static_objects_id.reserve(msg->markers.size());
+
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
     bbox.size=marker.scale;
-    _static_objects_id.push_back(marker.id);
-    _static_objects.push_back(bbox);
+
+    bb_bench::Object3D obj = {marker.id, bbox, get_label(marker.ns, marker.scale.x, marker.scale.y)};
+    _static_objects.push_back(obj);
   }
 
   RCLCPP_INFO(this->get_logger(), "Static Objects saved!");
@@ -152,18 +184,127 @@ void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerAr
   if(msg.get()==nullptr)
     return;
   _moving_objects_bbox.clear();
-  _moving_objects_id.clear();
   _moving_objects_bbox.reserve(msg->markers.size());
-  _moving_objects_id.reserve(msg->markers.size());
   for(auto marker: msg->markers){
     vision_msgs::msg::BoundingBox3D bbox;
     bbox.center=marker.pose;
     bbox.size=marker.scale;
-    _moving_objects_id.push_back(marker.id);
-    _moving_objects_bbox.push_back(bbox);
+
+    bb_bench::Object3D obj = {marker.id, bbox, get_label(marker.ns, marker.scale.x, marker.scale.y)};
+    _moving_objects_bbox.push_back(obj);
   }
 
   // RCLCPP_INFO_STREAM(this->get_logger(), "Moving Objects saved! " << _moving_objects_bbox.size() << " Objects");
+}
+
+int binarySearch_id(vector<bb_bench::Object3D> &objects, int id) {
+  int high,low,mid;
+  high = objects.size() - 1;
+  low = 0;
+  while (low <= high) {
+    mid = low + (high - low) / 2;
+
+    if (id == objects[mid].id)
+      return mid;
+
+    if (id > objects[mid].id)
+      low = mid + 1;
+
+    if (id < objects[mid].id)
+      high = mid - 1;
+  }
+
+  return -1;
+}
+
+int binarySearch_id(std::vector<vision_msgs::msg::Detection3D> &objects, std::string track_id) {
+  int high,low,mid;
+  high = objects.size() - 1;
+  low = 0;
+  while (low <= high) {
+    mid = low + (high - low) / 2;
+
+    if (track_id == objects[mid].tracking_id)
+      return mid;
+
+    if (track_id > objects[mid].tracking_id)
+      low = mid + 1;
+
+    if (track_id < objects[mid].tracking_id)
+      high = mid - 1;
+  }
+
+  return -1;
+}
+
+void BBBenchmark::publish_selected_obj(std::vector<vision_msgs::msg::Detection3D>& tracked_obj){
+  if(!get_parameter("active_selection").as_bool())
+    return;
+
+  // Find element with id equal to saved and publish
+  std::sort(_all_objects.begin(),_all_objects.end(), [](const bb_bench::Object3D &a, const bb_bench::Object3D &b) {
+    return a.id < b.id;
+    }
+  );
+  int gt_index = binarySearch_id(_all_objects, _selected_gt_id);
+  if(gt_index == -1)
+    return; // No object with the selected index, probably deleted 
+  auto gt_object = _all_objects[gt_index];
+
+  visualization_msgs::msg::Marker marker_gt;
+    marker_gt.header.frame_id = _fixed_frame;
+    marker_gt.header.stamp = tracked_obj[0].header.stamp;
+    marker_gt.ns = bb_bench::classLabelString[static_cast<int>(gt_object.label)];
+    marker_gt.id = gt_index;
+    marker_gt.type = visualization_msgs::msg::Marker::CUBE;
+    marker_gt.action = visualization_msgs::msg::Marker::ADD;
+    marker_gt.lifetime = rclcpp::Duration(0,200*10e6);
+    marker_gt.color.r = 0;
+    marker_gt.color.g = 255;
+    marker_gt.color.b = 255;
+    marker_gt.color.a = 0.9;
+    marker_gt.pose = gt_object.bbox.center;
+    marker_gt.scale = gt_object.bbox.size;
+  _selected_gt_pub->publish(marker_gt);
+  //---------------
+
+  // Find element with track id correspondent and publish
+  auto it = _gt_index_to_track_id.find(_selected_gt_id);
+  if(it == _gt_index_to_track_id.end())
+    return; // No tracked object associated
+
+  std::string track_id = it->second;
+  std::sort(tracked_obj.begin(),tracked_obj.end(), [](const vision_msgs::msg::Detection3D &a, const vision_msgs::msg::Detection3D &b) {
+    return a.tracking_id < b.tracking_id;
+    }
+  );
+  int track_index = binarySearch_id(tracked_obj, track_id);
+  if(track_index == -1)
+    return; // No tracked object with the selected index, probably deleted 
+  auto track_object = tracked_obj[track_index];
+
+  visualization_msgs::msg::Marker marker_track;
+    marker_track.header.frame_id = _fixed_frame;
+    marker_track.header.stamp = track_object.header.stamp;
+    marker_track.ns = "TrackedObject_selected";
+    marker_track.id = 0;
+    marker_track.type = visualization_msgs::msg::Marker::CUBE;
+    marker_track.action = visualization_msgs::msg::Marker::ADD;
+    marker_track.lifetime = rclcpp::Duration(0,200*10e6);
+    marker_track.color.r = 255;
+    marker_track.color.g = 0;
+    marker_track.color.b = 255;
+    marker_track.color.a = 0.9;
+    marker_track.pose = track_object.bbox.center;
+    marker_track.scale = track_object.bbox.size;
+  _selected_track_pub->publish(marker_track);
+
+  static std::string last_track_id = "";
+  if(last_track_id != track_id){
+    RCLCPP_INFO_STREAM(this->get_logger(), "Changed Track id! Tracking object id = " << track_id);
+    last_track_id = track_id;
+  }
+
 }
 
 void BBBenchmark::publish_lidar_range(std::vector<std::string> lidars, std::vector<int64_t> lidars_max_dist)
@@ -193,6 +334,38 @@ visualization_msgs::msg::Marker BBBenchmark::getLidarRangeMarker(std::string fra
   marker.scale.z = range*2;
 
   return marker;
+}
+
+void BBBenchmark::change_frame(std::shared_ptr<geometry_msgs::msg::PointStamped> old_message, std::string& new_frame){
+  std::string old_frame = old_message->header.frame_id;
+  geometry_msgs::msg::TransformStamped tf_result;
+  try {
+    tf_result = _tf_buffer.lookupTransform(new_frame, old_frame, rclcpp::Time(0));
+  } catch (tf2::TransformException& ex) {
+    std::cout << "No transform exists for the given tfs" << std::endl;
+    return;
+  }
+  tf2::Quaternion q(
+    tf_result.transform.rotation.x,
+    tf_result.transform.rotation.y,
+    tf_result.transform.rotation.z,
+    tf_result.transform.rotation.w
+  );
+  tf2::Vector3 p(
+    tf_result.transform.translation.x,
+    tf_result.transform.translation.y,
+    tf_result.transform.translation.z
+  );
+  tf2::Transform transform(q, p);
+
+  tf2::Vector3 v(old_message->point.x, old_message->point.y, old_message->point.z);
+  v = transform * v;
+  old_message->point.x = v.x();
+  old_message->point.y = v.y();
+  old_message->point.z = v.z();
+
+  old_message->header.frame_id = new_frame;
+  return;
 }
 
 void BBBenchmark::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame){
@@ -553,16 +726,16 @@ vector<float> to_minmax(vision_msgs::msg::Detection3D &det){
   return minmax;
 }
 
-vector<vector<float> > BBBenchmark::iou_distance(vector<vision_msgs::msg::BoundingBox3D> &a_bboxs, vector<vision_msgs::msg::Detection3D> &b_bboxs)
+vector<vector<float> > BBBenchmark::iou_distance(vector<bb_bench::Object3D> &a_bboxs, vector<vision_msgs::msg::Detection3D> &b_bboxs)
 {
 	vector<vector<float> > aminmaxs, bminmaxs;
 	for (unsigned int i = 0; i < a_bboxs.size(); i++)
 	{
-		aminmaxs.push_back(to_minmax(a_bboxs[i]));
+		aminmaxs.push_back(to_minmax(a_bboxs[i].bbox));
 	}
 	for (unsigned int i = 0; i < b_bboxs.size(); i++)
 	{
-		bminmaxs.push_back(to_minmax(b_bboxs[i]));
+		bminmaxs.push_back(to_minmax(b_bboxs[i].bbox));
 	}
 
 	vector<vector<float> > _ious = ious(aminmaxs, bminmaxs);
@@ -605,14 +778,15 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   // Convert markers of moving objects in bbox only when it is necessary to compare
   save_gt_bbox(_moving_objects);
   // Put moving and static objects together
-  vector<vision_msgs::msg::BoundingBox3D> all_objects(_static_objects);
-  vector<int> all_objects_id(_static_objects_id);
-  all_objects.insert(all_objects.end(), _moving_objects_bbox.begin(), _moving_objects_bbox.end());
-  all_objects_id.insert(all_objects_id.end(), _moving_objects_id.begin(), _moving_objects_id.end());
+  _all_objects.clear();
+  _all_objects.reserve(_static_objects.size()+_moving_objects_bbox.size());
+  _all_objects.insert(_all_objects.end(), _static_objects.begin(), _static_objects.end());
+  _all_objects.insert(_all_objects.end(), _moving_objects_bbox.begin(), _moving_objects_bbox.end());
+
   // Retrive objects on cameras and lidars
-  vector<vision_msgs::msg::BoundingBox3D> on_camera = filter_camera(all_objects);
-  vector<vision_msgs::msg::BoundingBox3D> on_lidar = filter_lidar(all_objects);
-  vector<vision_msgs::msg::BoundingBox3D> objects_on_sight = obj_union(on_camera, on_lidar);
+  vector<bb_bench::Object3D> on_camera = filter_camera(_all_objects);
+  vector<bb_bench::Object3D> on_lidar = filter_lidar(_all_objects);
+  vector<bb_bench::Object3D> objects_on_sight = obj_union(on_camera, on_lidar);
 
   // RCLCPP_INFO_STREAM(this->get_logger(), "Objects on sight: " << objects_on_sight.size() << " [by Cameras: " << on_camera.size() << " - by Lidars: " << on_lidar.size() << "]");
   
@@ -669,7 +843,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     int gt_index;
     std::string track_id;
     for(size_t i=0; i<match_gt.size(); i++){
-      gt_index = all_objects_id[match_gt[i]];
+      gt_index = objects_on_sight[match_gt[i]].id;
       track_id = tracked_objects->detections[match_track[i]].tracking_id;
       if(_gt_index_to_track_id.count(gt_index) != 0 && _gt_index_to_track_id[gt_index] != track_id)
         _tot_ass_mismatch++;
@@ -677,10 +851,10 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     }
     //------
 
-    vector<vision_msgs::msg::BoundingBox3D> true_positive_gt =    filter_indices(objects_on_sight, match_gt);
+    vector<bb_bench::Object3D> true_positive_gt =                 filter_indices(objects_on_sight, match_gt);
     vector<vision_msgs::msg::Detection3D> true_positive_track =   filter_indices(tracked_objects->detections, match_track);
     vector<vision_msgs::msg::Detection3D> false_positive_det =    filter_indices(tracked_objects->detections, wrong_tracked);
-    vector<vision_msgs::msg::BoundingBox3D> missed_gt =           filter_indices(objects_on_sight, missed_obj);
+    vector<bb_bench::Object3D> missed_gt =                        filter_indices(objects_on_sight, missed_obj);
     show_objects(true_positive_gt, "True Positive");
     show_objects(missed_gt, "Missed Objects");
     
@@ -715,7 +889,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     tot_MOTP = _tot_iou_dist_detections/_tot_true_positive;
   }
 
-  MOTA = 1.0 - static_cast<double>((_tot_missed + _tot_false_positive + _tot_ass_mismatch))/_tot_objects_to_detect;
+  MOTA = 1.0 - static_cast<double>(_tot_missed + _tot_false_positive + _tot_ass_mismatch)/_tot_objects_to_detect;
 
   // RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
   //                                         "\tDetA: " << detA*100 << "%\n" << 
@@ -746,22 +920,91 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
 
   
   _stats_pub->publish(stats_message);
+  publish_selected_obj(tracked_objects->detections);
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 // Custom comparison function for BoundingBoxes
-bool customCompare(const vision_msgs::msg::BoundingBox3D& obj1, const vision_msgs::msg::BoundingBox3D& obj2) {
-    if (obj1.center.position.x != obj2.center.position.x) return obj1.center.position.x < obj2.center.position.x;
-    if (obj1.center.position.y != obj2.center.position.y) return obj1.center.position.y < obj2.center.position.y;
-    return obj1.center.position.z < obj2.center.position.z;
+bool customCompare(const bb_bench::Object3D& obj1, const bb_bench::Object3D& obj2) {
+  if (obj1.bbox.center.position.x != obj2.bbox.center.position.x) return obj1.bbox.center.position.x < obj2.bbox.center.position.x;
+  if (obj1.bbox.center.position.y != obj2.bbox.center.position.y) return obj1.bbox.center.position.y < obj2.bbox.center.position.y;
+  return obj1.bbox.center.position.z < obj2.bbox.center.position.z;
 
 }
 
-vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::obj_union(vector<vision_msgs::msg::BoundingBox3D> list_a, vector<vision_msgs::msg::BoundingBox3D> list_b){
-  vector<vision_msgs::msg::BoundingBox3D> v;
+int binarySearch_nearX(vector<bb_bench::Object3D>& objects, double x_value) {
+  int high,low,mid;
+  high = objects.size() - 1;
+  low = 0;
+  double distance;
+  while (low <= high) {
+    mid = low + (high - low) / 2;
+    distance = x_value - objects[mid].bbox.center.position.x;
+
+    if (std::abs(distance) < 3)
+      return mid;
+
+    if (distance > 0)
+      low = mid + 1;
+
+    if (distance < 0)
+      high = mid - 1;
+  }
+
+  return -1;
+}
+
+double distanceBetweenPoints(geometry_msgs::msg::Point &p1, geometry_msgs::msg::Point &p2) {
+    return sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2) + pow(p2.z - p1.z, 2));
+}
+
+
+void BBBenchmark::point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message){
+  static const float searching_distance = 5.0;
+
+  if(_fixed_frame != cp_message->header.frame_id){
+    change_frame(cp_message, _fixed_frame);
+  }
+
+  geometry_msgs::msg::Point clicked_point = cp_message->point;
+
+  std::sort(_all_objects.begin(),_all_objects.end(), customCompare);
+
+  // Find element with binary search close to the x coordinate 
+  int index = binarySearch_nearX(_all_objects, cp_message->point.x);
+  if(index==-1)
+    return;
+
+  // Search around that point on objects with x within +- 5 meters the one with min distance
+  double min_distance = 1000;
+  _selected_gt_id = _all_objects[index].id;
+  double dist;
+  for(int i=index; i<static_cast<int>(_all_objects.size()) && std::abs(_all_objects[i].bbox.center.position.x - cp_message->point.x) < searching_distance; i++){
+    dist = distanceBetweenPoints(clicked_point, _all_objects[i].bbox.center.position);
+    if(dist < min_distance){
+      min_distance = dist;
+      _selected_gt_id = _all_objects[i].id;
+    }
+  }
+  for(int i=index; i>0 && std::abs(_all_objects[i].bbox.center.position.x - cp_message->point.x) < searching_distance; i--){
+    dist = distanceBetweenPoints(clicked_point, _all_objects[i].bbox.center.position);
+    if(dist < min_distance){
+      min_distance = dist;
+      _selected_gt_id = _all_objects[i].id;
+    }
+  }
+
+  RCLCPP_INFO_STREAM(this->get_logger(), "Start following gt_object number " << _selected_gt_id);
+
+  rclcpp::Parameter param("active_selection", true);
+  this->set_parameter(param);
+}
+
+vector<bb_bench::Object3D> BBBenchmark::obj_union(vector<bb_bench::Object3D>& list_a, vector<bb_bench::Object3D>& list_b){
+  vector<bb_bench::Object3D> v;
   v.resize(list_a.size() + list_b.size());
-  std::vector<vision_msgs::msg::BoundingBox3D>::iterator it;
+  std::vector<bb_bench::Object3D>::iterator it;
 
   std::sort(list_a.begin(),list_a.end(), customCompare);
   std::sort(list_b.begin(),list_b.end(), customCompare);
@@ -772,7 +1015,7 @@ vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::obj_union(vector<vision_msg
   return v;
 }
 
-void BBBenchmark::show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, std::string ns){
+void BBBenchmark::show_objects(vector<bb_bench::Object3D> objects, std::string ns){
   #ifndef HIDE_DEBUG_MESSAGES
   visualization_msgs::msg::MarkerArray msg;
   msg.markers.reserve(objects.size());
@@ -788,20 +1031,20 @@ void BBBenchmark::show_objects(vector<vision_msgs::msg::BoundingBox3D> objects, 
     marker.color.g = 255;
     marker.color.b = 0;
     marker.color.a = 1.0;
-    marker.pose = objects[i].center;
-    marker.scale = objects[i].size;
+    marker.pose = objects[i].bbox.center;
+    marker.scale = objects[i].bbox.size;
     msg.markers.push_back(marker);
   }
   _debug_pub->publish(msg);
   #endif
 }
 
-vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_camera(vector<vision_msgs::msg::BoundingBox3D> objects){
-  vector<vision_msgs::msg::BoundingBox3D> on_camera;
+vector<bb_bench::Object3D> BBBenchmark::filter_camera(vector<bb_bench::Object3D>& objects){
+  vector<bb_bench::Object3D> on_camera;
   for(unsigned long int j=0; j<objects.size(); j++){
-    tf2::Vector3 v_origin( objects[j].center.position.x,
-                    objects[j].center.position.y, 
-                    objects[j].center.position.z);
+    tf2::Vector3 v_origin( objects[j].bbox.center.position.x,
+                    objects[j].bbox.center.position.y, 
+                    objects[j].bbox.center.position.z);
 
     for(unsigned long int id=0; id<_camera_models.size(); id++){
       if(_camera_models[id].initialized()){
@@ -828,16 +1071,16 @@ vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_camera(vector<vision
   return on_camera;
 }
 
-vector<vision_msgs::msg::BoundingBox3D> BBBenchmark::filter_lidar(vector<vision_msgs::msg::BoundingBox3D> objects){
-  vector<vision_msgs::msg::BoundingBox3D> on_lidar;
+vector<bb_bench::Object3D> BBBenchmark::filter_lidar(vector<bb_bench::Object3D>& objects){
+  vector<bb_bench::Object3D> on_lidar;
   if(!_lidar_ready){
     init_lidar_tf();
   }
 
   for(unsigned long int j=0; j<objects.size(); j++){
-    tf2::Vector3 v_origin( objects[j].center.position.x,
-                    objects[j].center.position.y, 
-                    objects[j].center.position.z);
+    tf2::Vector3 v_origin( objects[j].bbox.center.position.x,
+                    objects[j].bbox.center.position.y, 
+                    objects[j].bbox.center.position.z);
     for(unsigned long int id=0; id<_lidars.size(); id++){
       // Move the point in the tf of the lidar
       tf2::Vector3 v = _tf2_transform_lidar[id] * v_origin;

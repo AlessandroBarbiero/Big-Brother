@@ -100,6 +100,7 @@ class BBVisualizer : public rclcpp::Node
 
     // Set to true to enable the demo window to take inspiration for useful ImGui visualizations
     bool demo = false;
+    bool show_button_stop_follow = false;
 
     std::string _data_file = "stats.txt";
     bool _saved_data = false;

@@ -24,10 +24,7 @@ BBVisualizer::BBVisualizer()
 }
 
 void BBVisualizer::point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message){
-  RCLCPP_INFO_STREAM(this->get_logger(), "Clicked point: {" << 
-    cp_message->point.x << "," <<
-    cp_message->point.y << "," <<
-    cp_message->point.z << "}");
+  show_button_stop_follow = true;
 }
 
 // Make the UI compact because there are so many fields
@@ -160,6 +157,13 @@ void BBVisualizer::setParameters(){
   ImGui::SameLine();
   if(ImGui::Button("Hide 3D det")){
     setROSParameter("fake_lidar_detector", "active", false);
+  }
+
+  if(show_button_stop_follow){
+    if(ImGui::Button("Stop follow")){
+      setROSParameter("bb_benchmark", "active_selection", false);
+      show_button_stop_follow = false;
+    }
   }
 
   ImGui::End();
