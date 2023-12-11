@@ -426,10 +426,10 @@ void BBVisualizer::visualizeFocus(){
       size_y_gt.AddPoint(     t, _focus_gt->scale.y);
       size_z_gt.AddPoint(     t, _focus_gt->scale.z);
 
-      float time_elapsed_gt = (t - x_gt.getSecondLast().x);
-      float distance_gt = sqrt(pow(_focus_gt->pose.position.x - last_focus_gt->pose.position.x, 2) + pow(_focus_gt->pose.position.y - last_focus_gt->pose.position.y, 2));
+      float time_elapsed_gt = (t - x_gt.getNegativeIndex(-3).x);
+      float distance_gt = sqrt(pow(_focus_gt->pose.position.x - x_gt.getNegativeIndex(-3).y, 2) + pow(_focus_gt->pose.position.y - y_gt.getNegativeIndex(-3).y, 2));
       float v = distance_gt / time_elapsed_gt;
-      float w = (theta_gt.getLast().y - theta_gt.getSecondLast().y) / time_elapsed_gt;
+      float w = (theta_gt.getLast().y - theta_gt.getNegativeIndex(-3).y) / time_elapsed_gt;
 
       if(v != 0)
         v_gt.AddPoint(     t, v);
@@ -478,8 +478,8 @@ void BBVisualizer::visualizeFocus(){
     plotComparison(size_x_gt, size_x_track, "Size_X", t, history, 2);
     plotComparison(size_y_gt, size_y_track, "Size_Y", t, history, 2);
     plotComparison(size_z_gt, size_z_track, "Size_Z", t, history, 2);
-    plotComparison(v_gt, v_track, "V", t, history, 50, false);
-    plotComparison(w_gt, w_track, "Omega", t, history, 50, false);
+    plotComparison(v_gt, v_track, "V", t, history, 40, false);
+    plotComparison(w_gt, w_track, "Omega", t, history, 40, false);
 
     ImPlot::EndSubplots();
   }

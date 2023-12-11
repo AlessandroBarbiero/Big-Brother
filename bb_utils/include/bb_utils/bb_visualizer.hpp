@@ -79,7 +79,7 @@ struct ScrollingBuffer {
         if(i>=0 || Data.size() <= -i)
             return ImVec2(0,0);
         int difference = Offset + i;
-        if (difference <= 0)
+        if (difference < 0)
             return Data[Data.size() + difference];
 
         return Data[difference];
