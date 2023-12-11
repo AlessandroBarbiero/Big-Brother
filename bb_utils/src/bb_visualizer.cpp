@@ -453,7 +453,7 @@ void BBVisualizer::visualizeFocus(){
       for(auto track : _last_track_msg.tracks){
         if(track.track_id == static_cast<int64_t>(_focus_track->id)){
           v = track.mean[6];
-          w = track.mean[7];
+          w = track.mean[7] * 180.0 / M_PI;
           break;
         }
       }
