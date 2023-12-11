@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iomanip>
 #include <unordered_map>
+#include <X11/Xlib.h>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -16,6 +17,8 @@
 #include "bb_interfaces/msg/stats.hpp"
 #include "bb_interfaces/msg/s_track_array.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include <visualization_msgs/msg/marker.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "imgui_framework.hpp"
 #include "imgui.h"
@@ -49,6 +52,38 @@ struct ScrollingBuffer {
             Offset  = 0;
         }
     }
+
+    ImVec2 getLast(){
+        if (Data.size() == 0)
+            return ImVec2(0,0);
+        if (Offset == 0)
+            return Data[Data.size() - 1];
+
+        return Data[Offset-1];
+    }
+
+    ImVec2 getSecondLast(){
+        if (Data.size() == 0)
+            return ImVec2(0,0);
+        if (Data.size() == 1)
+            return getLast();
+        if (Offset == 0)
+            return Data[Data.size() - 2];
+        if (Offset == 1)
+            return Data[Data.size() - 1];
+
+        return Data[Offset-2];
+    }
+
+    ImVec2 getNegativeIndex(int i){
+        if(i>=0 || Data.size() <= -i)
+            return ImVec2(0,0);
+        int difference = Offset + i;
+        if (difference <= 0)
+            return Data[Data.size() + difference];
+
+        return Data[difference];
+    }
 };
 }
 
@@ -79,12 +114,16 @@ class BBVisualizer : public rclcpp::Node
 
     void update_stats(std::shared_ptr<bb_interfaces::msg::Stats> stats_message);
     void update_stracks(std::shared_ptr<bb_interfaces::msg::STrackArray> strack_message);
+    void update_gt(std::shared_ptr<visualization_msgs::msg::Marker> marker);
+    void update_track(std::shared_ptr<visualization_msgs::msg::Marker> marker);
+
     void point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message);
 
     void update_imgui();
 
     void visualizeTracks();
     void visualizeStats();
+    void visualizeFocus();
     void writeStats();
     void plotHistory();
     void plotPieGraphs(int dim);
@@ -100,7 +139,6 @@ class BBVisualizer : public rclcpp::Node
 
     // Set to true to enable the demo window to take inspiration for useful ImGui visualizations
     bool demo = false;
-    bool show_button_stop_follow = false;
 
     std::string _data_file = "stats.txt";
     bool _saved_data = false;
@@ -111,6 +149,11 @@ class BBVisualizer : public rclcpp::Node
     // rclcpp::Publisher<bb_interfaces::msg::Message>::SharedPtr publisher_;
     // rclcpp::Service<bb_interfaces::srv::ChangeMessage>::SharedPtr srv_;
 
+    // %%%%%%%%% Focus
+    bool _focus_activated = false;
+    std::shared_ptr<visualization_msgs::msg::Marker> _focus_gt;
+    std::shared_ptr<visualization_msgs::msg::Marker> _focus_track;
+
     // %%%%%%%%% STrack
     bb_interfaces::msg::STrackArray _last_track_msg;
 
@@ -120,9 +163,15 @@ class BBVisualizer : public rclcpp::Node
     double _detA, _locA, _MOTP, _tot_detA, _tot_locA, _tot_MOTP, _MOTA;
     std::map<std::string, std::string> _statistics_map;
 
+    //-----------------
+
     rclcpp::TimerBase::SharedPtr imgui_timer_;
 
+    // %%%%%%%%% Subscribers
     rclcpp::Subscription<bb_interfaces::msg::Stats>::SharedPtr _stats_sub;
     rclcpp::Subscription<bb_interfaces::msg::STrackArray>::SharedPtr _strack_sub;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr _clicked_point_sub;
+
+    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr _focus_track_sub;
+    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr _focus_gt_sub;
 };

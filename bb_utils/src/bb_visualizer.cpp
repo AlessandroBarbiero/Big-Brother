@@ -7,7 +7,22 @@ bool CompareWithSortSpecs(const bb_interfaces::msg::STrack& a, const bb_interfac
 BBVisualizer::BBVisualizer()
 : Node("bb_visualizer")
 {
-  ImGUI_f::init(1280, 720, "bb_visualizer");
+  int width = 1280;
+  int height = 720;
+  Display* display = XOpenDisplay(nullptr);
+    if (display) {
+        Screen* screen = DefaultScreenOfDisplay(display);
+        if (screen) {
+            width = screen->width;
+            height = screen->height;
+        } else {
+            std::cerr << "Failed to get the default screen. Open a smaller visualizer" << std::endl;
+        }
+        XCloseDisplay(display);
+    } else {
+        std::cerr << "Failed to open X display. Open a smaller visualizer" << std::endl;
+    }
+  ImGUI_f::init(width, height, "bb_visualizer");
   ImGUI_f::uploadFonts();
 
   imgui_timer_ = this->create_wall_timer(
@@ -21,10 +36,23 @@ BBVisualizer::BBVisualizer()
   _clicked_point_sub = this->create_subscription<geometry_msgs::msg::PointStamped>(
   "clicked_point", 10, std::bind(&BBVisualizer::point_clicked, this, _1));
 
+  _focus_gt_sub = this->create_subscription<visualization_msgs::msg::Marker>(
+  "benchmark/selected_gt", 10, std::bind(&BBVisualizer::update_gt, this, _1));
+  _focus_track_sub = this->create_subscription<visualization_msgs::msg::Marker>(
+  "benchmark/selected_track", 10, std::bind(&BBVisualizer::update_track, this, _1));
+
+}
+
+void BBVisualizer::update_gt(std::shared_ptr<visualization_msgs::msg::Marker> marker){
+  _focus_gt = marker;
+}
+
+void BBVisualizer::update_track(std::shared_ptr<visualization_msgs::msg::Marker> marker){
+  _focus_track = marker;
 }
 
 void BBVisualizer::point_clicked(std::shared_ptr<geometry_msgs::msg::PointStamped> cp_message){
-  show_button_stop_follow = true;
+  _focus_activated = true;
 }
 
 // Make the UI compact because there are so many fields
@@ -105,6 +133,8 @@ void BBVisualizer::update_imgui(){
 
   visualizeStats();
   visualizeTracks();
+  if(_focus_activated && _focus_gt)
+    visualizeFocus();
   setParameters();
 
   ImGui::Begin("Framerate", NULL, window_flags);
@@ -159,10 +189,10 @@ void BBVisualizer::setParameters(){
     setROSParameter("fake_lidar_detector", "active", false);
   }
 
-  if(show_button_stop_follow){
+  if(_focus_activated){
     if(ImGui::Button("Stop follow")){
       setROSParameter("bb_benchmark", "active_selection", false);
-      show_button_stop_follow = false;
+      _focus_activated = false;
     }
   }
 
@@ -320,6 +350,159 @@ void BBVisualizer::visualizeStats(){
 
   if (ImGui::Button("Show previously saved data")){
     openDataFile();
+  }
+
+  ImGui::End();
+}
+
+// Keep angle within [-PI , PI]
+inline void normalizeAngle(float& angle){
+	angle = fmod(angle + M_PI, 2*M_PI) - M_PI;
+}
+
+float getYawFromQuat(geometry_msgs::msg::Quaternion& quat){
+	tf2::Quaternion q(
+        quat.x,
+        quat.y,
+        quat.z,
+        quat.w);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw_d;
+    m.getRPY(roll, pitch, yaw_d, 2);
+	float yaw = yaw_d;
+	// Keep yaw within [-PI , PI]
+	normalizeAngle(yaw);
+	return yaw * 180.0 / M_PI;
+}
+
+void plotComparison(ImPlot::ScrollingBuffer& gt, ImPlot::ScrollingBuffer& track, std::string name, float t, float history, double zoom_around = -1, bool follow_gt = true){
+  static ImPlotAxisFlags flags = ImPlotAxisFlags_AutoFit;
+    if (ImPlot::BeginPlot(("##"+name).c_str(), ImVec2(-1,-1))) {
+        ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoDecorations, flags);
+        ImPlot::SetupAxisLimits(ImAxis_X1,t - history, t, ImGuiCond_Always);
+        if (zoom_around >0){
+          if (follow_gt)
+            ImPlot::SetupAxisLimits(ImAxis_Y1, gt.getLast().y - zoom_around, gt.getLast().y + zoom_around, ImGuiCond_Always);
+          else
+            ImPlot::SetupAxisLimits(ImAxis_Y1, - zoom_around, zoom_around, ImGuiCond_Always);
+        }
+
+        if(gt.Data.size()>0)
+        ImPlot::PlotLine((name+" GT").c_str(), &gt.Data[0].x, &gt.Data[0].y, gt.Data.size(), 0, gt.Offset, 2*sizeof(float));
+        if(track.Data.size()>0)
+          ImPlot::PlotLine((name+" Track").c_str(), &track.Data[0].x, &track.Data[0].y, track.Data.size(), 0, track.Offset, 2*sizeof(float));
+        ImPlot::EndPlot();
+    }
+}
+
+void BBVisualizer::visualizeFocus(){
+  static std::shared_ptr<visualization_msgs::msg::Marker> last_focus_gt = _focus_gt;
+  static std::shared_ptr<visualization_msgs::msg::Marker> last_focus_track = _focus_track;
+  static bool freeze = false;
+
+  ImGuiWindowFlags window_flags = 0;
+  window_flags |= ImGuiWindowFlags_NoDocking;
+  ImGui::Begin("Focus", NULL, window_flags);
+
+  static ImPlot::ScrollingBuffer x_gt, x_track;
+  static ImPlot::ScrollingBuffer y_gt, y_track;
+  static ImPlot::ScrollingBuffer theta_gt, theta_track;
+  static ImPlot::ScrollingBuffer size_x_gt, size_x_track;
+  static ImPlot::ScrollingBuffer size_y_gt, size_y_track;
+  static ImPlot::ScrollingBuffer size_z_gt, size_z_track;
+
+  static ImPlot::ScrollingBuffer v_gt, v_track;
+  static ImPlot::ScrollingBuffer w_gt, w_track;
+
+  static float t = 0;
+  if(!freeze){
+    t += ImGui::GetIO().DeltaTime;
+
+    if(last_focus_gt != _focus_gt){
+      x_gt.AddPoint(          t, _focus_gt->pose.position.x);
+      y_gt.AddPoint(          t, _focus_gt->pose.position.y);
+      theta_gt.AddPoint(      t, getYawFromQuat(_focus_gt->pose.orientation));
+      size_x_gt.AddPoint(     t, _focus_gt->scale.x);
+      size_y_gt.AddPoint(     t, _focus_gt->scale.y);
+      size_z_gt.AddPoint(     t, _focus_gt->scale.z);
+
+      float time_elapsed_gt = (t - x_gt.getSecondLast().x);
+      float distance_gt = sqrt(pow(_focus_gt->pose.position.x - last_focus_gt->pose.position.x, 2) + pow(_focus_gt->pose.position.y - last_focus_gt->pose.position.y, 2));
+      float v = distance_gt / time_elapsed_gt;
+      float w = (theta_gt.getLast().y - theta_gt.getSecondLast().y) / time_elapsed_gt;
+
+      if(v != 0)
+        v_gt.AddPoint(     t, v);
+      if (w != 0)
+        w_gt.AddPoint(     t, w);
+
+      last_focus_gt = _focus_gt;
+    }
+
+
+    if(_focus_track && last_focus_track != _focus_track){
+      x_track.AddPoint(       t, _focus_track->pose.position.x);
+      y_track.AddPoint(       t, _focus_track->pose.position.y);
+      theta_track.AddPoint(   t, getYawFromQuat(_focus_track->pose.orientation));
+      size_x_track.AddPoint(  t, _focus_track->scale.x);
+      size_y_track.AddPoint(  t, _focus_track->scale.y);
+      size_z_track.AddPoint(  t, _focus_track->scale.z);
+
+      float v = 0;
+      float w = 0;
+      for(auto track : _last_track_msg.tracks){
+        if(track.track_id == static_cast<int64_t>(_focus_track->id)){
+          v = track.mean[6];
+          w = track.mean[7];
+          break;
+        }
+      }
+      v_track.AddPoint(     t, v);
+      w_track.AddPoint(     t, w);
+
+      last_focus_track = _focus_track;
+    }
+  }
+
+  static float history = 15.0f;
+  ImGui::SliderFloat("History",&history,1,30,"%.1f s");
+
+  static ImPlotSubplotFlags s_flags = ImPlotSubplotFlags_None;
+  
+  static float rratios[] = {1,1,1,1,1,1,1,1};
+  static float cratios[] = {1,1,1,1,1,1,1,1};
+  if (ImPlot::BeginSubplots("Comparing GT and Track", 4, 2, ImVec2(-1,-1), s_flags, rratios, cratios)) {
+    plotComparison(x_gt, x_track, "X", t, history);
+    plotComparison(y_gt, y_track, "Y", t, history);
+    plotComparison(theta_gt, theta_track, "Theta", t, history, 180, false);
+    plotComparison(size_x_gt, size_x_track, "Size_X", t, history, 2);
+    plotComparison(size_y_gt, size_y_track, "Size_Y", t, history, 2);
+    plotComparison(size_z_gt, size_z_track, "Size_Z", t, history, 2);
+    plotComparison(v_gt, v_track, "V", t, history, 50, false);
+    plotComparison(w_gt, w_track, "Omega", t, history, 50, false);
+
+    ImPlot::EndSubplots();
+  }
+
+  ImGui::Text("GT: {%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f}", x_gt.getLast().y, y_gt.getLast().y, 
+    theta_gt.getLast().y, size_x_gt.getLast().y, size_y_gt.getLast().y, size_z_gt.getLast().y, v_gt.getLast().y, w_gt.getLast().y);
+  ImGui::Text("Track: {%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f}", 
+    x_track.getLast().y, y_track.getLast().y, theta_track.getLast().y, size_x_track.getLast().y, 
+    size_y_track.getLast().y, size_z_track.getLast().y, v_track.getLast().y, w_track.getLast().y);
+  
+  if(_focus_track){
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "\tID: %d", _focus_track->id);
+  }
+
+  if(freeze){
+    if(ImGui::Button("Start")){
+      freeze = false;
+    }
+  }else{
+    if(ImGui::Button("Freeze")){
+      freeze = true;
+    }
   }
 
   ImGui::End();

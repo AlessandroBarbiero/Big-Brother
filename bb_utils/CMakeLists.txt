@@ -104,6 +104,8 @@ ament_target_dependencies(bb_visualizer
   rclcpp
   std_msgs
   geometry_msgs
+  visualization_msgs
+  tf2_geometry_msgs
   bb_interfaces
   )
 # Added for ImGui

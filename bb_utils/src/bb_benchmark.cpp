@@ -287,7 +287,7 @@ void BBBenchmark::publish_selected_obj(std::vector<vision_msgs::msg::Detection3D
     marker_track.header.frame_id = _fixed_frame;
     marker_track.header.stamp = track_object.header.stamp;
     marker_track.ns = "TrackedObject_selected";
-    marker_track.id = 0;
+    marker_track.id = atoi(track_id.c_str());
     marker_track.type = visualization_msgs::msg::Marker::CUBE;
     marker_track.action = visualization_msgs::msg::Marker::ADD;
     marker_track.lifetime = rclcpp::Duration(0,200*10e6);
