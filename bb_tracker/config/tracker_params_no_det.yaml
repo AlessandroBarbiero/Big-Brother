@@ -2,7 +2,7 @@ bb_tracker:
    ros__parameters:
       fixed_frame: sensors_home
       # Visualization
-      show_img_projection: true
+      show_img_projection: false
       show_covariance: false
       points_per_track: 100
       # Detection

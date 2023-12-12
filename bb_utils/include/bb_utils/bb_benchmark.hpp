@@ -3,6 +3,8 @@
 #include <vector>
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <iostream>
 // ROS2
 #include <rclcpp/rclcpp.hpp>
 #include <tf2/transform_datatypes.h>
@@ -23,6 +25,8 @@
 
 #include <bb_utils/benchmark_data_type.hpp>
 
+#define NANOSEC_IN_SEC 1000000000
+
 using std::placeholders::_1;
 using namespace std;
 
@@ -32,6 +36,7 @@ class BBBenchmark : public rclcpp::Node
 {
   public:
     BBBenchmark();
+    ~BBBenchmark();
 
     void change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArray> old_message, std::string& new_frame);
     void change_frame(std::shared_ptr<geometry_msgs::msg::PointStamped> old_message, std::string& new_frame);
@@ -77,6 +82,11 @@ class BBBenchmark : public rclcpp::Node
     int _tot_ass_mismatch = 0;
     float _tot_iou_detections = 0, _tot_iou_dist_detections = 0;
 
+    // %%%%%% CSV-FILE
+    std::string _gt_file_name = "data/gt.csv";
+    std::string _track_file_name = "data/track.csv";
+    std::ofstream _gt_file;
+    std::ofstream _track_file; 
 
     // %%%%%% ASSOCIATION
     std::map<int,std::string>_gt_index_to_track_id;

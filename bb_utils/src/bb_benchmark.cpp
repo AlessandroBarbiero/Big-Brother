@@ -104,9 +104,22 @@ BBBenchmark::BBBenchmark()
   _selected_gt_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/selected_gt", 10);
   _selected_track_pub = this->create_publisher<visualization_msgs::msg::Marker>("benchmark/selected_track", 10);
 
+  _gt_file.open(_gt_file_name, std::ios_base::out | std::ios::trunc);
+  if (!_gt_file.is_open()) {
+    std::cerr << "Unable to open file " << _gt_file_name << " for appending!" << std::endl;
+  }
+  _track_file.open(_track_file_name, std::ios_base::out | std::ios::trunc);
+  if (!_track_file.is_open()) {
+    std::cerr << "Unable to open file " << _track_file_name << " for appending!" << std::endl;
+  }
 
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
 
+}
+
+BBBenchmark::~BBBenchmark(){
+  _gt_file.close();
+  _track_file.close();
 }
 
 void BBBenchmark::init_lidar_tf(){
@@ -167,7 +180,7 @@ void BBBenchmark::save_static_gt(std::shared_ptr<visualization_msgs::msg::Marker
     bbox.center=marker.pose;
     bbox.size=marker.scale;
 
-    bb_bench::Object3D obj = {marker.id, bbox, get_label(marker.ns, marker.scale.x, marker.scale.y)};
+    bb_bench::Object3D obj = {marker.id, get_label(marker.ns, marker.scale.x, marker.scale.y), bbox};
     _static_objects.push_back(obj);
   }
 
@@ -190,7 +203,7 @@ void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerAr
     bbox.center=marker.pose;
     bbox.size=marker.scale;
 
-    bb_bench::Object3D obj = {marker.id, bbox, get_label(marker.ns, marker.scale.x, marker.scale.y)};
+    bb_bench::Object3D obj = {marker.id, get_label(marker.ns, marker.scale.x, marker.scale.y), bbox};
     _moving_objects_bbox.push_back(obj);
   }
 
@@ -768,8 +781,6 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 
 // %%%%%%%%%%%%%%%%%% main part %%%%%%%%%%%%%%%
 
-// TODO: add save all data to file csv that saves all tracked objects and ground truth
-
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
   int objects_to_detect, false_positive, true_positive, missed;
@@ -794,6 +805,22 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   show_objects(on_lidar, "Objects_on_lidar");
   show_objects(objects_on_sight, "Objects_in_sensor_range");
   objects_to_detect = objects_on_sight.size();
+
+  _gt_file << "t-" << tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC << std::endl;
+  _track_file << "t-" << tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC << std::endl;
+  for(auto obj : objects_on_sight){
+    _gt_file << obj.toCSV() << std::endl;
+  }
+
+
+  for(auto det : tracked_objects->detections){
+    std::string class_name = det.results[0].id;
+    std::transform(class_name.begin(), class_name.end(), class_name.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+
+    bb_bench::Object3D temp = {atoi(det.tracking_id.c_str()), bb_bench::class_to_label.at(class_name), det.bbox};
+    _track_file << temp.toCSV() << std::endl;
+  }
 
   //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
   // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
