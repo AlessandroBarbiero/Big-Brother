@@ -1,6 +1,7 @@
 # ROS
 import rclpy
 from rclpy.node import Node
+from rclpy.publisher import Publisher
 from message_filters import TimeSynchronizer, Subscriber
 from rcl_interfaces.msg import SetParametersResult
 from image_geometry import PinholeCameraModel
@@ -23,6 +24,7 @@ import cv2 # OpenCV library
 import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
+from functools import partial
 # My scripts
 from .utility import *
 
@@ -49,7 +51,9 @@ class YoloDetector(Node):
                 ('publish_2d', True),
                 ('publish_3d', True),
                 ('confidence_threshold', 0.5),
-                ('iou_nms', 0.35)
+                ('iou_nms', 0.35),
+                ('multi_topics', False),
+                ('image_topic_list', ['topic1', 'topic2']),
             ]
         )
         self.add_on_set_parameters_callback(self.parameter_callback)
@@ -67,25 +71,55 @@ class YoloDetector(Node):
                         'truck': 2.0}
         
         publish_3d = self.get_parameter('publish_3d').value
+        multi_topics = self.get_parameter('multi_topics').value
+        if publish_3d and multi_topics:
+            self.get_logger().info("Cannot publish 3D detections with multiple topics")
+            self.destroy_node()
+            raise RuntimeError("Cannot publish 3D detections with multiple topics")
+        
+        if multi_topics:
+            image_topic_list = self.get_parameter('image_topic_list').value
+            self._sub_list = []
+            self._pub_list = []
+            for topic in image_topic_list:
+                self.get_logger().info("Working with {}".format(topic))
 
-        sub1 = Subscriber(self, Image, "to_detect")
-        sub2 = Subscriber(self, CameraInfo, "camera_info")
+                parts = topic.split('/')
+                # Take all parts except the last one and add det2d
+                det_topic = '/'.join(parts[:-1])
+                det_topic += "/det2d"
 
-        if publish_3d:
-            sub3 = Subscriber(self, Image, "depth")
-            self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
-            self._tss.registerCallback(self.detect_objects)
+                self.get_logger().info("Publish on {}".format(det_topic))
 
-            self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+                pub2d = self.create_publisher(Detection2DArray, det_topic, 10)
+                self._pub_list.append(pub2d)
 
-            self.tf_buffer = Buffer()
-            self.tf_listener = TransformListener(self.tf_buffer, self)
+                cb_func = partial(self.detect_objects2D, publisher=pub2d)
+
+                sub_img = self.create_subscription(Image, topic, cb_func, 10)
+                self._sub_list.append(sub_img)
+
+
         else:
-            self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
-            self._tss.registerCallback(self.detect_objects2D)
 
-        self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
+            self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
 
+            if publish_3d:
+                sub1 = Subscriber(self, Image, "to_detect")
+                sub2 = Subscriber(self, CameraInfo, "camera_info")
+                sub3 = Subscriber(self, Image, "depth")
+                self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
+                self._tss.registerCallback(self.detect_objects)
+
+                self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+
+                self.tf_buffer = Buffer()
+                self.tf_listener = TransformListener(self.tf_buffer, self)
+            else:
+                cb_func = partial(self.detect_objects2D, publisher=self._pub2d)
+                self._sub_img = self.create_subscription(Image, "to_detect", cb_func, 10)
+
+        
 
         # Load a pretrained YOLO model
         self.yolo = YOLO('yolov8m.pt')
@@ -109,7 +143,7 @@ class YoloDetector(Node):
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
         
-    def detect_objects2D(self, data: Image, camera_info: CameraInfo):
+    def detect_objects2D(self, data: Image, publisher: Publisher):
         """
         Callback function, it is called everytime an image is published on the given topic. It calls the yolo predict and publishes the bounding boxes 2D,
         It can also show the debug image if the parameter is set
@@ -201,11 +235,11 @@ class YoloDetector(Node):
 
         # publish detections
         if(publish_2d):
-            self._pub2d.publish(detections2d_msg)
+            publisher.publish(detections2d_msg)
 
         if(self.get_parameter('show_debug').value):
             # Display image
-            cv2.imshow("Detection", cv_image)
+            cv2.imshow(publisher.topic, cv_image)
             cv2.waitKey(1)
 
 
@@ -376,7 +410,7 @@ def main(args=None):
     yolo_detector = YoloDetector()
 
     #rclpy.spin(yolo_detector)
-
+    
     try:
         rclpy.spin(yolo_detector)
     except:
@@ -384,9 +418,8 @@ def main(args=None):
 
 
     # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
     yolo_detector.destroy_node()
+
     rclpy.shutdown()
 
 
