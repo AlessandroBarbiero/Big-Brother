@@ -82,7 +82,7 @@ class YoloDetector(Node):
             self._sub_list = []
             self._pub_list = []
             for topic in image_topic_list:
-                self.get_logger().info("Working with {}".format(topic))
+                self.get_logger().info("Subscribe to {}".format(topic))
 
                 parts = topic.split('/')
                 # Take all parts except the last one and add det2d
