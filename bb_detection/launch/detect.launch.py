@@ -37,8 +37,10 @@ def generate_launch_description():
             {"publish_2d": True},
             {"multi_topics": True},
             {"image_topic_list": [
-                "/carla/sensors_home/static_rgb_camera/image",
-                "/carla/sensors_home/static_rgb_camera2/image"
+                "/carla/cross_s/rgb/image",
+                "/carla/int_road_s/rgb/image",
+                "/carla/near_station_s/rgb_w_station/image",
+                "/carla/near_station_s/rgb_w_street/image",
                 ]
             }
         ]
