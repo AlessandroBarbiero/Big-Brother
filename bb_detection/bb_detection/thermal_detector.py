@@ -251,7 +251,7 @@ class ThermalDetector(Node):
 
         if(self.get_parameter('show_debug').value):
             # Display image
-            cv2.imshow("Detection", cv_image)
+            cv2.imshow(self._pub2d.topic, cv_image)
             cv2.waitKey(1)
              
 
