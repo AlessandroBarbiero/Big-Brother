@@ -112,6 +112,9 @@ BBBenchmark::BBBenchmark()
   if (!_track_file.is_open()) {
     std::cerr << "Unable to open file " << _track_file_name << " for appending!" << std::endl;
   }
+  std::string header = "timestamp,detection_number,id,class,x,y,z,theta,size_x,size_y,size_z";
+  _gt_file << header << std::endl;
+  _track_file << header << std::endl;
 
   RCLCPP_INFO(this->get_logger(), "Benchmark Ready!");
 
@@ -783,6 +786,7 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
+  static int detection_number = 0;
   int objects_to_detect, false_positive, true_positive, missed;
   float tot_iou = 0, tot_dist = 0;
   double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1, MOTA;
@@ -806,12 +810,12 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   show_objects(objects_on_sight, "Objects_in_sensor_range");
   objects_to_detect = objects_on_sight.size();
 
-  _gt_file << "t-" << tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC << std::endl;
-  _track_file << "t-" << tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC << std::endl;
-  for(auto obj : objects_on_sight){
-    _gt_file << obj.toCSV() << std::endl;
-  }
+  // %%%%%%%%%%%% Write CSV
 
+  std::string timestamp_str = std::to_string(tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC);
+  for(auto obj : objects_on_sight){
+    _gt_file << timestamp_str << "," << detection_number << "," << obj.toCSV() << std::endl;
+  }
 
   for(auto det : tracked_objects->detections){
     std::string class_name = det.results[0].id;
@@ -819,8 +823,10 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
         [](unsigned char c){ return std::tolower(c); });
 
     bb_bench::Object3D temp = {atoi(det.tracking_id.c_str()), bb_bench::class_to_label.at(class_name), det.bbox};
-    _track_file << temp.toCSV() << std::endl;
+    _track_file << timestamp_str << "," << detection_number << "," << temp.toCSV() << std::endl;
   }
+
+  // %%%%%%%%%%%%%%%%%%%%%
 
   //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
   // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
@@ -948,6 +954,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   
   _stats_pub->publish(stats_message);
   publish_selected_obj(tracked_objects->detections);
+  detection_number++;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
