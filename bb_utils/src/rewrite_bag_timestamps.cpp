@@ -147,6 +147,11 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
       topic_type = topic_to_type.at(bag_message->topic_name);
       // Get the timestamp from the header
       stamp = getStamp(bag_message, topic_type);
+      static builtin_interfaces::msg::Time empty;
+      if(stamp == empty){
+        counter++;
+        continue;
+      }
       timestamp = int64_t(stamp.sec) * NANOSEC_IN_SEC + int64_t(stamp.nanosec);
 
       if(bag_message->topic_name=="/clock"){
@@ -213,6 +218,7 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
   static rclcpp::Serialization<vision_msgs::msg::Detection2DArray> det2d_serializer;
   static rclcpp::Serialization<vision_msgs::msg::Detection3DArray> det3d_serializer;
   static rclcpp::Serialization<rcl_interfaces::msg::Log> log_serializer;
+  static std::vector<std::string> topic_types_seen;
 
   builtin_interfaces::msg::Time stamp;
   rclcpp::SerializedMessage extracted_serialized_msg(*bag_message->serialized_data);
@@ -266,8 +272,18 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
       log_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
       stamp = extracted_msg.stamp;
     }
-    else{
-      std::cerr << "Type " << topic_type << " not supported, look at getStamp() function" << std::endl;
+    else {
+      bool found = false;
+      for(auto type : topic_types_seen){
+        if(type == topic_type){
+          found = true;
+          break;
+        }
+      }
+      if(!found){
+        topic_types_seen.push_back(topic_type);
+        std::cerr << "Type " << topic_type << " not supported, look at getStamp() function" << std::endl;
+      }
     }
 
   return stamp;
