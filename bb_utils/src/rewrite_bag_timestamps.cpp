@@ -27,6 +27,7 @@
 
 #define NANOSEC_IN_SEC int64_t(1000000000)
 #define SEC_IN_HOUR int64_t(3600)
+#define SEC_IN_MIN 60.0
 
 // To run this type:
 // ros2 run bb_utils rewrite_bag_timestamps /path/to/input.bag /path/to/output.bag [-a]
@@ -194,7 +195,7 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> duration = end - start_time;
   // Print the duration in seconds
-  std::cout << "Execution time: " << duration.count() << " seconds." << std::endl;
+  std::cout << "Execution time: " << duration.count()/SEC_IN_MIN << " min, " << duration.count() - (duration.count()/SEC_IN_MIN)*SEC_IN_MIN << " sec." << std::endl;
 }
 
 bool endsWithSubstring(
@@ -217,7 +218,7 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
   static rclcpp::Serialization<derived_object_msgs::msg::ObjectArray> object_array_serializer;
   static rclcpp::Serialization<vision_msgs::msg::Detection2DArray> det2d_serializer;
   static rclcpp::Serialization<vision_msgs::msg::Detection3DArray> det3d_serializer;
-  static rclcpp::Serialization<rcl_interfaces::msg::Log> log_serializer;
+  // static rclcpp::Serialization<rcl_interfaces::msg::Log> log_serializer; // Removed because the timestamp in the message is the real one not simulated
   static std::vector<std::string> topic_types_seen;
 
   builtin_interfaces::msg::Time stamp;
@@ -267,11 +268,11 @@ builtin_interfaces::msg::Time getStamp(std::shared_ptr<rosbag2_storage::Serializ
       det3d_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
       stamp = extracted_msg.header.stamp;
     }
-    else if(topic_type == "rcl_interfaces/msg/Log"){
-      rcl_interfaces::msg::Log extracted_msg;
-      log_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
-      stamp = extracted_msg.stamp;
-    }
+    // else if(topic_type == "rcl_interfaces/msg/Log"){
+    //   rcl_interfaces::msg::Log extracted_msg;
+    //   log_serializer.deserialize_message(&extracted_serialized_msg, &extracted_msg);
+    //   stamp = extracted_msg.stamp;
+    // }
     else {
       bool found = false;
       for(auto type : topic_types_seen){
