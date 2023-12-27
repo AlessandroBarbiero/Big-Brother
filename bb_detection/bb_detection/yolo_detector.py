@@ -89,7 +89,7 @@ class YoloDetector(Node):
                 det_topic = '/'.join(parts[:-1])
                 det_topic += "/det2d"
 
-                self.get_logger().info("Publish on {}".format(det_topic))
+                # self.get_logger().info("Publish on {}".format(det_topic))
 
                 pub2d = self.create_publisher(Detection2DArray, det_topic, 10)
                 self._pub_list.append(pub2d)
@@ -122,6 +122,7 @@ class YoloDetector(Node):
         
 
         # Load a pretrained YOLO model
+        self.get_logger().info("Load Yolo model")
         self.yolo = YOLO('yolov8m.pt')
         self.yolo.to("cuda:0")
 
@@ -239,6 +240,7 @@ class YoloDetector(Node):
 
         if(self.get_parameter('show_debug').value):
             # Display image
+            cv2.namedWindow(publisher.topic, cv2.WINDOW_NORMAL)
             cv2.imshow(publisher.topic, cv_image)
             cv2.waitKey(1)
 
@@ -398,6 +400,7 @@ class YoloDetector(Node):
 
         if(self.get_parameter('show_debug').value):
             # Display image
+            cv2.namedWindow("Detection", cv2.WINDOW_NORMAL)
             cv2.imshow("Detection", cv_image)
             cv2.waitKey(1)
         # Publish debug image to a topic
