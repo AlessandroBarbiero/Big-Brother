@@ -60,6 +60,7 @@ class FakeDetector(Node):
         # Init a variable to false, it turns true every time a point cloud message is received,
         # signaling that it's time to publish the fake detections
         self.need_to_pub = False
+        self.get_logger().info("Fake lidar detector ready")
 
     def callback_gt_static(self, msg : MarkerArray):
         self.static_objects = msg.markers
@@ -88,6 +89,10 @@ class FakeDetector(Node):
             except TransformException as ex:
                 self.get_logger().warn(f'Could not transform {lidar_topic} to {self.fixed_frame}: {ex}')
                 return
+            
+            #TODO: remove on bag fix
+            tf.transform._translation.y *= -1
+            #---
 
             self.last_transform_lidar.append(tf)
         self.lidar_ready = True
@@ -103,7 +108,7 @@ class FakeDetector(Node):
         for obj in objects:
             lidar_tf : TransformStamped
             for i, lidar_tf in enumerate(self.last_transform_lidar):
-                if distance_from_origin(                                                                \
+                if distance_from_origin(                                            \
                      do_transform_pose(pose=obj.pose, transform=lidar_tf).position) \
                        < self.lidar_max_distances[i]:
                     filtered.append(obj)
@@ -293,7 +298,7 @@ def _get_struct_fmt(is_bigendian, fields, field_names=None):
 def main(args=None):
     rclpy.init(args=args)
 
-    Logger('LOG').info("Initializing node...")
+    # Logger('LOG').info("Initializing node...")
 
     detector = FakeDetector()
 
