@@ -18,7 +18,7 @@ def generate_launch_description():
                 ("/detection_2d", camera + "det2d")
             ],
             parameters=[
-                {"show_debug": False},
+                {"show_debug": True},
                 {"publish_3d": False},
                 {"publish_2d": True},
                 {"exclude_border_objects": False}
@@ -54,13 +54,13 @@ def generate_launch_description():
             ("/detection_3d", "/bytetrack/detections3d")
         ],
         parameters=[
-            {'lidar_list'           : ["cross_s/lidar"]},
-            {'lidar_max_distances'  : [30]},
+            {'lidar_list'           : ["cross_s/lidar", "near_station_s/lidar", "int_road_s/lidar"]},
+            {'lidar_max_distances'  : [30, 30, 30]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
-            {"percentage_miss"      : 0.15},
-            {"noise_position"       : 0.15},
-            {"noise_size"           : 0.30},
+            {"percentage_miss"      : 0.0},
+            {"noise_position"       : 0.0},
+            {"noise_size"           : 0.0},
             {"noise_orientation"    : 0.0}
         ]
     )
