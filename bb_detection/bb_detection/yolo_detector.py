@@ -26,6 +26,7 @@ import random
 from ultralytics import YOLO
 from ultralytics.yolo.engine.results import Results
 from functools import partial
+import subprocess
 # My scripts
 from .utility import *
 
@@ -81,7 +82,7 @@ class YoloDetector(Node):
         #lifespan=rclpy.duration.Duration(seconds=3.0),\
         #lifespan=qos_profile_system_default.lifespan,\
         qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
-                                depth=10,\
+                                depth=5,\
                                 reliability=qos_profile_system_default.reliability,\
                                 durability=QoSDurabilityPolicy.VOLATILE,\
                                 liveliness=QoSLivelinessPolicy.AUTOMATIC,\
@@ -91,6 +92,7 @@ class YoloDetector(Node):
         
         if multi_topics:
             image_topic_list = self.get_parameter('image_topic_list').value
+            self.to_resize = {}
             self._sub_list = []
             self._pub_list = []
             for topic in image_topic_list:
@@ -100,6 +102,8 @@ class YoloDetector(Node):
                 # Take all parts except the last one and add det2d
                 det_topic = '/'.join(parts[:-1])
                 det_topic += "/det2d"
+                # Resize the windows only the first time they are shown
+                self.to_resize[det_topic] = True 
 
                 # self.get_logger().info("Publish on {}".format(det_topic))
 
@@ -244,7 +248,7 @@ class YoloDetector(Node):
                 pos = (min_pt[0] + 5, min_pt[1] + 25)
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 cv2.putText(cv_image, label, pos, font,
-                            1, color, 1, cv2.LINE_AA)
+                            0.5, color, 1, cv2.LINE_AA)
 
         # publish detections
         if(publish_2d):
@@ -254,7 +258,41 @@ class YoloDetector(Node):
             # Display image
             cv2.namedWindow(publisher.topic, cv2.WINDOW_NORMAL)
             cv2.imshow(publisher.topic, cv_image)
+            if self.to_resize[publisher.topic]:
+                def get_min_dim():
+                    output = subprocess.Popen('xrandr | grep "\*" | cut -d" " -f4',shell=True, stdout=subprocess.PIPE).communicate()[0].decode('UTF-8')
+                    min_w = 10000
+                    min_h = 10000
+                    for screen in output.split():
+                        resolution = screen.split('x')
+                        if min_w > int(resolution[0]):
+                            min_w = int(resolution[0])
+                        if min_h > int(resolution[1]):
+                            min_h = int(resolution[1])
+                    return min_w, min_h
+                min_w, min_h = get_min_dim()
+
+                order = 0
+                for i,key in enumerate(self.to_resize.keys()):
+                    if key == publisher.topic:
+                        order = i
+                        break
+                l = 500
+                v = 300
+                l_pad = l + 40
+                v_pad = v + 75
+                tot_h_pos = min_w // l_pad
+                tot_v_pos = min_h // v_pad
+                h_pos = order % tot_h_pos
+                v_pos = (order // tot_h_pos) % tot_v_pos
+                x = 5 + h_pos * l_pad
+                y = 5 + v_pos * v_pad
+
+                cv2.moveWindow(publisher.topic, x, y)
+                cv2.resizeWindow(publisher.topic, l, v)
+                self.to_resize[publisher.topic] = False
             cv2.waitKey(1)
+
 
 
     def detect_objects(self, data: Image, camera_info: CameraInfo, depth: Image):
@@ -402,7 +440,7 @@ class YoloDetector(Node):
                 pos = (min_pt[0] + 5, min_pt[1] + 25)
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 cv2.putText(cv_image, label, pos, font,
-                            1, color, 1, cv2.LINE_AA)
+                            0.5, color, 1, cv2.LINE_AA)
 
         # publish detections
         if(publish_3d):
@@ -424,7 +462,7 @@ def main(args=None):
 
     yolo_detector = YoloDetector()
 
-    #rclpy.spin(yolo_detector)
+    # rclpy.spin(yolo_detector)
     
     try:
         rclpy.spin(yolo_detector)

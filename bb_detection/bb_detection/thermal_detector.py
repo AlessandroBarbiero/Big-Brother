@@ -1,12 +1,14 @@
 # ROS
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSDurabilityPolicy, QoSReliabilityPolicy, QoSLivelinessPolicy, qos_profile_system_default
 from message_filters import TimeSynchronizer, Subscriber
 from rcl_interfaces.msg import SetParametersResult
 from image_geometry import PinholeCameraModel
 from tf2_ros import TransformException
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
+from rclpy.impl.implementation_singleton import rclpy_implementation as _rclpy
 # ROS messages
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
@@ -19,6 +21,8 @@ from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Image
 import cv2 # OpenCV library
 import numpy as np
 from copy import deepcopy
+import subprocess
+import random
 # My files
 from .utility import *
 from .bev.Bev import Bev
@@ -69,14 +73,25 @@ class ThermalDetector(Node):
                         'motorcycle': (230, 0, 0),
                         'bicycle': (32,11,119)
                         }
+        
 
-        sub1 = Subscriber(self, Image, "to_detect")
-        sub2 = Subscriber(self, CameraInfo, "camera_info")
+        qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
+                        depth=5,\
+                        reliability=qos_profile_system_default.reliability,\
+                        durability=QoSDurabilityPolicy.VOLATILE,\
+                        liveliness=QoSLivelinessPolicy.AUTOMATIC,\
+                        deadline=qos_profile_system_default.deadline,\
+                        lifespan=rclpy.duration.Duration(seconds=3.0),\
+                        liveliness_lease_duration=qos_profile_system_default.liveliness_lease_duration)
+
+
+        sub1 = Subscriber(self, Image, "to_detect", qos_profile=qos_profile)
+        sub2 = Subscriber(self, CameraInfo, "camera_info", qos_profile=qos_profile)
         self._tss = TimeSynchronizer([sub1, sub2], queue_size=5)
         self._tss.registerCallback(self.detect)
 
-        self._pub3d = self.create_publisher(Detection3DArray, 'detection_3d', 10)
-        self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
+        self._pub3d = self.create_publisher(Detection3DArray, 'detection_3d', qos_profile=qos_profile)
+        self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', qos_profile=qos_profile)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -99,7 +114,7 @@ class ThermalDetector(Node):
                 cv2.destroyAllWindows()
         return SetParametersResult(successful=True)
     
-    
+
     def detect(self, data: Image, camera_info: CameraInfo):
         """
         Callback function, it is called everytime an image is published on the given topic. It transform the semantic segmentation into 
@@ -113,7 +128,7 @@ class ThermalDetector(Node):
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
             self.get_logger().info("Started detecting images")
-            self.no_image_detected_yet = False
+            # self.no_image_detected_yet = False
 
         if(publish_3d):
             # Compute the transformation from the Default frame to the sensor frame to compute the bev projection
@@ -241,7 +256,7 @@ class ThermalDetector(Node):
                     pos = (min_pt[0] + 5, min_pt[1] + 25)
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     cv2.putText(cv_image, class_name, pos, font,
-                                1, bounding_box_color, 1, cv2.LINE_AA)
+                                0.5, bounding_box_color, 1, cv2.LINE_AA)
 
         # Publish detections
         if(publish_3d):
@@ -251,8 +266,42 @@ class ThermalDetector(Node):
 
         if(self.get_parameter('show_debug').value):
             # Display image
-            cv2.imshow(self._pub2d.topic, cv_image)
+            topic_name = data.header.frame_id
+            cv2.namedWindow(topic_name, cv2.WINDOW_NORMAL)
+            cv2.imshow(topic_name, cv_image)
+            if self.no_image_detected_yet:
+                def get_min_dim():
+                    output = subprocess.Popen('xrandr | grep "\*" | cut -d" " -f4',shell=True, stdout=subprocess.PIPE).communicate()[0].decode('UTF-8')
+                    min_w = 10000
+                    min_h = 10000
+                    for screen in output.split():
+                        resolution = screen.split('x')
+                        if min_w > int(resolution[0]):
+                            min_w = int(resolution[0])
+                        if min_h > int(resolution[1]):
+                            min_h = int(resolution[1])
+                    return min_w, min_h
+                min_w, min_h = get_min_dim()
+
+                order = random.randint(0,3)
+                l = 400
+                v = 400
+                l_pad = l + 40
+                v_pad = v + 75
+                tot_h_pos = min_w // l_pad
+                tot_v_pos = min_h // v_pad
+                h_pos = order % tot_h_pos
+                v_pos = (order // tot_h_pos) % tot_v_pos
+                x = min_w - (h_pos) * l_pad     # x = min_w - (h_pos+1) * l_pad
+                y = min_h - (v_pos) * v_pad     # y = min_h - (v_pos+1) * v_pad
+
+                self.get_logger().info(str((x,y)))
+
+                cv2.moveWindow(topic_name, x, y)
+                cv2.resizeWindow(topic_name, l, v)
             cv2.waitKey(1)
+        
+        self.no_image_detected_yet = False
              
 
 def main(args=None):
@@ -267,9 +316,6 @@ def main(args=None):
 
     # rclpy.spin(thermal_detector)
 
-    # Destroy the node explicitly
-    # (optional - otherwise it will be done automatically
-    # when the garbage collector destroys the node object)
     thermal_detector.destroy_node()
     rclpy.shutdown()
 
