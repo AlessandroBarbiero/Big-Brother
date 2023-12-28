@@ -295,8 +295,6 @@ class ThermalDetector(Node):
                 x = min_w - (h_pos) * l_pad     # x = min_w - (h_pos+1) * l_pad
                 y = min_h - (v_pos) * v_pad     # y = min_h - (v_pos+1) * v_pad
 
-                self.get_logger().info(str((x,y)))
-
                 cv2.moveWindow(topic_name, x, y)
                 cv2.resizeWindow(topic_name, l, v)
             cv2.waitKey(1)
