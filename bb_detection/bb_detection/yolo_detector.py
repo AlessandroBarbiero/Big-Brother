@@ -1,5 +1,6 @@
 # ROS
 import rclpy
+from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSDurabilityPolicy, QoSReliabilityPolicy, QoSLivelinessPolicy, qos_profile_system_default
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from message_filters import TimeSynchronizer, Subscriber
@@ -77,6 +78,17 @@ class YoloDetector(Node):
             self.destroy_node()
             raise RuntimeError("Cannot publish 3D detections with multiple topics")
         
+        #lifespan=rclpy.duration.Duration(seconds=3.0),\
+        #lifespan=qos_profile_system_default.lifespan,\
+        qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
+                                depth=10,\
+                                reliability=qos_profile_system_default.reliability,\
+                                durability=QoSDurabilityPolicy.VOLATILE,\
+                                liveliness=QoSLivelinessPolicy.AUTOMATIC,\
+                                deadline=qos_profile_system_default.deadline,\
+                                lifespan=rclpy.duration.Duration(seconds=3.0),\
+                                liveliness_lease_duration=qos_profile_system_default.liveliness_lease_duration)
+        
         if multi_topics:
             image_topic_list = self.get_parameter('image_topic_list').value
             self._sub_list = []
@@ -91,18 +103,18 @@ class YoloDetector(Node):
 
                 # self.get_logger().info("Publish on {}".format(det_topic))
 
-                pub2d = self.create_publisher(Detection2DArray, det_topic, 10)
+                pub2d = self.create_publisher(Detection2DArray, det_topic, qos_profile=qos_profile)
                 self._pub_list.append(pub2d)
 
                 cb_func = partial(self.detect_objects2D, publisher=pub2d)
 
-                sub_img = self.create_subscription(Image, topic, cb_func, 10)
+                sub_img = self.create_subscription(Image, topic, cb_func, qos_profile=qos_profile)
                 self._sub_list.append(sub_img)
 
 
         else:
 
-            self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', 10)
+            self._pub2d = self.create_publisher(Detection2DArray, 'detection_2d', qos_profile=qos_profile)
 
             if publish_3d:
                 sub1 = Subscriber(self, Image, "to_detect")
@@ -111,13 +123,13 @@ class YoloDetector(Node):
                 self._tss = TimeSynchronizer([sub1, sub2, sub3], queue_size=5)
                 self._tss.registerCallback(self.detect_objects)
 
-                self._pub = self.create_publisher(Detection3DArray, 'detection_3d', 10)
+                self._pub = self.create_publisher(Detection3DArray, 'detection_3d', qos_profile=qos_profile)
 
                 self.tf_buffer = Buffer()
                 self.tf_listener = TransformListener(self.tf_buffer, self)
             else:
                 cb_func = partial(self.detect_objects2D, publisher=self._pub2d)
-                self._sub_img = self.create_subscription(Image, "to_detect", cb_func, 10)
+                self._sub_img = self.create_subscription(Image, "to_detect", cb_func, qos_profile=qos_profile)
 
         
 
