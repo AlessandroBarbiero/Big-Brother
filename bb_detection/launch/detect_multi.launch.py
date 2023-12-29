@@ -5,7 +5,8 @@ def generate_launch_description():
 
     thermal_cameras_topics = ["/carla/cross_s/thermal/",
                               "/carla/int_road_s/thermal/", 
-                              "/carla/near_station_s/thermal/"]
+                              "/carla/near_station_s/thermal/"
+                              ]
 
     thermal_nodes = []
     for camera in thermal_cameras_topics:
