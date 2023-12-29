@@ -79,8 +79,17 @@ class YoloDetector(Node):
             self.destroy_node()
             raise RuntimeError("Cannot publish 3D detections with multiple topics")
         
-        #lifespan=rclpy.duration.Duration(seconds=3.0),\
-        #lifespan=qos_profile_system_default.lifespan,\
+        # Keep all detections
+        # qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
+        #                         depth=10,\
+        #                         reliability=QoSReliabilityPolicy.RELIABLE,\
+        #                         durability=QoSDurabilityPolicy.VOLATILE,\
+        #                         liveliness=QoSLivelinessPolicy.AUTOMATIC,\
+        #                         deadline=qos_profile_system_default.deadline,\
+        #                         lifespan=rclpy.duration.Duration(seconds=5.0),\
+        #                         liveliness_lease_duration=qos_profile_system_default.liveliness_lease_duration)
+        
+        # Real-time
         qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
                                 depth=5,\
                                 reliability=qos_profile_system_default.reliability,\
@@ -89,7 +98,7 @@ class YoloDetector(Node):
                                 deadline=qos_profile_system_default.deadline,\
                                 lifespan=rclpy.duration.Duration(seconds=3.0),\
                                 liveliness_lease_duration=qos_profile_system_default.liveliness_lease_duration)
-        
+
         if multi_topics:
             image_topic_list = self.get_parameter('image_topic_list').value
             self.to_resize = {}

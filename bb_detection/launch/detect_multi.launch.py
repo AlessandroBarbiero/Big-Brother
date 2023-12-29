@@ -18,7 +18,7 @@ def generate_launch_description():
                 ("/detection_2d", camera + "det2d")
             ],
             parameters=[
-                {"show_debug": True},
+                {"show_debug": False},
                 {"publish_3d": False},
                 {"publish_2d": True},
                 {"exclude_border_objects": False}
@@ -32,7 +32,7 @@ def generate_launch_description():
         executable="yolo_detector",
         parameters=[
             {"confidence_threshold": 0.1},
-            {"show_debug": True},
+            {"show_debug": False},
             {"publish_3d": False},
             {"publish_2d": True},
             {"multi_topics": True},
@@ -58,9 +58,9 @@ def generate_launch_description():
             {'lidar_max_distances'  : [30, 30, 30]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},
-            {"percentage_miss"      : 0.0},
-            {"noise_position"       : 0.0},
-            {"noise_size"           : 0.0},
+            {"percentage_miss"      : 0.15},
+            {"noise_position"       : 0.15},
+            {"noise_size"           : 0.30},
             {"noise_orientation"    : 0.0}
         ]
     )

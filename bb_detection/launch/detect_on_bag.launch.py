@@ -22,7 +22,7 @@ def generate_launch_description():
 
     detect = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('bb_detection'), 'detect.launch.py')])
+         get_package_share_directory('bb_detection'), 'detect_multi.launch.py')])
       )
 
     bag_name_arg = DeclareLaunchArgument(
@@ -33,7 +33,7 @@ def generate_launch_description():
 
     # Start the bag slowing it by 10 times to allow the record 
     bag_process = ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', bag_folder + bag_name, '-r', '0.1'],
+            cmd=['ros2', 'bag', 'play', bag_folder + bag_name, '-r', '0.01', '--read-ahead-queue-size', '10000'],
             on_exit=[
                 emit_shutdown_action
                 ],

@@ -74,7 +74,18 @@ class ThermalDetector(Node):
                         'bicycle': (32,11,119)
                         }
         
+        # Register all detections
+        # qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
+        #                 depth=10,\
+        #                 reliability=QoSReliabilityPolicy.RELIABLE,\
+        #                 durability=QoSDurabilityPolicy.VOLATILE,\
+        #                 liveliness=QoSLivelinessPolicy.AUTOMATIC,\
+        #                 deadline=qos_profile_system_default.deadline,\
+        #                 lifespan=rclpy.duration.Duration(seconds=5.0),\
+        #                 liveliness_lease_duration=qos_profile_system_default.liveliness_lease_duration)
+        # ----------
 
+        # Real-time
         qos_profile = QoSProfile(history=QoSHistoryPolicy.KEEP_LAST,\
                         depth=5,\
                         reliability=qos_profile_system_default.reliability,\
