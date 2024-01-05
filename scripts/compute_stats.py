@@ -17,7 +17,8 @@ class ObjectList:
 
 
 class Object3D:
-    def __init__(self, timestamp, detection_number, obj_id, obj_class, x, y, z, theta, size_x, size_y, size_z):
+    def __init__(self, timestamp : int, detection_number : int, obj_id : int, obj_class : str,
+                  x : float, y : float, z : float, theta : float, size_x : float, size_y : float, size_z : float):
         self.timestamp = timestamp
         self.detection_number = detection_number
         self.id = obj_id
@@ -87,7 +88,7 @@ def linear_assignment(objects1, objects2):
     row_ind, col_ind = scipy.optimize.linear_sum_assignment(cost_matrix)
 
     # Match the indices to get corresponding pairs of boxes
-    matched_pairs = [(i, col_ind[i]) for i in range(num_boxes1) if col_ind[i] != -1]
+    matched_pairs = [(i, col_ind[i]) for i in range(min(num_boxes1, num_boxes2)) if col_ind[i] != -1]
     return matched_pairs
 
 
