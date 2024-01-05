@@ -1,0 +1,29 @@
+bb_benchmark:
+   ros__parameters:
+      fps: 10
+      match_thresh: 0.7
+      fixed_frame: map
+      show_range: true
+      alpha_range: 0.1
+      camera_list: [
+         "/carla/cross_s/rgb/camera_info",
+         "/carla/int_road_s/rgb/camera_info",
+         "/carla/near_station_s/rgb_w_station/camera_info",
+         "/carla/near_station_s/rgb_w_street/camera_info",
+         "/carla/cross_s/thermal/camera_info",
+         "/carla/int_road_s/thermal/camera_info", 
+         "/carla/near_station_s/thermal/camera_info"
+         ]
+      camera_max_distances: [
+         30, 30, 30, 30,
+         35, 35, 35
+      ]
+      lidar_list: [
+         "cross_s/lidar", 
+         "near_station_s/lidar", 
+         "int_road_s/lidar"
+      ]
+      lidar_max_distances: [
+         30, 30, 30
+      ]
+      

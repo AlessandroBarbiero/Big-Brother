@@ -55,7 +55,12 @@ def generate_launch_description():
             ("/detection_3d", "/bytetrack/detections3d")
         ],
         parameters=[
-            {'lidar_list'           : ["cross_s/lidar", "near_station_s/lidar", "int_road_s/lidar"]},
+            {'lidar_list'           : [
+                    "cross_s/lidar", 
+                    "near_station_s/lidar", 
+                    "int_road_s/lidar"
+                ]
+            },
             {'lidar_max_distances'  : [30, 30, 30]},
             {"fixed_frame"          : "map"},
             {"random_seed"          : 42},

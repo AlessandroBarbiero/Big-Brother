@@ -2,9 +2,9 @@ bb_tracker:
    ros__parameters:
       fixed_frame: map
       # Visualization
-      show_img_projection: true
+      show_img_projection: false
       show_covariance: false
-      points_per_track: 100
+      points_per_track: 120
       # Detection
       left_handed_system: true
       max_dt_past: 2000

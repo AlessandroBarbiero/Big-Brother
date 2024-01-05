@@ -1,19 +1,17 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
-from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 
-import sys, os
+import os
 
 def generate_launch_description():
 
     config = os.path.join(
         get_package_share_directory('bb_utils'),
         'config',
-        'benchmark_params.yaml'
+        'benchmark_params_multi_sens.yaml'
     )
     
     track_on_bag = IncludeLaunchDescription(
@@ -30,8 +28,9 @@ def generate_launch_description():
         #     ("/bytetrack/active_tracks", "/something")
         # ],
         parameters=[config],
-        output='screen'
+        output='screen',
         # prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
+        prefix=["xterm -font 10x20 -e gdb -ex run --args"] # add gdb
     )
 
     visualizer_node = Node(

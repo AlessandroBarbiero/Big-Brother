@@ -5,12 +5,11 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Camera Axes1/Status1
         - /Active Tracks1/Topic1
         - /TrackPaths1/Namespaces1
         - /SensorRange1/Namespaces1
       Splitter Ratio: 0.5
-    Tree Height: 210
+    Tree Height: 441
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -176,7 +175,7 @@ Visualization Manager:
       Enabled: true
       Name: TrackPaths
       Namespaces:
-        {}
+        TrackPath: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -188,7 +187,7 @@ Visualization Manager:
       Enabled: true
       Name: TextId
       Namespaces:
-        {}
+        TrackID: true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -220,7 +219,9 @@ Visualization Manager:
       Enabled: true
       Name: StaticVehicles
       Namespaces:
-        {}
+        Bicycle: true
+        Car: true
+        Motorcycle: true
       Topic:
         Depth: 5
         Durability Policy: Transient Local
@@ -232,7 +233,7 @@ Visualization Manager:
       Enabled: true
       Name: MovingObjects
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -334,25 +335,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 125.62503051757812
+      Distance: 138.6868438720703
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -1.208073377609253
-        Y: 53.39227294921875
-        Z: 7.954370021820068
+        X: 4.270318984985352
+        Y: 12.6096773147583
+        Z: -24.924726486206055
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.2497965097427368
+      Pitch: 1.5347962379455566
       Target Frame: sensors_home
       Value: Orbit (rviz)
-      Yaw: 2.8578646183013916
+      Yaw: 2.9978654384613037
     Saved: ~
 Window Geometry:
   DebugCamera:
