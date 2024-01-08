@@ -71,16 +71,16 @@ def calculate_iou_cost(minmaxA : list, minmaxB : list) -> float:
     inter_ymax = min(minmaxA[4], minmaxB[4])
     inter_zmax = min(minmaxA[5], minmaxB[5])
 
-    # Calculate the intersection area
-    inter_area = max(0, inter_xmax - inter_xmin) * max(0, inter_ymax - inter_ymin) * max(0, inter_zmax - inter_zmin)
+    # Calculate the intersection volume
+    inter_volume = max(0, inter_xmax - inter_xmin) * max(0, inter_ymax - inter_ymin) * max(0, inter_zmax - inter_zmin)
 
-    # Calculate the union area
-    boxA_area = (minmaxA[3] - minmaxA[0]) * (minmaxA[4] - minmaxA[1]) * (minmaxA[5] - minmaxA[2])
-    boxB_area = (minmaxB[3] - minmaxB[0]) * (minmaxB[4] - minmaxB[1]) * (minmaxB[5] - minmaxB[2])
-    union_area = boxA_area + boxB_area - inter_area
+    # Calculate the union volume
+    boxA_volume = (minmaxA[3] - minmaxA[0]) * (minmaxA[4] - minmaxA[1]) * (minmaxA[5] - minmaxA[2])
+    boxB_volume = (minmaxB[3] - minmaxB[0]) * (minmaxB[4] - minmaxB[1]) * (minmaxB[5] - minmaxB[2])
+    union_volume = boxA_volume + boxB_volume - inter_volume
 
     # Calculate IoU
-    iou = inter_area / union_area if union_area > 0 else 0
+    iou = inter_volume / union_volume if union_volume > 0 else 0.0
     return 1 - iou  # Subtract from 1 to convert IoU to a cost
 
 
@@ -97,7 +97,7 @@ def linear_assignment_obj(objects1: list, objects2: list, iou_thresh: float) -> 
         - sum of cost (1-iou) for all matched pairs
         - sum of iou for all matched pairs
     """
-    # Calculate cost matrix based on IoU
+    # Compute cost matrix based on IoU
     num_boxes1 = len(objects1)
     num_boxes2 = len(objects2)
     cost_matrix = np.zeros((num_boxes1, num_boxes2))
@@ -123,7 +123,7 @@ def linear_assignment_cost_mat(cost_matrix, iou_thresh):
     thresh = 1 - iou_thresh
     
     x, y = scipy.optimize.linear_sum_assignment(cost_matrix)  # row x, col y
-    matches = np.asarray([[x[i], y[i]] for i in range(len(x)) if cost_matrix[x[i], y[i]] <= thresh])
+    matches = np.asarray([[row, col] for row, col in zip(x,y) if cost_matrix[row, col] <= thresh])
 
     zz = [cost_matrix[i[0], i[1]] for i in matches]
     tot_cost = sum(zz)
@@ -215,6 +215,7 @@ def main():
         tot_missed                 +=  missed
         tot_objects_to_detect      +=  len(gt)
 
+        #print(f"true positive: {true_positive}, false positive: {false_positive}, missed: {missed}")
 
     if(tot_true_positive != 0):
         detA = tot_true_positive / (tot_true_positive + tot_false_positive + tot_missed)
