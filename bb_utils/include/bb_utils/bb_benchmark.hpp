@@ -43,6 +43,7 @@ class BBBenchmark : public rclcpp::Node
 
   private:
     void compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
+    void append_csv(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects, std::vector<bb_bench::Object3D>& objects_on_sight);
     void camera_info_callback(std::shared_ptr<sensor_msgs::msg::CameraInfo> cam_info_message, int id, int max_distance);
     void save_static_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);
     void save_gt(std::shared_ptr<visualization_msgs::msg::MarkerArray> msg);

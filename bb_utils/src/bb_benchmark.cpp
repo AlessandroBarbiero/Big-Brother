@@ -786,7 +786,6 @@ vector<T> filter_indices(vector<T> &source_vector, vector<int> &indices){
 
 void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects)
 {
-  static int detection_number = 0;
   int objects_to_detect, false_positive, true_positive, missed;
   float tot_iou = 0, tot_dist = 0;
   double detA, locA, MOTP, tot_detA = 0, tot_locA = 0, tot_MOTP = 1, MOTA;
@@ -810,24 +809,6 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   show_objects(objects_on_sight, "Objects_in_sensor_range");
   objects_to_detect = objects_on_sight.size();
 
-  // %%%%%%%%%%%% Write CSV
-
-  std::string timestamp_str = std::to_string(tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC);
-  for(auto obj : objects_on_sight){
-    _gt_file << timestamp_str << "," << detection_number << "," << obj.toCSV() << std::endl;
-  }
-
-  for(auto det : tracked_objects->detections){
-    std::string class_name = det.results[0].id;
-    std::transform(class_name.begin(), class_name.end(), class_name.begin(),
-        [](unsigned char c){ return std::tolower(c); });
-
-    bb_bench::Object3D temp = {atoi(det.tracking_id.c_str()), bb_bench::class_to_label.at(class_name), det.bbox};
-    _track_file << timestamp_str << "," << detection_number << "," << temp.toCSV() << std::endl;
-  }
-
-  // %%%%%%%%%%%%%%%%%%%%%
-
   //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
   // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
   // MOTP -> (multiple object tracking precision) uses distance instead of accuracy, low values are better MOTP = sum(d_t)/sum(matches_t)   for example d_t = 1-IoU
@@ -838,7 +819,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   // HOTA = 1/19 * sum(HOTA_alpa)_alpha from 0.05 to 1 increasing by 0.05
 
   // MOTA = 1 - sum(m_t + FP_t + mme_t)/sum(obj_in_scene_t)     m = misses, FP = false positive, mme = mismatches (tracks are exchanged, object considered in wrong track)
-
+ 
   if (tracked_objects->detections.empty()){
     true_positive = 0;
     missed = objects_to_detect;
@@ -852,6 +833,8 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     if(tracked_objects->header.frame_id != _fixed_frame){
       change_frame(tracked_objects, _fixed_frame);
     }
+
+    append_csv(tracked_objects, objects_on_sight);
 
     // Find matches with hungarian algorithm
     vector<vector<float> > dists;
@@ -954,10 +937,29 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   
   _stats_pub->publish(stats_message);
   publish_selected_obj(tracked_objects->detections);
-  detection_number++;
 }
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+void BBBenchmark::append_csv(std::shared_ptr<vision_msgs::msg::Detection3DArray> tracked_objects, std::vector<bb_bench::Object3D>& objects_on_sight){
+  static int detection_number = 0;
+
+  std::string timestamp_str = std::to_string(tracked_objects->header.stamp.nanosec + static_cast<int64_t>(tracked_objects->header.stamp.sec) * NANOSEC_IN_SEC);
+  for(auto obj : objects_on_sight){
+    _gt_file << timestamp_str << "," << detection_number << "," << obj.toCSV() << std::endl;
+  }
+
+  for(auto det : tracked_objects->detections){
+    std::string class_name = det.results[0].id;
+    std::transform(class_name.begin(), class_name.end(), class_name.begin(),
+        [](unsigned char c){ return std::tolower(c); });
+
+    bb_bench::Object3D temp = {atoi(det.tracking_id.c_str()), bb_bench::class_to_label.at(class_name), det.bbox};
+    _track_file << timestamp_str << "," << detection_number << "," << temp.toCSV() << std::endl;
+  }
+
+  detection_number++;
+}
 
 // Custom comparison function for BoundingBoxes
 bool customCompare(const bb_bench::Object3D& obj1, const bb_bench::Object3D& obj2) {
