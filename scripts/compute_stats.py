@@ -5,6 +5,8 @@ import numpy as np
 from lap import lapjv # same used in C
 from copy import deepcopy
 from typing import Tuple
+from collections import defaultdict
+import math
 
 class ObjectList:
     '''
@@ -91,8 +93,8 @@ def linear_assignment_obj(objects1: list, objects2: list, iou_thresh: float) -> 
     A match is considered only if the iou is above the thresh
     :returns
         - list of matched pair indices
-        - number of unmatched objects of the first list
-        - number of unmatched objects of the second list
+        - unmatched objects of the first list
+        - unmatched objects of the second list
         - sum of cost (1-iou) for all matched pairs
         - sum of iou for all matched pairs
     """
@@ -114,8 +116,8 @@ def linear_assignment_cost_mat(cost_matrix, iou_thresh):
     A match is considered only if the iou is above the thresh
     :returns
         - list of matched pair indices
-        - number of unmatched objects of the first list
-        - number of unmatched objects of the second list
+        - unmatched objects of the first list
+        - unmatched objects of the second list
         - sum of cost (1-iou) for all matched pairs
         - sum of iou for all matched pairs
     """
@@ -133,7 +135,7 @@ def linear_assignment_cost_mat(cost_matrix, iou_thresh):
         unmatched_a = list(set(np.arange(cost_matrix.shape[0])) - set(matches[:, 0]))
         unmatched_b = list(set(np.arange(cost_matrix.shape[1])) - set(matches[:, 1]))
 
-    return matches, len(unmatched_a), len(unmatched_b), tot_cost, tot_iou
+    return matches, unmatched_a, unmatched_b, tot_cost, tot_iou
 
 
 def read_csv(file_path : str) -> list:
@@ -168,6 +170,73 @@ def read_csv(file_path : str) -> list:
 
     return gts
 
+def compute_HOTA(track_history : list, gt_history : list, alpha : float):
+    '''
+    Returns the HOTA performance value using the given alpha
+    :param track_history: a list of ObjectList elements representing the history of the tracking detections, 
+            each element of the list is a different detection and should have a different detection number
+    :param gt_history: a list of ObjectList elements representing the history of the ground truth registered at different detection times, 
+            each element of the list is relative to a different detection and should have a different detection number
+    :param alpha: the alpha parameter to compute the HOTA, it represents the IoU threshold in the computation of the Hungarian Algorithm
+    :returns the HOTA_alpha value
+    '''
+
+    tot_true_positive       = 0
+    tot_false_positive      = 0
+    tot_missed              = 0
+
+    # Variables to keep assA info
+    gt_history_track = defaultdict(list)
+    track_history_track = defaultdict(list)
+    tp_track_history = []
+    tp_gt_history = []
+    for i in range(len(track_history)):
+        track = track_history[i].object_list
+        gt = gt_history[i].object_list
+        pairs, unmatch_track, unmatch_gt, tot_cost, tot_iou = linear_assignment_obj(track, gt, 1-alpha)
+        true_positive = len(pairs)
+        false_positive = len(unmatch_track)
+        missed = len(unmatch_gt)
+        match_track_ids = [track[pair[0]].id for pair in pairs]
+        match_gt_ids = [gt[pair[1]].id for pair in pairs]
+
+        # computations for the assA, build two dictionaries that link each id to the history of linked objects of the other category
+        for i in range(len(match_gt_ids)):
+            gt_history_track[match_gt_ids[i]].append(match_track_ids[i])
+            track_history_track[match_track_ids[i]].append(match_gt_ids[i])
+        for gt_i in unmatch_gt:
+            gt_history_track[gt[gt_i].id].append(None)
+        for t_i in unmatch_track:
+            track_history_track[track[t_i].id].append(None)
+
+        tp_track_history.append(match_track_ids)
+        tp_gt_history.append(match_gt_ids)
+
+        tot_true_positive          +=  true_positive
+        tot_false_positive         +=  false_positive
+        tot_missed                 +=  missed
+    
+    # Compute assA
+    tot_ass_iou = 0
+    for match_track_ids, match_gt_ids in zip(tp_track_history, tp_gt_history):
+        for track_id, gt_id in zip(match_track_ids, match_gt_ids):
+            TPA = track_history_track[track_id].count(gt_id)
+            FPA = len(track_history_track[track_id]) - TPA
+            FNA = len(gt_history_track[gt_id]) - TPA
+            ass_iou = TPA / (TPA + FPA + FNA)
+            tot_ass_iou += ass_iou
+
+    if(tot_true_positive != 0):
+        detA = tot_true_positive / (tot_true_positive + tot_false_positive + tot_missed)
+        assA = tot_ass_iou / tot_true_positive
+    else:
+        print(f"NO True positives for alpha = {alpha}!")
+        detA = 0
+        assA = 0
+
+    return math.sqrt(detA * assA)
+
+
 def main():
 
     print("Reading csv...")
@@ -185,20 +254,37 @@ def main():
     tot_objects_to_detect   = 0
 
     print("Analyzing data...")
+    # Variables to keep assA info
+    gt_history_track = defaultdict(list)
+    track_history_track = defaultdict(list)
+    tp_track_history = []
+    tp_gt_history = []
     for i in range(len(track_history)):
         track = track_history[i].object_list
         gt = gt_history[i].object_list
         pairs, unmatch_track, unmatch_gt, tot_cost, tot_iou = linear_assignment_obj(track, gt, 0.7)
         true_positive = len(pairs)
-        false_positive = unmatch_track
-        missed = unmatch_gt
-        match_track = [pair[0] for pair in pairs]
-        match_gt = [pair[1] for pair in pairs]
+        false_positive = len(unmatch_track)
+        missed = len(unmatch_gt)
+        match_track_ids = [track[pair[0]].id for pair in pairs]
+        match_gt_ids = [gt[pair[1]].id for pair in pairs]
+
+        # computations for the assA, build two dictionaries that link each id to the history of linked objects of the other category
+        for i in range(len(match_gt_ids)):
+            gt_history_track[match_gt_ids[i]].append(match_track_ids[i])
+            track_history_track[match_track_ids[i]].append(match_gt_ids[i])
+        for gt_i in unmatch_gt:
+            gt_history_track[gt[gt_i].id].append(None)
+        for t_i in unmatch_track:
+            track_history_track[track[t_i].id].append(None)
+
+        tp_track_history.append(match_track_ids)
+        tp_gt_history.append(match_gt_ids)
 
         # Compute association mismatch
-        for i in range(len(match_gt)):
-            gt_index = gt[match_gt[i]].id
-            track_id = track[match_track[i]].id
+        for i in range(len(match_gt_ids)):
+            gt_index = match_gt_ids[i]
+            track_id = match_track_ids[i]
             
             if gt_index in gt_index_to_track_id and gt_index_to_track_id[gt_index] != track_id:
                 tot_ass_mismatch += 1
@@ -213,14 +299,37 @@ def main():
         tot_missed                 +=  missed
         tot_objects_to_detect      +=  len(gt)
 
+    
+    # Compute assA
+    tot_ass_iou = 0
+    tot_TPA = 0
+    tot_FPA = 0
+    tot_FNA = 0
+    for match_track_ids, match_gt_ids in zip(tp_track_history, tp_gt_history):
+        for track_id, gt_id in zip(match_track_ids, match_gt_ids):
+            TPA = track_history_track[track_id].count(gt_id)
+            FPA = len(track_history_track[track_id]) - TPA
+            FNA = len(gt_history_track[gt_id]) - TPA
+            ass_iou = TPA / (TPA + FPA + FNA)
+            tot_ass_iou += ass_iou
+            tot_TPA += TPA
+            tot_FPA += FPA
+            tot_FNA += FNA
 
     if(tot_true_positive != 0):
         detA = tot_true_positive / (tot_true_positive + tot_false_positive + tot_missed)
         locA = tot_iou_matched / tot_true_positive
+        assA = tot_ass_iou / tot_true_positive
         MOTP = tot_iou_cost_matched / tot_true_positive
     
-
+    
     MOTA = 1.0 - (tot_missed + tot_false_positive + tot_ass_mismatch)/tot_objects_to_detect
+    detRe = tot_true_positive / (tot_true_positive + tot_missed)
+    detPr = tot_true_positive / (tot_true_positive + tot_false_positive)
+    detF1 = 2.0 * (detPr * detRe)/(detPr+detRe)
+    assRe = tot_TPA / (tot_TPA + tot_FNA)
+    assPr = tot_TPA / (tot_TPA + tot_FPA)
+    assF1 = 2.0 * (assPr * assRe)/(assPr+assRe)
 
 
     print(f"\
@@ -231,11 +340,32 @@ def main():
     ass. mismatch:\t{tot_ass_mismatch}\n\
     total objects:\t{tot_objects_to_detect}\n\
     \n\
-    detA:\t{detA}\n\
-    locA:\t{locA}\n\
-    MOTP:\t{MOTP}\n\
-    MOTA:\t{MOTA}\n\
+    detA:\t{detA:.4f}\n\
+    locA:\t{locA:.4f}\n\
+    assA:\t{assA:.4f}\n\
+    \n\
+    DetRe:\t{detRe:.4f}\n\
+    DetPr:\t{detPr:.4f}\n\
+    DetF1:\t{detF1:.4f}\n\
+    AssRe:\t{assRe:.4f}\n\
+    AssPr:\t{assPr:.4f}\n\
+    AssF1:\t{assF1:.4f}\n\
+    \n\
+    MOTP:\t{MOTP:.4f}\n\
+    MOTA:\t{MOTA:.4f}\n\
     #####################################" \
+    )
+
+    print("Computing HOTA...")
+    tot_HOTA_alpha = 0
+    for alpha in np.arange(0.05, 1, 0.05):
+        HOTA_alpha = compute_HOTA(track_history, gt_history, alpha)
+        print(f"alpha = {alpha:.2f} -> HOTA_a = {HOTA_alpha:.4f}")
+        tot_HOTA_alpha += HOTA_alpha
+
+    HOTA = tot_HOTA_alpha / 19.0
+    print(f"\n\
+    HOTA:\t{HOTA:.4f}\n" \
     )
 
 

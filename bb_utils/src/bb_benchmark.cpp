@@ -809,17 +809,18 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
   show_objects(objects_on_sight, "Objects_in_sensor_range");
   objects_to_detect = objects_on_sight.size();
 
-  //TODO: HOTA (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
+  // HOTA (POST) (Higher Order Tracking Accuracy) it uses 3 accuracy scores: locA, detA, assA.
   // locA -> Localization Accuracy (LocA) by averaging the Loc-IoU over all pairs of matching predicted and ground-truth detections (if there is a match how much they intersect)
   // MOTP -> (multiple object tracking precision) uses distance instead of accuracy, low values are better MOTP = sum(d_t)/sum(matches_t)   for example d_t = 1-IoU
   // detA -> Detection Accuracy (DetA) computed as DetA = TP / (TP+FP+m) True Positive = matching detections, False Positive = predicted detections that don't match, Misses = Ground Truth detection that don't match
-  // TODO: assA -> Association Accuracy (AssA). AssA = average_of( TPA / (TPA+FPA+FNA) ) for all the matched detections. 
+  // assA (POST) -> Association Accuracy (AssA). AssA = average_of( TPA / (TPA+FPA+FNA) ) for all the matched detections. 
   //          TPA = number of matching detections with ground truth for that track in time. FPA = predicted trajectory not true. FNA = real trajectory not matched.
   // HOTA_alpha = sqrt(DetA_alpha * AssA_alpha) where alpha is the value of the hungarian algorithm
   // HOTA = 1/19 * sum(HOTA_alpa)_alpha from 0.05 to 1 increasing by 0.05
 
   // MOTA = 1 - sum(m_t + FP_t + mme_t)/sum(obj_in_scene_t)     m = misses, FP = false positive, mme = mismatches (tracks are exchanged, object considered in wrong track)
- 
+  // assA and HOTA are computed in post processing using the data saved in the csv, to see those values run the compute_stats.py script after the benchmark node
+
   if (tracked_objects->detections.empty()){
     true_positive = 0;
     missed = objects_to_detect;
