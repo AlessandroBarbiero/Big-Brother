@@ -17,7 +17,7 @@ def generate_launch_description():
     track_on_bag = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('bb_tracker'), 'launch'),
-         '/track_on_bag.launch.py'])
+         '/track_on_bag_multi_sens.launch.py'])
       )
 
     benchmark_node = Node(
