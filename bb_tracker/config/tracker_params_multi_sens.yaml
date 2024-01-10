@@ -7,6 +7,7 @@ bb_tracker:
       points_per_track: 120
       # Detection
       left_handed_system: true
+      exclude_border_objects: false
       max_dt_past: 2000
       camera_list: [
          "/carla/cross_s/rgb/camera_info",
