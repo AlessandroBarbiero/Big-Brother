@@ -31,7 +31,7 @@ def generate_launch_description():
         description='Name of the bag you want to play'
     )
 
-    # Start the bag slowing it by 10 times to allow the record 
+    # Start the bag slowing it by 100 times to allow the record 
     bag_process = ExecuteProcess(
             cmd=['ros2', 'bag', 'play', bag_folder + bag_name, '-r', '0.01', '--read-ahead-queue-size', '10000'],
             on_exit=[
