@@ -52,6 +52,7 @@ class YoloDetector(Node):
                 ('show_debug', True),
                 ('publish_2d', True),
                 ('publish_3d', True),
+                ('exclude_border_objects', False),
                 ('confidence_threshold', 0.5),
                 ('iou_nms', 0.35),
                 ('multi_topics', False),
@@ -175,6 +176,7 @@ class YoloDetector(Node):
         It can also show the debug image if the parameter is set
         """
         publish_2d = self.get_parameter('publish_2d').value
+        exclude_border_objects = self.get_parameter('exclude_border_objects').value
 
         # Display the message on the console if it is the first time
         if self.no_image_detected_yet:
@@ -229,6 +231,9 @@ class YoloDetector(Node):
             # top-right
             max_pt = (int(uv_coordinates[0] + bbox_image_size[0] / 2.0),
                             int(uv_coordinates[1] + bbox_image_size[1] / 2.0))
+            
+            if (exclude_border_objects and (min_pt[0]<=5 or min_pt[1]<=5 or max_pt[0] >= data.width-5 or max_pt[1]>= data.height-5)):
+                continue
 
             if(publish_2d):
                 detection2d = Detection2D()

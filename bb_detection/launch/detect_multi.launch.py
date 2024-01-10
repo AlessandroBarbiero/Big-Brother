@@ -22,7 +22,7 @@ def generate_launch_description():
                 {"show_debug": False},
                 {"publish_3d": False},
                 {"publish_2d": True},
-                {"exclude_border_objects": False}
+                {"exclude_border_objects": True}
             ]
         )
         thermal_nodes.append(thermal_node)
@@ -34,6 +34,7 @@ def generate_launch_description():
         parameters=[
             {"confidence_threshold": 0.1},
             {"show_debug": False},
+            {"exclude_border_objects": True},
             {"publish_3d": False},
             {"publish_2d": True},
             {"multi_topics": True},
