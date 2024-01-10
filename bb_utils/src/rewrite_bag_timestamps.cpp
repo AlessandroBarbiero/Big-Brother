@@ -195,7 +195,7 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> duration = end - start_time;
   // Print the duration in seconds
-  std::cout << "Execution time: " << duration.count()/SEC_IN_MIN << " min, " << duration.count() - (duration.count()/SEC_IN_MIN)*SEC_IN_MIN << " sec." << std::endl;
+  std::cout << "Execution time: " << static_cast<int>(duration.count()/SEC_IN_MIN) << " min, " << duration.count() - static_cast<int>((duration.count()/SEC_IN_MIN))*SEC_IN_MIN << " sec." << std::endl;
 }
 
 bool endsWithSubstring(
