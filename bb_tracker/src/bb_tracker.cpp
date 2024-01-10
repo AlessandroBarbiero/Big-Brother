@@ -18,6 +18,8 @@ BBTracker::BBTracker()
   // Detection
   auto left_handed_system_desc = rcl_interfaces::msg::ParameterDescriptor{};
   left_handed_system_desc.description = "Set to true to if the Detections 3D come from a left handed system like Unreal Engine (yaw angle is rotated 180 degrees)";
+  auto exclude_border_objects_desc = rcl_interfaces::msg::ParameterDescriptor{};
+  exclude_border_objects_desc.description = "Set to true to avoid considering 2D detections that are touching the border of the image (the dimensions could be wrong)";
   auto max_dt_desc = rcl_interfaces::msg::ParameterDescriptor{};
   max_dt_desc.description = "Max interval (current time - new detection time) in milliseconds, older detections are discarded";
   auto camera_list_desc = rcl_interfaces::msg::ParameterDescriptor{};
@@ -69,6 +71,7 @@ BBTracker::BBTracker()
   this->declare_parameter("points_per_track", 100, points_track_desc);
   // Detection
   this->declare_parameter("left_handed_system", false, left_handed_system_desc);
+  this->declare_parameter("exclude_border_objects", false, exclude_border_objects_desc);
   this->declare_parameter("max_dt_past", 2000, max_dt_desc);
   this->declare_parameter("camera_list", camera_info_topics, camera_list_desc);
   this->declare_parameter("image_list", image_topics, image_list_desc);
@@ -327,7 +330,8 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
   #endif
 }
 
-void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects) {
+void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects, int w_img, int h_img) {
+    bool exclude_border_objects = get_parameter("exclude_border_objects").as_bool();
     auto detections = detections_message->detections;
     objects.reserve(detections.size());
     for(auto detection : detections){
@@ -342,6 +346,8 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
         static_cast<float>(detection.bbox.center.x+detection.bbox.size_x/2),
         static_cast<float>(detection.bbox.center.y+detection.bbox.size_y/2),
          };
+      if (exclude_border_objects && (obj.tlbr[0]<=5 or obj.tlbr[1]<=5 or obj.tlbr[2] >= w_img-5 or obj.tlbr[3]>= h_img-5))
+        continue;
       obj.label = BYTETracker::class_to_label[detection.results[0].id];
       obj.prob = detection.results[0].score;
       obj.time_ms = detection.header.stamp.sec*1000 + detection.header.stamp.nanosec/1e+6;
@@ -390,7 +396,7 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
     std::cout.flush();
   #endif
 
-  if (_num_updates % 50 == 0)
+  if (_num_updates % 100 == 0)
   {
       RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, static_cast<int>(_num_updates * MICRO_IN_SECOND / _total_ms), static_cast<int>(MICRO_IN_SECOND / duration));
   }
@@ -411,7 +417,7 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
 
   vector<Object2D> objects2D;
   // Put detection2d array inside the object structure
-  decode_detections(detection_msg, objects2D);
+  decode_detections(detection_msg, objects2D, camera_info->width, camera_info->height);
   vector<STrack*> output_stracks = update_tracker(objects2D, camera_info);
   publish_stracks(output_stracks);
 
@@ -426,7 +432,7 @@ void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstS
    std::cout.flush();
   #endif
 
-  if (_num_updates % 50 == 0)
+  if (_num_updates % 100 == 0)
   {
       RCLCPP_INFO(this->get_logger(), "Update number %d, (Average %d fps | Current %d fps)", _num_updates, static_cast<int>(_num_updates * MICRO_IN_SECOND / _total_ms), static_cast<int>(MICRO_IN_SECOND / duration));
   }

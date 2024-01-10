@@ -55,7 +55,7 @@ class BBTracker : public rclcpp::Node
   private:
     rcl_interfaces::msg::SetParametersResult parametersCallback(const std::vector<rclcpp::Parameter> &parameters);
     void decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message, vector<Object3D>& objects);
-    void decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects);
+    void decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects, int w_img, int h_img);
     void add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message);
     void add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info);
     void add_detection2D_image( int id, const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detections, 
