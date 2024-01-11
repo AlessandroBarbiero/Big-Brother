@@ -33,7 +33,7 @@ BBBenchmark::BBBenchmark()
   _cameras = {"cam1"};
   _cameras_max_dist = {0};
 
-  _lidars = {"lid1"};
+  _lidars = {"no_lidar"}; // Do not change this default name
   _lidars_max_dist = {0};
 
   this->declare_parameter("fps", 30, fps_desc);
@@ -210,7 +210,6 @@ void BBBenchmark::save_gt_bbox(std::shared_ptr<visualization_msgs::msg::MarkerAr
     _moving_objects_bbox.push_back(obj);
   }
 
-  // RCLCPP_INFO_STREAM(this->get_logger(), "Moving Objects saved! " << _moving_objects_bbox.size() << " Objects");
 }
 
 int binarySearch_id(vector<bb_bench::Object3D> &objects, int id) {
@@ -406,18 +405,6 @@ void BBBenchmark::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArra
   );
   tf2::Transform transform(q, p);
 
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox BEFORE transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
-
   for(auto& detect : old_message->detections){
 
     tf2::Vector3 v(detect.bbox.center.position.x, detect.bbox.center.position.y, detect.bbox.center.position.z);
@@ -441,18 +428,6 @@ void BBBenchmark::change_frame(std::shared_ptr<vision_msgs::msg::Detection3DArra
     detect.bbox.size.y = s.y();
     detect.bbox.size.z = s.z();
   }
-
-  // for(auto& detect : old_message->detections){
-  //   auto bbox = detect.bbox;
-  //   std::cout << "bbox AFTER transform values: " 
-  //               << " x=" << bbox.center.position.x
-  //               << " y=" << bbox.center.position.y
-  //               << " z=" << bbox.center.position.z
-  //               << " w=" << bbox.size.x
-  //               << " d=" << bbox.size.y
-  //               << " h=" << bbox.size.z
-  //               << std::endl;
-  // }
 
   old_message->header.frame_id = new_frame;
   return;
@@ -531,8 +506,6 @@ void BBBenchmark::linear_assignment(vector<vector<float> > &cost_matrix, int cos
 	}
 
 	vector<int> rowsol; vector<int> colsol;
-	//unused variable
-	//float c = lapjv(cost_matrix, rowsol, colsol, true, thresh);
 	lapjv(cost_matrix, rowsol, colsol, true, thresh);
 	for (unsigned int i = 0; i < rowsol.size(); i++)
 	{
@@ -916,15 +889,6 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
 
   MOTA = 1.0 - static_cast<double>(_tot_missed + _tot_false_positive + _tot_ass_mismatch)/_tot_objects_to_detect;
 
-  // RCLCPP_INFO_STREAM(this->get_logger(), "Stats: \n" << 
-  //                                         "\tDetA: " << detA*100 << "%\n" << 
-  //                                         "\tLocA: " << locA*100 << "%\n" <<
-  //                                         "\tMOTP: " << MOTP << "\n" <<
-  //                                         "\tTotal DetA: " << tot_detA*100 << "%\n" << 
-  //                                         "\tTotal LocA: " << tot_locA*100 << "%\n" <<
-  //                                         "\tTotal MOTP: " << tot_MOTP
-  //                                         );
-
   bb_interfaces::msg::Stats stats_message;
   stats_message.det_a =                 detA;
   stats_message.loc_a =                 locA;
@@ -975,7 +939,6 @@ bool customCompare(const bb_bench::Object3D& obj1, const bb_bench::Object3D& obj
   if (obj1.bbox.center.position.x != obj2.bbox.center.position.x) return obj1.bbox.center.position.x < obj2.bbox.center.position.x;
   if (obj1.bbox.center.position.y != obj2.bbox.center.position.y) return obj1.bbox.center.position.y < obj2.bbox.center.position.y;
   return obj1.bbox.center.position.z < obj2.bbox.center.position.z;
-
 }
 
 int binarySearch_nearX(vector<bb_bench::Object3D>& objects, double x_value) {
@@ -1098,7 +1061,7 @@ vector<bb_bench::Object3D> BBBenchmark::filter_camera(vector<bb_bench::Object3D>
 
         // Check if point inside image
         if(v.z()<0 || v.z()>_cameras_max_dist[id])   // Object behind the camera or further then max dist
-          break;
+          continue;
         cv::Point3d point3d(v.x(), v.y(), v.z());
         cv::Point2d point = _camera_models[id].project3dToPixel(point3d);
 
@@ -1118,6 +1081,10 @@ vector<bb_bench::Object3D> BBBenchmark::filter_camera(vector<bb_bench::Object3D>
 
 vector<bb_bench::Object3D> BBBenchmark::filter_lidar(vector<bb_bench::Object3D>& objects){
   vector<bb_bench::Object3D> on_lidar;
+
+  if(_lidars[0] == "no_lidar")
+    return on_lidar;
+
   if(!_lidar_ready){
     init_lidar_tf();
   }
@@ -1129,11 +1096,6 @@ vector<bb_bench::Object3D> BBBenchmark::filter_lidar(vector<bb_bench::Object3D>&
     for(unsigned long int id=0; id<_lidars.size(); id++){
       // Move the point in the tf of the lidar
       tf2::Vector3 v = _tf2_transform_lidar[id] * v_origin;
-      // std::cout << "vector: " 
-      //           << v.x() << " , "
-      //           << v.y() << " , "
-      //           << v.z()
-      //           << " length: " << v.length() << std::endl;
       // Check if point inside lidar_range
       if(v.length()<_lidars_max_dist[id]){
         on_lidar.push_back(objects[j]);
