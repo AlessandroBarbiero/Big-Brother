@@ -2,8 +2,8 @@
 
 #include "dataType.h"
 #include <bb_tracker/ellipsoid_ellipse.hpp>
-//TODO: add when finished to speed up
-// #define DEIGEN_NO_DEBUG
+// Add to speed up avoiding assert and other debug
+#define DEIGEN_NO_DEBUG
 
 namespace byte_kalman
 {

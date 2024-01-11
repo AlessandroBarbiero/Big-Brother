@@ -1,6 +1,5 @@
 #include <bb_tracker/bb_tracker.hpp>
 
-// #define DEBUG
 #define NO_PROGRESS // Avoid printing the fps and number of tracks
 #define OBJECT_BUFFER_SIZE 500
 
@@ -167,11 +166,6 @@ BBTracker::BBTracker()
       id++;
     }
 
-    // This is the single TimeSync
-    // _camera_image.subscribe(this, "bytetrack/camera_image");
-    // _sync_det_camera = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo, sensor_msgs::msg::Image>>(
-    // _detection2d, _camera_info, _camera_image, 100);
-    // _sync_det_camera->registerCallback(std::bind(&BBTracker::add_detection2D_image, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));       
   }
   else{
     int id = 0;
@@ -203,11 +197,7 @@ BBTracker::BBTracker()
 
       id++;
     }
-
-    // This is for the single TimeSync
-    // _sync_det2d = std::make_shared<message_filters::TimeSynchronizer<vision_msgs::msg::Detection2DArray, sensor_msgs::msg::CameraInfo>>(
-    // _detection2d, _camera_info, 100);
-    // _sync_det2d->registerCallback(std::bind(&BBTracker::add_detection2D, this, std::placeholders::_1, std::placeholders::_2));       
+ 
   }
 
   _det_publisher = this->create_publisher<vision_msgs::msg::Detection3DArray>("bytetrack/active_tracks", 10);
@@ -325,9 +315,6 @@ void BBTracker::decode_detections(std::shared_ptr<vision_msgs::msg::Detection3DA
 
     objects.push_back(obj);
   }
-  #ifdef DEBUG
-    std::cout << "Number of objects 3D: " << objects.size() << std::endl;
-  #endif
 }
 
 void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::Detection2DArray> detections_message, vector<Object2D>& objects, int w_img, int h_img) {
@@ -338,7 +325,7 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
       // Decode
       Object2D obj;
       // if(detection.bbox.center.theta != 0){
-      //   //TODO: think about handling tilted bbox
+      //   Handle tilted bbox
       // }
       obj.tlbr = {
         static_cast<float>(detection.bbox.center.x-detection.bbox.size_x/2),
@@ -354,19 +341,12 @@ void BBTracker::decode_detections(const std::shared_ptr<const vision_msgs::msg::
 
       objects.push_back(obj);
     }
-    #ifdef DEBUG
-      std::cout << "Number of objects 2D: " << objects.size() << std::endl;
-    #endif
 }
 
 // %%%%%%%%%% Callbacks
 
 void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArray> detections_message)
 {
-  #ifdef DEBUG
-    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detections_message->header.frame_id.c_str());
-  #endif
-
   if (detections_message->detections.empty())
     return;
 
@@ -404,10 +384,6 @@ void BBTracker::add_detection3D(std::shared_ptr<vision_msgs::msg::Detection3DArr
 
 void BBTracker::add_detection2D(const vision_msgs::msg::Detection2DArray::ConstSharedPtr& detection_msg, const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info)
 {
-  #ifdef DEBUG
-    RCLCPP_INFO(this->get_logger(), "I heard from: '%s'", detection_msg->header.frame_id.c_str());
-  #endif
-
   if (detection_msg->detections.empty())
     return;
 
@@ -449,16 +425,6 @@ rcl_interfaces::msg::SetParametersResult BBTracker::parametersCallback(const std
   }
   return result;
 }
-
-// TODO: delete
-// Function that prints the posizion of the mouse on click over image
-// void mouse_callback(int event, int x, int y, int flags, void* userdata)
-// {
-//   if  ( event == EVENT_LBUTTONDOWN )
-//   {
-//     cout << "----> Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
-//   }
-// }
 
 // Add a color legend on the right showing colors and relative label on the image
 void addColorLegend(cv::Mat& image, const std::vector<cv::Scalar>& colors, const std::vector<std::string>& labels) {
@@ -503,13 +469,8 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
     objPtr.push_back(&trackedObj[i]);
   }
   int64_t current_time_ms = detection_msg->header.stamp.sec*MILLIS_IN_SECONDS + detection_msg->header.stamp.nanosec/NANO_IN_MILLIS;
-  //cout << "Predict at time of 2d detection for display on image" << endl;
-  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
-  // TODO: delete Fake points to test the draw
-  // std::vector<STrack> trackedObj;
-  // trackedObj.push_back(real_trackedObj[0]);
-  // trackedObj[0].minwdh = {-30,15,0,2,2,2};
+  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time_ms);
 
   // ---------
 
@@ -565,51 +526,6 @@ void BBTracker::add_detection2D_image(int id, const vision_msgs::msg::Detection2
       RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
   }
 
-  return;
-}
-
-void BBTracker::test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image){
-  cv_bridge::CvImagePtr cv_ptr;
-  std::vector<STrack> trackedObj = this->_tracker.getTrackedObj();
-  std::vector<STrack *> objPtr;
-  for(size_t i=0; i<trackedObj.size(); i++){
-    objPtr.push_back(&trackedObj[i]);
-  }
-  // Predict the position of the objects before drawing them
-  int64_t current_time = camera_info->header.stamp.sec*1000 + camera_info->header.stamp.nanosec/1e+6;
-  //cout << "Test ellipse project prediction" << endl;
-  STrack::multi_predict(objPtr, _tracker.kalman_filter, current_time);
-
-  TRANSFORMATION vMat = getViewMatrix(_fixed_frame, camera_info->header.frame_id);
-
-  // Projection matrix in this way is the same as using the one of image_geometry::PinholeCameraModel 
-  // and is the same as a simple K matrix because it is not adding any rotation and translation respect to the camera frame
-  // P = [K | 0]
-  PROJ_MATRIX P;
-  int p_index = 0;
-  for (int i = 0; i < 3; ++i) {
-      for (int j = 0; j < 4; ++j) {
-          P(i, j) = camera_info->p[p_index];
-          p_index++;
-      }
-  }
-
-  try
-  {
-    cv_ptr = cv_bridge::toCvCopy(image, image->encoding);
-    // Draw ellipses for tracked objects
-    for(auto obj :trackedObj)
-      draw_ellipse(cv_ptr, obj, P, vMat);
-
-    std::string window_name = "Image Window";
-    cv::imshow(window_name, cv_ptr->image);
-    cv::waitKey(1);
-
-  }
-  catch (cv_bridge::Exception& e)
-  {
-      RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
-  }
   return;
 }
 
@@ -905,13 +821,12 @@ visualization_msgs::msg::Marker BBTracker::createPathMarker(STrack* track, std_m
 
 int main(int argc, char * argv[])
 {
-  try{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<BBTracker>());
-    rclcpp::shutdown();
-  }catch (...){
-    getchar();
-  }
+
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<BBTracker>());
+  rclcpp::shutdown();
+
   getchar();
+  
   return 0;
 }

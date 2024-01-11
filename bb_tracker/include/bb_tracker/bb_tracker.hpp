@@ -80,7 +80,6 @@ class BBTracker : public rclcpp::Node
     TRANSFORMATION getViewMatrix(const std::string& from_tf, const std::string& camera_tf);
     void draw_ellipse(cv_bridge::CvImagePtr image_ptr, STrack obj, PROJ_MATRIX& projMat, TRANSFORMATION& vMat);
   
-    void test_ellipse_project(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& camera_info, const sensor_msgs::msg::Image::ConstSharedPtr& image);
   private:
 
     // Set to true to visualize the projection of the objects considered by the tracker and
@@ -90,7 +89,6 @@ class BBTracker : public rclcpp::Node
     tf2_ros::Buffer _tf_buffer;
     tf2_ros::TransformListener _tf_listener;
 
-    // rclcpp::TimerBase::SharedPtr _timer;
     rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr _det_publisher;
     rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr _det_poses_publisher;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _path_publisher;
