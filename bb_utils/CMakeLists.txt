@@ -145,29 +145,8 @@ ament_target_dependencies(bb_benchmark
 # -----------
 
 
-
-# -------------- other nodes
-add_executable(bb_talker src/bb_publisher.cpp)
-ament_target_dependencies(bb_talker
-  rclcpp
-  std_msgs
-  vision_msgs
-  # bb_interfaces
-  )
-add_executable(bb_listener src/bb_subscriber.cpp)
-ament_target_dependencies(bb_listener 
-  rclcpp
-  std_msgs
-  message_filters
-  vision_msgs
-  )
-# ---------------
-
-
 install(TARGETS 
   bb_visualizer
-  bb_talker
-  bb_listener
   rewrite_bag_timestamps
   bb_benchmark
   DESTINATION lib/${PROJECT_NAME})

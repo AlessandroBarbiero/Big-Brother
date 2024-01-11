@@ -11,9 +11,6 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-// #include "bb_interfaces/msg/message.hpp"
-// #include "bb_interfaces/srv/change_message.hpp"
-
 #include "bb_interfaces/msg/stats.hpp"
 #include "bb_interfaces/msg/s_track_array.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
@@ -94,16 +91,6 @@ class BBVisualizer : public rclcpp::Node
   public:
     BBVisualizer();
 
-    // void change_message(const std::shared_ptr<bb_interfaces::srv::ChangeMessage::Request> request,
-    //       std::shared_ptr<bb_interfaces::srv::ChangeMessage::Response>       response) 
-    // {
-    //   strcpy(this->message_, request->message_to_display.c_str());  
-    //   printf(message_);                                   
-    //   RCLCPP_INFO(this->get_logger(), "Incoming request\nmessage_to_display: %s",
-    //                 request->message_to_display);
-    //   spawnWord_ = true;
-    //   spawnTimer_ = 0.0f;
-    // }
     static const ImGuiTableSortSpecs* s_current_sort_specs;
 
   private:
@@ -143,11 +130,6 @@ class BBVisualizer : public rclcpp::Node
     std::string _data_file = "stats.txt";
     bool _saved_data = false;
     char _note_to_add[256];
-
-    // rclcpp::TimerBase::SharedPtr timer_;
-
-    // rclcpp::Publisher<bb_interfaces::msg::Message>::SharedPtr publisher_;
-    // rclcpp::Service<bb_interfaces::srv::ChangeMessage>::SharedPtr srv_;
 
     // %%%%%%%%% Focus
     bool _focus_activated = false;

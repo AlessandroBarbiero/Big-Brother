@@ -17,23 +17,14 @@ find_package(vision_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 set(msg_files
-  "msg/Message.msg"
   "msg/Stats.msg"
   "msg/STrack.msg"
   "msg/STrackArray.msg"
 )
 
-set(srv_files
-  "srv/ChangeMessage.srv"
-  "srv/StopVisualizer.srv"
-)
-
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
-  ${srv_files}
   DEPENDENCIES vision_msgs std_msgs
-
-  # DEPENDENCIES geometry_msgs # Add packages that above messages depend on
 )
 
 # Add this if you are exporting executable nodes in the same package

@@ -28,7 +28,6 @@ BBVisualizer::BBVisualizer()
   imgui_timer_ = this->create_wall_timer(
   std::chrono::seconds(0), std::bind(&BBVisualizer::update_imgui, this));
 
-  // srv_ = this->create_service<bb_interfaces::srv::ChangeMessage>("change_message",  std::bind(&BBVisualizer::change_message, this, _1, _2)); 
   _stats_sub = this->create_subscription<bb_interfaces::msg::Stats>(
   "benchmark/stats", 10, std::bind(&BBVisualizer::update_stats, this, _1));
   _strack_sub = this->create_subscription<bb_interfaces::msg::STrackArray>(
