@@ -3,7 +3,7 @@ bb_benchmark:
       fps: 10
       match_thresh: 0.7
       fixed_frame: map
-      show_range: true
+      show_range: false
       alpha_range: 0.1
       camera_list: [
          "/carla/cross_s/rgb/camera_info",
