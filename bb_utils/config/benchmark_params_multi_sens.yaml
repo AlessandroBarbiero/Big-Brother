@@ -9,13 +9,13 @@ bb_benchmark:
          "/carla/cross_s/rgb/camera_info",
          "/carla/int_road_s/rgb/camera_info",
          "/carla/near_station_s/rgb_w_station/camera_info",
-         "/carla/near_station_s/rgb_w_street/camera_info",
+         #"/carla/near_station_s/rgb_w_street/camera_info",
          "/carla/cross_s/thermal/camera_info",
          "/carla/int_road_s/thermal/camera_info", 
          "/carla/near_station_s/thermal/camera_info"
          ]
       camera_max_distances: [
-         30, 30, 30, 30,
+         30, 30, 30, # 30,
          35, 35, 35
       ]
       lidar_list: [

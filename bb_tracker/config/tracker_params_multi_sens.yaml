@@ -13,7 +13,7 @@ bb_tracker:
          "/carla/cross_s/rgb/camera_info",
          "/carla/int_road_s/rgb/camera_info",
          "/carla/near_station_s/rgb_w_station/camera_info",
-         "/carla/near_station_s/rgb_w_street/camera_info",
+         #"/carla/near_station_s/rgb_w_street/camera_info",
          "/carla/cross_s/thermal/camera_info",
          "/carla/int_road_s/thermal/camera_info", 
          "/carla/near_station_s/thermal/camera_info"
@@ -22,7 +22,7 @@ bb_tracker:
          "/carla/cross_s/rgb/image",
          "/carla/int_road_s/rgb/image",
          "/carla/near_station_s/rgb_w_station/image",
-         "/carla/near_station_s/rgb_w_street/image",
+         #"/carla/near_station_s/rgb_w_street/image",
          "/carla/cross_s/thermal/image",
          "/carla/int_road_s/thermal/image", 
          "/carla/near_station_s/thermal/image"
@@ -31,14 +31,14 @@ bb_tracker:
          "/carla/cross_s/rgb/det2d",
          "/carla/int_road_s/rgb/det2d",
          "/carla/near_station_s/rgb_w_station/det2d",
-         "/carla/near_station_s/rgb_w_street/det2d",
+         #"/carla/near_station_s/rgb_w_street/det2d",
          "/carla/cross_s/thermal/det2d",
          "/carla/int_road_s/thermal/det2d", 
          "/carla/near_station_s/thermal/det2d"
       ]
       detection3d_list: [
          "bytetrack/detections3d",
-         #"second_topic"
+         # "second_topic"
       ]
       # Tracker Time
       time_to_lost: 1000
