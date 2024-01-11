@@ -829,7 +829,15 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     locA = 0;
     MOTP = 1;
   }
-  else{
+  else if (objects_on_sight.empty()){
+    true_positive = 0;
+    missed = 0;
+    false_positive = tracked_objects->detections.size();
+    detA = 0;
+    locA = 0;
+    MOTP = 1;
+  }
+  else {
     // Move all tracked and gt to a common fixed frame
     if(tracked_objects->header.frame_id != _fixed_frame){
       change_frame(tracked_objects, _fixed_frame);
@@ -843,7 +851,7 @@ void BBBenchmark::compute_stats(std::shared_ptr<vision_msgs::msg::Detection3DArr
     vector<vector<int> > matches;
     vector<int> missed_obj, wrong_tracked;
     // Here I am using the same threshold for car and pedestrians, consider using a lower threshold for pedestrians
-    linear_assignment(dists, dists.size(), dists[0].size(), _match_thresh, matches, missed_obj, wrong_tracked);
+    linear_assignment(dists, dists.size(), dists.empty() ? 0 : dists[0].size(), _match_thresh, matches, missed_obj, wrong_tracked);
     true_positive = matches.size();
     false_positive = wrong_tracked.size();
     missed = missed_obj.size();
