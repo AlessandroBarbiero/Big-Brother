@@ -4,7 +4,7 @@ bb_tracker:
       # Visualization
       show_img_projection: false
       show_covariance: false
-      points_per_track: 120
+      points_per_track: 150
       # Detection
       left_handed_system: true
       exclude_border_objects: false
