@@ -30,7 +30,7 @@ BBBenchmark::BBBenchmark()
   auto selection_desc = rcl_interfaces::msg::ParameterDescriptor{};
   selection_desc.description = "Set to true if a gt object is currently being tracked and want to publish the relative data";
 
-  _cameras = {"cam1"};
+  _cameras = {"no_camera"}; // Do not change this default name
   _cameras_max_dist = {0};
 
   _lidars = {"no_lidar"}; // Do not change this default name
@@ -1049,6 +1049,10 @@ void BBBenchmark::show_objects(vector<bb_bench::Object3D> objects, std::string n
 
 vector<bb_bench::Object3D> BBBenchmark::filter_camera(vector<bb_bench::Object3D>& objects){
   vector<bb_bench::Object3D> on_camera;
+
+  if(_cameras[0] == "no_camera")
+    return on_camera;
+
   for(unsigned long int j=0; j<objects.size(); j++){
     tf2::Vector3 v_origin( objects[j].bbox.center.position.x,
                     objects[j].bbox.center.position.y, 
