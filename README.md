@@ -1,10 +1,14 @@
 # Big-Brother
 ROS2 Packages for distributed multi-sensor Object Detection and Tracking in autonomous vehicle scenario.
 
-This repository contains the code for the tracking algorithm developed in the paper 'Heterogeneous Data Fusion for Accurate Road User Tracking:
-A Distributed Multi-Sensor Collaborative Approach'.
+This repository contains the code for the tracking algorithm developed in the paper  
+'Heterogeneous Data Fusion for Accurate Road User Tracking: A Distributed Multi-Sensor Collaborative Approach'.
 
 Everything is implemented within ROS2 Foxy to allow an easier integration in real scenarios offering packages for detection, tracking and testing.
+
+<p align="center">
+<img src="https://github.com/AlessandroBarbiero/Big-Brother/assets/79710064/5b56c790-c217-4819-973b-b7805f534598" alt="Custom map with 3D bounding boxes" width="600" />
+</p>
 
 ## Abstract
 
@@ -107,7 +111,8 @@ source /.../workspace/install/local_setup.zsh
 
 ### Optional
 
-Set the environmental variable BAG_DIR pointing at the directory where you store the bag files. Some of the launch files use this variable to easily locate the bag files to run. There is no need to do this if you are not using the launch files to run the detectors or the tracker on a bag.
+Set the environmental variable `BAG_DIR` pointing at the directory where you store the bag files. Some of the launch files use this variable to easily locate the bag files to run.  
+There is no need to do this if you are not using the launch files to run the detectors or the tracker on a bag.
 
 ```cmd
 export BAG_DIR=/path_to_directory/bag_files/
@@ -116,7 +121,7 @@ export BAG_DIR=/path_to_directory/bag_files/
 ## How to use
 
 ### Track 
-Simply launch the tracker passing the config file and open rviz to visualize the result.
+Simply launch the tracker passing the config file and open RViz to visualize the result.
 ```cmd
 ros2 launch bb_tracker track.launch.py
 ```
@@ -171,17 +176,13 @@ In the following the results obtained in simulation.
 | AssRe | 0.8081 | 0.7226 | 0.8494 |
 | AssPr | 0.9965 | 0.9796 | 0.9919 |
 | AssF1 | 0.8925 | 0.8317 | 0.9152 |
-
-|       | V1     | V2     | V3     |
 |-------|--------|--------|--------|
 | MOTP  | 0.1448 | 0.2160 | 0.2249 |
 | MOTA  |  0.7898| 0.6651 | 0.6374 |
-
-|       | V1     | V2     | V3     |
 |-------|--------|--------|--------|
 | HOTA  | 0.8055 | 0.6617 | 0.5949 |
 
-*Comparison of evaluation metrics for Multi-Object Tracking in different sensor scenarios.*
+*Comparison of evaluation metrics for Multi-Object Tracking in different sensor scenarios. The values refer to tests performed in a simulation environment.*
 
 V1 = Three sensor stations with only lidar (noisy ground truth).  
 V2 = Three sensor stations with lidar, RGB and thermal (semantic segmentation) cameras.  
@@ -190,5 +191,5 @@ V3 = One sensor station with lidar, RGB and thermal (semantic segmentation) came
 
 ## Acknowledgement
 
-Part of the code take inspiration from [ByteTrack](https://github.com/ifzhang/ByteTrack).
+Part of the code takes inspiration from [ByteTrack](https://github.com/ifzhang/ByteTrack).
 Many thanks for their inspiring works.
