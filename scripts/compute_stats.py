@@ -1,3 +1,8 @@
+###############
+# This script is used to compute the performance indices starting from the csv files written during the test of the algorithm
+# The csv files contain sequences of objects tracked or ground truth for each timestamp
+###############
+
 import csv
 import numpy as np
 # from lapjv import lapjv   # lapjv from lapjv can work only on square matrices

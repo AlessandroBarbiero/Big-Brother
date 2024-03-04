@@ -171,15 +171,9 @@ void rewriteBagTimestamps(const std::string& input_bag, const std::string& outpu
       }
     }
 
-    // std::cout << "topic name: \t" << bag_message->topic_name << std::endl;
-    // std::cout << "stamp: \t\t" << bag_message->time_stamp << std::endl;
-    // std::cout << "header stamp: \t" << timestamp << std::endl;
-
     // if the timestamp is before the starting time of the bag -> bring everything to the correct time
     if (timestamp < bag_start_time)
       timestamp = bag_start_time + (timestamp - first_clock);
-
-    // std::cout << "published header stamp: \t" << timestamp << std::endl;
 
     // Update the message timestamp
     bag_message->time_stamp=timestamp;

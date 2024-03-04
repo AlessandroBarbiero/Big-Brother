@@ -65,21 +65,8 @@ def generate_launch_description():
         ]
     )
 
-    # static_tf = Node(
-    #         package='tf2_ros',
-    #         executable='static_transform_publisher',
-    #         arguments = ['0', '0', '0', '-0.5', '0.5', '-0.5', '-0.5', 'sensors_home/static_termic_camera', 'sensors_home/sensors_frame']
-    #     )
-    # static_tf_2 = Node(
-    #     package='tf2_ros',
-    #     executable='static_transform_publisher',
-    #     arguments = ['0', '0', '0', '0', '0', '0', '1', 'sensors_home/static_lidar', 'sensors_home']
-    # )
-
     ld = LaunchDescription()
     ld.add_action(thermal_node)
     ld.add_action(yolo_node)
     ld.add_action(lidar_node)
-    # ld.add_action(static_tf)
-    # ld.add_action(static_tf_2)
     return ld

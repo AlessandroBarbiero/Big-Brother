@@ -467,8 +467,6 @@ class YoloDetector(Node):
             cv2.namedWindow("Detection", cv2.WINDOW_NORMAL)
             cv2.imshow("Detection", cv_image)
             cv2.waitKey(1)
-        # Publish debug image to a topic
-        # self._dbg_pub.publish(self.cv_bridge.cv2_to_imgmsg(cv_image, encoding=data.encoding))
         
 
 def main(args=None):

@@ -32,12 +32,13 @@ Python packages:
 - cv bridge
 
 ### Tracker
-
+Dependencies
+- [Eigen3](https://eigen.tuxfamily.org/)
 
 ### Visualizer
 Dependencies:
 - [imgui](https://github.com/ocornut/imgui)
-- [imgui-f](https://github.com/AlessandroBarbiero/ImGui-f) (A framework made by me to start easily an imgui based GUI)
+- [imgui-f](https://github.com/AlessandroBarbiero/ImGui-f) (A framework to easily start an imgui based GUI)
 - [implot](https://github.com/epezent/implot)
 - [glfw](https://github.com/glfw/glfw)
 
@@ -52,6 +53,12 @@ To add a different storage option with a better compression:
 ```cmd
 sudo apt install ros-foxy-rosbag2-storage-mcap
 ```
+
+### Scripts
+Python packages:
+- sympy
+- numpy
+- lap
 
 ## Before run
 

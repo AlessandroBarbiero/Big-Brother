@@ -39,6 +39,7 @@ qtcreator-*
 .vscode/
 
 # Folders of external projects
-# vista/
-# det3d/
 ros2_tao_pointpillars/
+
+# Virtual environment
+venv/

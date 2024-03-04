@@ -2,8 +2,8 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>bb_utils</name>
-  <version>0.0.0</version>
-  <description>Framework for distributed object detection and tracking</description>
+  <version>1.0.0</version>
+  <description>Evaluation and test of the framework for distributed object detection and tracking 'Big Brother'</description>
   <maintainer email="alessandro.barbiero@mail.polimi.it">Alessandro Barbiero</maintainer>
   <license>Apache License 2.0</license>
 

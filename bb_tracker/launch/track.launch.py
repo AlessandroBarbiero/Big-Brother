@@ -21,9 +21,6 @@ def generate_launch_description():
     tracker_node = Node(
         package="bb_tracker",
         executable="bb_tracker",
-        remappings=[
-            # ("/bytetrack/camera_info", "/carla/sensors_home/static_termic_camera/camera_info")
-        ],
         parameters=[config],
         output='screen',
         #prefix=["xterm -font 10x20 -g 100x25 -e gdb -ex run --args"]          # add gdb

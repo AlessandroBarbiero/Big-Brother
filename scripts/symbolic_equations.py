@@ -1,6 +1,8 @@
 from sympy import *
 import traceback 
 
+# Attempt to simplify the jacobian of the ellipse state, the code runs for two days without stopping
+
 def matrix_to_ccode(matrix, name):
     result = "\\\\{} is initialized as a RowMajor matrix\n{} <<\n".format(name,name)
     for i in matrix:
@@ -29,19 +31,6 @@ if __name__ == '__main__':
         d = d_ratio*h
 
         # VIEW MATRIX
-        # vr00 = Symbol('Vr_00')
-        # vr01 = Symbol('Vr_01')
-        # vr02 = Symbol('Vr_02')
-        # vr10 = Symbol('Vr_10')
-        # vr11 = Symbol('Vr_11')
-        # vr12 = Symbol('Vr_12')
-        # vr20 = Symbol('Vr_20')
-        # vr21 = Symbol('Vr_21')
-        # vr22 = Symbol('Vr_22')
-        # VR = Matrix([[vr00, vr01, vr02],[vr10, vr11, vr12],[vr20, vr21, vr22]])
-        # vtx = Symbol('Vtx')
-        # vty = Symbol('Vty')
-        # vtz = Symbol('Vtz')
         vr00 = Symbol('vr00')
         vr01 = Symbol('vr01')
         vr02 = Symbol('vr02')

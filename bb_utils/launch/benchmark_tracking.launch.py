@@ -23,10 +23,6 @@ def generate_launch_description():
     benchmark_node = Node(
         package="bb_utils",
         executable="bb_benchmark",
-        # remappings=[
-        #     ("/bytetrack/detections", "/something"),
-        #     ("/bytetrack/active_tracks", "/something")
-        # ],
         parameters=[config],
         output='screen',
         prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font
