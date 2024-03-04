@@ -1,7 +1,5 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess
-from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
@@ -25,10 +23,6 @@ def generate_launch_description():
     benchmark_node = Node(
         package="bb_utils",
         executable="bb_benchmark",
-        # remappings=[
-        #     ("/bytetrack/detections", "/something"),
-        #     ("/bytetrack/active_tracks", "/something")
-        # ],
         parameters=[config],
         output='screen'
         # prefix=["xterm -font 10x20 -e"] # open in a new terminal with big font

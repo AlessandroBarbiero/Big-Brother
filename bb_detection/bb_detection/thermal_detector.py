@@ -9,6 +9,7 @@ from tf2_ros import TransformException
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
 from rclpy.impl.implementation_singleton import rclpy_implementation as _rclpy
+from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 # ROS messages
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
@@ -17,7 +18,6 @@ from vision_msgs.msg import ObjectHypothesisWithPose
 from vision_msgs.msg import Detection3DArray, Detection2DArray
 from geometry_msgs.msg import TransformStamped
 # Other
-from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import numpy as np
 from copy import deepcopy

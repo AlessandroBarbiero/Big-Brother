@@ -9,6 +9,7 @@ from image_geometry import PinholeCameraModel
 from tf2_ros import TransformException
 from tf2_ros.transform_listener import TransformListener
 from tf2_ros.buffer import Buffer
+from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 # ROS messages
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import CameraInfo
@@ -20,7 +21,6 @@ from vision_msgs.msg import Detection2DArray
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import Quaternion
 # Other
-from cv_bridge import CvBridge # Package to convert between ROS and OpenCV Images
 import cv2 # OpenCV library
 import random
 from ultralytics import YOLO
