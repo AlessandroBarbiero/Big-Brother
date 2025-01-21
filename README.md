@@ -2,7 +2,7 @@
 ROS2 Packages for distributed multi-sensor Object Detection and Tracking in autonomous vehicle scenario.
 
 This repository contains the code for the tracking algorithm developed in the paper  
-'Heterogeneous Data Fusion for Accurate Road User Tracking: A Distributed Multi-Sensor Collaborative Approach'.
+['Heterogeneous Data Fusion for Accurate Road User Tracking: A Distributed Multi-Sensor Collaborative Approach'](https://ieeexplore.ieee.org/document/10588597).
 
 Everything is implemented within ROS2 Foxy to allow an easier integration in real scenarios offering packages for detection, tracking and testing.
 
